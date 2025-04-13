@@ -1,0 +1,115 @@
+import pygame
+import sys
+import os
+import time
+from config import font, big_font, WHITE, BLACK, WIDTH, HEIGHT
+
+import math
+
+
+
+# 文件路径
+SCORE_FILE = "high_scores.txt"
+
+def resource_path(relative_path):
+    """获取打包后的资源路径"""
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
+
+def draw_timer(screen, start_time):
+    elapsed = int(time.time() - start_time)
+    timer_text = font.render(f"Survival Time: {elapsed}s", True, WHITE)
+    screen.blit(timer_text, (10, 10))
+    return elapsed
+
+
+def game_over_screen(screen, survival_time):
+    screen.fill(BLACK)
+    over = big_font.render("Game Over!", True, WHITE)
+    time_text = font.render(f"You survived for {survival_time} seconds", True, WHITE)
+
+    screen.blit(over, (WIDTH // 2 - over.get_width() // 2, HEIGHT // 2 - 100))
+    screen.blit(time_text, (WIDTH // 2 - time_text.get_width() // 2, HEIGHT // 2))
+    pygame.display.flip()
+
+
+def update_high_scores(score):
+    """更新排行榜"""
+    try:
+        with open("high_scores.txt", "a") as f:
+            f.write(f"{score}\n")
+    except Exception as e:
+        print(f"Error updating high scores: {e}")
+
+    # 读取排行榜并按分数排序
+    try:
+        with open("high_scores.txt", "r") as f:
+            scores = [int(line.strip()) for line in f.readlines()]
+            scores.sort(reverse=True)  # 降序排列
+
+        # 仅保留前10名
+        top_scores = scores[:10]
+        print("High Scores:", top_scores)  # 调试信息
+    except Exception as e:
+        print(f"Error reading high scores: {e}")
+
+
+def display_high_scores(screen):
+    """Display the top 10 high scores at the beginning of the game"""
+    screen.fill(BLACK)
+
+    # Display the title (Centered at the top)
+    title = big_font.render("High Scores", True, WHITE)
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 50))
+
+    # Display game instructions (in English)
+    desc_lines = [
+        "Survive in Mafuyu's Sekai!",
+        "1. Use arrow keys to move",
+        "2. Space to shoot",
+        "3. Shooting power increases with more enemies on screen",
+        "4. Enemies may drop life recovery items, become stronger over time."
+    ]
+
+    # Adjust vertical spacing between each line
+    line_start_y = 120  # Starting Y position for the first description line
+    line_spacing = 35  # Distance between each line
+
+    for idx, line in enumerate(desc_lines):
+        line_surface = font.render(line, True, (255, 215, 0))  # Gold-colored text
+        screen.blit(line_surface, (WIDTH // 2 - line_surface.get_width() // 2, line_start_y + idx * line_spacing))
+
+    # Adjust the starting position for the high scores list
+    scores_start_y = line_start_y + len(desc_lines) * line_spacing + 60  # Increased space after instructions
+
+    # Display high scores
+    try:
+        with open(SCORE_FILE, "r") as f:
+            scores = [int(line.strip()) for line in f.readlines()]
+            scores.sort(reverse=True)
+    except Exception as e:
+        print(f"Error reading high scores: {e}")
+        scores = []
+
+    # Adding extra vertical space between the instructions and the scores
+    for i, score in enumerate(scores[:10]):
+        score_text = font.render(f"{i + 1}. {score}", True, WHITE)
+        screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, scores_start_y + i * line_spacing))
+
+    # Display prompt to start the game
+    tip = font.render("Press any key to start", True, WHITE)
+    screen.blit(tip, (WIDTH // 2 - tip.get_width() // 2, HEIGHT - 80))
+
+    pygame.display.flip()
+
+    # Wait for any key press to start the game
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                waiting = False
