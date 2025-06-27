@@ -10,17 +10,19 @@ from utils import resource_path
 class Enemy:
     def __init__(self, width, height, enemy_type='basic', difficulty_level=1):
         self.enemy_type = enemy_type
+        self.map_width = width
+        self.map_height = height
 
         # 生成初始位置（四边随机）
         edge = random.choice(['top', 'bottom', 'left', 'right'])
         if edge == 'top':
-            self.x, self.y = random.randint(0, width), 0
+            self.x, self.y = random.randint(0, self.map_width), 0
         elif edge == 'bottom':
-            self.x, self.y = random.randint(0, width), height
+            self.x, self.y = random.randint(0, self.map_width), self.map_height
         elif edge == 'left':
-            self.x, self.y = 0, random.randint(0, height)
+            self.x, self.y = 0, random.randint(0, self.map_height)
         else:
-            self.x, self.y = width, random.randint(0, height)
+            self.x, self.y = self.map_width, random.randint(0, self.map_height)
 
         # 难度调整倍率（每级提升10%速度，20%血量）
         speed_multiplier = 1 + 0.5 * (difficulty_level - 1)
@@ -83,7 +85,7 @@ class Enemy:
             self.apply_color_filter((0, 255, 0))  # 绿
 
         # 随机巡逻路径点（增强巡逻行为）
-        self.patrol_points = [(random.randint(0, width), random.randint(0, height)) for _ in range(3)]
+        self.patrol_points = [(random.randint(0, self.map_width), random.randint(0, self.map_height)) for _ in range(3)]
         self.current_patrol_point = 0
 
     def apply_color_filter(self, color):
@@ -194,10 +196,10 @@ class Enemy:
         # 更新rect的位置
         self.rect.center = (self.x, self.y)
 
-        # 敌人遇到屏幕边界时随机改变运动方向
-        if self.x <= 0 or self.x >= pygame.display.get_surface().get_width():
+        # 敌人遇到地图边界时随机改变运动方向
+        if self.x <= 0 or self.x >= self.map_width:
             self.vx *= -1  # 水平方向反转
-        if self.y <= 0 or self.y >= pygame.display.get_surface().get_height():
+        if self.y <= 0 or self.y >= self.map_height:
             self.vy *= -1  # 垂直方向反转
 
     def draw(self, screen, camera):

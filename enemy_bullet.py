@@ -1,6 +1,6 @@
 import pygame
 import math
-from config import WIDTH, HEIGHT, BULLET_RADIUS, BULLET_SPEED
+from config import WIDTH, HEIGHT, BULLET_RADIUS, BULLET_SPEED, MAP_WIDTH, MAP_HEIGHT
 from utils import resource_path
 
 class EnemyBullet:
@@ -32,7 +32,7 @@ class EnemyBullet:
 
     def off_screen(self):
         margin = 20
-        return self.x < -margin or self.x > WIDTH + margin or self.y < -margin or self.y > HEIGHT + margin
+        return self.x < -margin or self.x > MAP_WIDTH + margin or self.y < -margin or self.y > MAP_HEIGHT + margin
 
     def hits(self, player):
         dx = self.x - player.x

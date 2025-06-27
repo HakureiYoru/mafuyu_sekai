@@ -3,7 +3,7 @@ import sys
 import time
 import random
 import math
-from config import WIDTH, HEIGHT, FPS, SPAWN_INTERVAL, PLAYER_RADIUS
+from config import WIDTH, HEIGHT, FPS, SPAWN_INTERVAL, PLAYER_RADIUS, MAP_WIDTH, MAP_HEIGHT
 from difficulty import DifficultyManager
 
 from player import Player
@@ -17,26 +17,21 @@ from bomb_pickup import BombPickUp
 from camera import Camera
 from utils import resource_path
 
-
-MAP_WIDTH = 8000
-MAP_HEIGHT = 8000
-
-
 def spawn_enemy_wave(enemies, difficulty_level):
     """Spawn a mix of enemies based on current difficulty."""
-    enemies.append(Enemy(WIDTH, HEIGHT, enemy_type='basic', difficulty_level=difficulty_level))
+    enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='basic', difficulty_level=difficulty_level))
     if random.random() < min(0.1 + 0.03 * difficulty_level, 0.4):
-        enemies.append(Enemy(WIDTH, HEIGHT, enemy_type='large', difficulty_level=difficulty_level))
+        enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='large', difficulty_level=difficulty_level))
     if random.random() < min(0.35 + 0.04 * difficulty_level, 0.7):
-        enemies.append(Enemy(WIDTH, HEIGHT, enemy_type='fast', difficulty_level=difficulty_level))
+        enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='fast', difficulty_level=difficulty_level))
     if random.random() < min(0.25 + 0.05 * difficulty_level, 0.7):
-        enemies.append(Enemy(WIDTH, HEIGHT, enemy_type='shooter', difficulty_level=difficulty_level))
+        enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='shooter', difficulty_level=difficulty_level))
     if random.random() < min(0.5 + 0.1 * difficulty_level, 0.9):
-        enemies.append(Enemy(WIDTH, HEIGHT, enemy_type='basic', difficulty_level=difficulty_level))
+        enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='basic', difficulty_level=difficulty_level))
 
 
 def reset_game():
-    player = Player(WIDTH // 2, HEIGHT // 2)  # 玩家初始位置
+    player = Player(MAP_WIDTH // 2, MAP_HEIGHT // 2)  # 玩家初始位置
     explosions = []
     enemies = []
     bullets = []
@@ -75,7 +70,8 @@ def main():
     clock = pygame.time.Clock()
 
     bg_image = pygame.image.load(resource_path("img/bg.png")).convert()
-    bg_image = pygame.transform.scale(bg_image, (WIDTH, HEIGHT))
+    bg_image = pygame.transform.scale(bg_image, (MAP_WIDTH, MAP_HEIGHT))
+    bg_rect = bg_image.get_rect()
 
     player, explosions, enemies, bullets, enemy_bullets, pickups, start_time, spawn_event, score, diff_manager = reset_game()
 
@@ -83,7 +79,7 @@ def main():
     game_over = False  # Game Over 状态变量
     while running:
         clock.tick(FPS)
-        screen.blit(bg_image, (0, 0))
+        screen.blit(bg_image, camera.apply(bg_rect))
 
         elapsed_time = time.time() - start_time
         if diff_manager.update(elapsed_time):
