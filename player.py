@@ -15,6 +15,7 @@ class Player:
         self.hp = self.max_hp
         self.cooldown_time = 0.2  # 射击冷却时间
         self.last_shot_time = 0
+        self.bomb_count = 0
 
         self.invincible = False
         self.invincible_start_time = 0
@@ -107,3 +108,7 @@ class Player:
         # 防止血量超过最大值
         hp_progress = max(0, min(self.hp / 3, 1))  # 确保hp_progress在0到1之间
         pygame.draw.rect(screen, (255, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width * hp_progress, hp_bar_height))
+
+    def draw_bomb_count(self, screen):
+        bomb_text = pygame.font.SysFont(None, 30).render(f"Bombs: {self.bomb_count}", True, (255, 255, 255))
+        screen.blit(bomb_text, (10, 70))

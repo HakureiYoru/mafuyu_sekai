@@ -2,7 +2,9 @@ import pygame
 import random
 import math
 import os
+import time
 from config import ENEMY_RADIUS, ENEMY_ACCELERATION, ENEMY_MAX_SPEED, ENEMY_HP, RED, BLACK
+from enemy_bullet import EnemyBullet
 from utils import resource_path
 
 class Enemy:
@@ -33,6 +35,8 @@ class Enemy:
             self.hp = self.max_hp  # 初始化当前血量为最大血量
             self.score = 5
             self.behavior_mode = 'patrol'  # large类只能有巡逻模式
+            self.shoot_cooldown = None
+            self.last_shot_time = 0
         elif self.enemy_type == 'fast':
             self.radius = ENEMY_RADIUS / 2 * radius_multiplier
             self.max_speed = ENEMY_MAX_SPEED * 4 * speed_multiplier
@@ -40,6 +44,17 @@ class Enemy:
             self.hp = self.max_hp  # 初始化当前血量为最大血量
             self.score = 2
             self.behavior_mode = 'chase'  # fast类只能有追击模式
+            self.shoot_cooldown = None
+            self.last_shot_time = 0
+        elif self.enemy_type == 'shooter':
+            self.radius = ENEMY_RADIUS * 1.2 * radius_multiplier
+            self.max_speed = ENEMY_MAX_SPEED * 0.8 * speed_multiplier
+            self.max_hp = ENEMY_HP * 1.2 * hp_multiplier
+            self.hp = self.max_hp
+            self.score = 3
+            self.behavior_mode = 'aggressive'
+            self.shoot_cooldown = 1.5
+            self.last_shot_time = 0
         else:  # basic
             self.radius = ENEMY_RADIUS * radius_multiplier
             self.max_speed = ENEMY_MAX_SPEED * speed_multiplier
@@ -47,6 +62,8 @@ class Enemy:
             self.hp = self.max_hp  # 初始化当前血量为最大血量
             self.score = 1
             self.behavior_mode = random.choice(['aggressive', 'evade', 'random'])  # 普通类可以有任意攻击模式
+            self.shoot_cooldown = None
+            self.last_shot_time = 0
 
         # 初始化速度
         self.vx = self.vy = 0
@@ -192,3 +209,10 @@ class Enemy:
 
     def collides_with(self, player):
         return math.hypot(self.x - player.x, self.y - player.y) < (self.radius + player.radius)
+
+    def can_shoot(self):
+        return self.shoot_cooldown is not None and time.time() - self.last_shot_time >= self.shoot_cooldown
+
+    def shoot(self, player):
+        self.last_shot_time = time.time()
+        return EnemyBullet(self.x, self.y, player)

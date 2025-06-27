@@ -7,14 +7,18 @@ class Explosion:
         self.x = x
         self.y = y
         self.radius = 1
-        self.max_radius = 30  # 最大半径
-        self.lifetime = 10  # 帧数寿命
+        if explosion_type == "big":
+            self.max_radius = 80
+            self.lifetime = 15
+        else:
+            self.max_radius = 30  # 最大半径
+            self.lifetime = 10  # 帧数寿命
         self.particles = []  # 存储爆炸粒子
         self.explosion_type = explosion_type  # 存储爆炸类型
 
     def update(self):
         # 增加半径和减少生命周期
-        self.radius += 3
+        self.radius = min(self.radius + 3, self.max_radius)
         self.lifetime -= 1
 
         # 生成粒子效果
