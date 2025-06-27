@@ -28,6 +28,10 @@ def spawn_enemy_wave(enemies, difficulty_level):
         enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='shooter', difficulty_level=difficulty_level))
     if random.random() < min(0.5 + 0.1 * difficulty_level, 0.9):
         enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='basic', difficulty_level=difficulty_level))
+    # Spawn rare boss if none exists
+    if not any(e.enemy_type == 'boss' for e in enemies):
+        if random.random() < 0.02:
+            enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='boss', difficulty_level=difficulty_level))
 
 
 def reset_game():
@@ -106,8 +110,9 @@ def main():
                 elif event.key == pygame.K_b and player.bomb_count > 0:
                     explosions.append(Explosion(player.x, player.y, explosion_type="big"))
                     for enemy in enemies[:]:
-                        if math.hypot(enemy.x - player.x, enemy.y - player.y) < 200:
-                            explosions.append(Explosion(enemy.x, enemy.y, explosion_type="enemy"))
+                        enemy.hp -= 2
+                        explosions.append(Explosion(enemy.x, enemy.y, explosion_type="enemy"))
+                        if enemy.hp <= 0:
                             score += enemy.score
                             enemies.remove(enemy)
                     player.bomb_count -= 1
@@ -141,8 +146,8 @@ def main():
             for enemy in enemies[:]:
                 enemy.move_towards(player)
                 enemy.draw(screen, camera)
-                if enemy.enemy_type == 'shooter' and enemy.can_shoot():
-                    enemy_bullets.append(enemy.shoot(player))
+                if enemy.can_shoot():
+                    enemy_bullets.extend(enemy.shoot(player))
 
                 if enemy.collides_with(player):
                     if player.is_invincible():

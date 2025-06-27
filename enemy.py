@@ -57,6 +57,20 @@ class Enemy:
             self.behavior_mode = 'aggressive'
             self.shoot_cooldown = 1.5
             self.last_shot_time = 0
+        elif self.enemy_type == 'boss':
+            self.radius = ENEMY_RADIUS * 5 * radius_multiplier
+            self.max_speed = ENEMY_MAX_SPEED * 0.6 * speed_multiplier
+            self.max_hp = ENEMY_HP * 10 * hp_multiplier
+            self.hp = self.max_hp
+            self.score = 50
+            self.behavior_mode = 'aggressive'
+            self.shoot_cooldown = 1
+            self.last_shot_time = 0
+            # pattern_phase controls angle offsets for rotating patterns
+            self.pattern_phase = 0
+            # attack_pattern cycles through different bullet patterns
+            self.attack_pattern = 0
+            self.burst_count = 0
         else:  # basic
             self.radius = ENEMY_RADIUS * radius_multiplier
             self.max_speed = ENEMY_MAX_SPEED * speed_multiplier
@@ -83,6 +97,8 @@ class Enemy:
             self.apply_color_filter((255, 0, 0))  # 红
         elif self.enemy_type == 'fast':
             self.apply_color_filter((0, 255, 0))  # 绿
+        elif self.enemy_type == 'boss':
+            self.apply_color_filter((128, 0, 128))  # 紫
 
         # 随机巡逻路径点（增强巡逻行为）
         self.patrol_points = [(random.randint(0, self.map_width), random.randint(0, self.map_height)) for _ in range(3)]
@@ -220,4 +236,31 @@ class Enemy:
 
     def shoot(self, player):
         self.last_shot_time = time.time()
-        return EnemyBullet(self.x, self.y, player)
+        bullets = []
+        if self.enemy_type == 'boss':
+            # Cycle through multiple complex patterns
+            if self.attack_pattern == 0:
+                # Rotating spiral
+                for i in range(0, 360, 20):
+                    angle = math.radians(i + self.pattern_phase)
+                    bullets.append(EnemyBullet(self.x, self.y, angle=angle))
+                self.pattern_phase = (self.pattern_phase + 15) % 360
+                if self.pattern_phase % 90 == 0:
+                    self.attack_pattern = 1
+            elif self.attack_pattern == 1:
+                # Full circular burst
+                for i in range(0, 360, 15):
+                    bullets.append(EnemyBullet(self.x, self.y, angle=math.radians(i)))
+                self.attack_pattern = 2
+            else:
+                # Spread shot aimed at the player, repeated three times
+                direction = math.atan2(player.y - self.y, player.x - self.x)
+                for spread in (-0.3, -0.15, 0, 0.15, 0.3):
+                    bullets.append(EnemyBullet(self.x, self.y, angle=direction + spread))
+                self.burst_count += 1
+                if self.burst_count >= 3:
+                    self.burst_count = 0
+                    self.attack_pattern = 0
+        else:
+            bullets.append(EnemyBullet(self.x, self.y, player))
+        return bullets
