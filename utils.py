@@ -18,9 +18,16 @@ def resource_path(relative_path):
 
 
 
+def format_time(seconds: float) -> str:
+    """Format seconds to MM:SS."""
+    minutes = int(seconds) // 60
+    secs = int(seconds) % 60
+    return f"{minutes:02d}:{secs:02d}"
+
+
 def draw_timer(screen, start_time):
-    elapsed = int(time.time() - start_time)
-    timer_text = font.render(f"Survival Time: {elapsed}s", True, WHITE)
+    elapsed = time.time() - start_time
+    timer_text = font.render(f"Time: {format_time(elapsed)}", True, WHITE)
     screen.blit(timer_text, (10, 10))
     return elapsed
 
@@ -28,7 +35,9 @@ def draw_timer(screen, start_time):
 def game_over_screen(screen, survival_time):
     screen.fill(BLACK)
     over = big_font.render("Game Over!", True, WHITE)
-    time_text = font.render(f"You survived for {survival_time} seconds", True, WHITE)
+    time_text = font.render(
+        f"You survived for {format_time(survival_time)}", True, WHITE
+    )
 
     screen.blit(over, (WIDTH // 2 - over.get_width() // 2, HEIGHT // 2 - 100))
     screen.blit(time_text, (WIDTH // 2 - time_text.get_width() // 2, HEIGHT // 2))
