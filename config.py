@@ -4,6 +4,10 @@ import pygame
 WIDTH, HEIGHT = 1024, 768
 FPS = 60
 
+# World/map size
+MAP_WIDTH = 10000
+MAP_HEIGHT = 10000
+
 # 玩家相关配置
 PLAYER_RADIUS = 40
 PLAYER_SPEED = 5

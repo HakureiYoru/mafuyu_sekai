@@ -1,7 +1,7 @@
 import pygame
 import time
 import math
-from config import PLAYER_RADIUS
+from config import PLAYER_RADIUS, MAP_WIDTH, MAP_HEIGHT
 
 from utils import resource_path  # 从 utils 中引入
 
@@ -45,6 +45,10 @@ class Player:
             self.y -= speed
         if keys[pygame.K_DOWN]:
             self.y += speed
+
+        # Clamp position within the map boundaries
+        self.x = max(0, min(self.x, MAP_WIDTH))
+        self.y = max(0, min(self.y, MAP_HEIGHT))
 
         self.rect.center = (self.x, self.y)
 
