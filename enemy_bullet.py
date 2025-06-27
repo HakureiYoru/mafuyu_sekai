@@ -4,23 +4,34 @@ from config import WIDTH, HEIGHT, BULLET_RADIUS, BULLET_SPEED, MAP_WIDTH, MAP_HE
 from utils import resource_path
 
 class EnemyBullet:
-    def __init__(self, x, y, target):
+    def __init__(self, x, y, target=None, angle=None):
         self.x = x
         self.y = y
         self.radius = BULLET_RADIUS // 2
 
-        original_image = pygame.image.load(resource_path("img/bullet.png")).convert_alpha()
-        original_image = pygame.transform.scale(original_image, (self.radius * 2, self.radius * 2))
+        base_image = pygame.image.load(resource_path("img/bullet.png")).convert_alpha()
+        base_image = pygame.transform.scale(base_image, (self.radius * 2, self.radius * 2))
+        # Tint bullet red
+        base_image.fill((255, 0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-        dx = target.x - self.x
-        dy = target.y - self.y
-        dist = math.hypot(dx, dy) or 1
-        self.vx = BULLET_SPEED * dx / dist
-        self.vy = BULLET_SPEED * dy / dist
+        if angle is not None:
+            # Angle in radians
+            self.vx = BULLET_SPEED * math.cos(angle)
+            self.vy = BULLET_SPEED * math.sin(angle)
+            angle_deg = math.degrees(math.atan2(-self.vy, self.vx)) - 90
+        else:
+            dx = target.x - self.x
+            dy = target.y - self.y
+            dist = math.hypot(dx, dy) or 1
+            self.vx = BULLET_SPEED * dx / dist
+            self.vy = BULLET_SPEED * dy / dist
+            angle_deg = math.degrees(math.atan2(-dy, dx)) - 90
 
-        angle_deg = math.degrees(math.atan2(-dy, dx)) - 90
-        self.image = pygame.transform.rotate(original_image, angle_deg)
+        self.image = pygame.transform.rotate(base_image, angle_deg)
         self.rect = self.image.get_rect(center=(self.x, self.y))
+        # Pre-create glow surface
+        self.glow_surf = pygame.Surface((self.radius * 4, self.radius * 4), pygame.SRCALPHA)
+        pygame.draw.circle(self.glow_surf, (255, 0, 0, 120), (self.radius * 2, self.radius * 2), self.radius * 2)
 
     def move(self):
         self.x += self.vx
@@ -28,7 +39,10 @@ class EnemyBullet:
         self.rect.center = (self.x, self.y)
 
     def draw(self, screen, camera):
-        screen.blit(self.image, camera.apply(self.rect))
+        pos = camera.apply(self.rect)
+        glow_rect = self.glow_surf.get_rect(center=pos.center)
+        screen.blit(self.glow_surf, glow_rect)
+        screen.blit(self.image, pos)
 
     def off_screen(self):
         margin = 20
