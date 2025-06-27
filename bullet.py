@@ -1,7 +1,7 @@
 import pygame
 import math
 import os
-from config import BULLET_RADIUS, BULLET_SPEED
+from config import WIDTH, HEIGHT, BULLET_RADIUS, BULLET_SPEED
 from utils import resource_path
 
 
@@ -60,8 +60,8 @@ class Bullet:
     def off_screen(self):
         margin = 20
         return (
-                self.x < -margin or self.x > 1024 + margin or
-                self.y < -margin or self.y > 768 + margin
+                self.x < -margin or self.x > WIDTH + margin or
+                self.y < -margin or self.y > HEIGHT + margin
         )
 
     def hits(self, enemy):

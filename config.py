@@ -8,11 +8,6 @@ FPS = 60
 PLAYER_RADIUS = 40
 PLAYER_SPEED = 5
 
-# 冷却时间和蓄力槽配置
-COOL_DOWN_TIME = 0.5  # 冷却时间为0.5秒
-COOL_DOWN_BAR_HEIGHT = 5  # 蓄力槽高度
-COOL_DOWN_COLOR = (0, 255, 0)  # 蓄力槽的颜色
-
 # 敌人
 ENEMY_RADIUS = 30
 ENEMY_ACCELERATION = 0.05

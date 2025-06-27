@@ -36,24 +36,27 @@ def game_over_screen(screen, survival_time):
 
 
 def update_high_scores(score):
-    """更新排行榜"""
-    try:
-        with open("high_scores.txt", "a") as f:
-            f.write(f"{score}\n")
-    except Exception as e:
-        print(f"Error updating high scores: {e}")
+    """更新排行榜，自动创建文件并仅保留前十名"""
+    scores = []
 
-    # 读取排行榜并按分数排序
-    try:
-        with open("high_scores.txt", "r") as f:
-            scores = [int(line.strip()) for line in f.readlines()]
-            scores.sort(reverse=True)  # 降序排列
+    if os.path.exists(SCORE_FILE):
+        try:
+            with open(SCORE_FILE, "r") as f:
+                scores = [int(line.strip()) for line in f if line.strip()]
+        except Exception as e:
+            print(f"Error reading high scores: {e}")
 
-        # 仅保留前10名
-        top_scores = scores[:10]
+    scores.append(score)
+    scores.sort(reverse=True)
+    top_scores = scores[:10]
+
+    try:
+        with open(SCORE_FILE, "w") as f:
+            for s in top_scores:
+                f.write(f"{s}\n")
         print("High Scores:", top_scores)  # 调试信息
     except Exception as e:
-        print(f"Error reading high scores: {e}")
+        print(f"Error updating high scores: {e}")
 
 
 def display_high_scores(screen):
