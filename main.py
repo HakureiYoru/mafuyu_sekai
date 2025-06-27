@@ -78,6 +78,7 @@ def main():
     bg_rect = bg_image.get_rect()
 
     player, explosions, enemies, bullets, enemy_bullets, pickups, start_time, spawn_event, score, diff_manager = reset_game()
+    boss_spawned = False
 
     running = True
     game_over = False  # Game Over 状态变量
@@ -90,6 +91,10 @@ def main():
             pygame.time.set_timer(spawn_event, diff_manager.spawn_interval)
             print(f"[难度升级] 当前等级：{diff_manager.current_level}")
         difficulty_level = diff_manager.current_level
+
+        if not boss_spawned and elapsed_time >= 120:
+            enemies.append(Enemy(MAP_WIDTH, MAP_HEIGHT, enemy_type='boss', difficulty_level=difficulty_level))
+            boss_spawned = True
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

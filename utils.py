@@ -2,7 +2,7 @@ import pygame
 import sys
 import os
 import time
-from config import font, big_font, WHITE, BLACK, WIDTH, HEIGHT
+from config import font, big_font, WHITE, BLACK, WIDTH, HEIGHT, FPS
 
 import math
 
@@ -119,6 +119,7 @@ def display_high_scores(screen):
 
     # Wait for any key press to start the game
     waiting = True
+    clock = pygame.time.Clock()
     while waiting:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -126,3 +127,5 @@ def display_high_scores(screen):
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
                 waiting = False
+        clock.tick(FPS)
+    pygame.event.clear()
