@@ -76,13 +76,14 @@ def display_high_scores(screen):
     title = big_font.render("High Scores", True, WHITE)
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 50))
 
-    # Display game instructions (in English)
+    # Display game instructions
     desc_lines = [
-        "Survive in Mafuyu's Sekai!",
-        "1. Use arrow keys to move",
-        "2. Space to shoot",
-        "3. Shooting power increases with more enemies on screen",
-        "4. Enemies may drop life recovery items, become stronger over time."
+        "生存于真冬的世界！",
+        "1. 方向键移动",
+        "2. 空格键射击",
+        "3. 屏幕敌人越多，射击越强",
+        "4. 敌人会掉落回复道具并逐渐变强",
+        "5. 按 B 键使用炸弹（若拥有）"
     ]
 
     # Adjust vertical spacing between each line

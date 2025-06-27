@@ -27,8 +27,8 @@ class EnemyBullet:
         self.y += self.vy
         self.rect.center = (self.x, self.y)
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, camera):
+        screen.blit(self.image, camera.apply(self.rect))
 
     def off_screen(self):
         margin = 20

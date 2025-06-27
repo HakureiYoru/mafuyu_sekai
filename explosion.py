@@ -29,7 +29,7 @@ class Explosion:
         for particle in self.particles:
             particle.update()
 
-    def draw(self, screen):
+    def draw(self, screen, camera):
         if self.lifetime > 0:
             # 渐变颜色效果：根据爆炸类型改变颜色
             if self.explosion_type == "player":
@@ -48,11 +48,12 @@ class Explosion:
                     color = YELLOW
 
             # 画爆炸的圆形
-            pygame.draw.circle(screen, color, (int(self.x), int(self.y)), self.radius, 2)
+            pos = camera.apply(pygame.Rect(self.x, self.y, 0, 0)).center
+            pygame.draw.circle(screen, color, pos, self.radius, 2)
 
             # 画粒子效果
             for particle in self.particles:
-                particle.draw(screen)
+                particle.draw(screen, camera)
 
     def is_finished(self):
         return self.lifetime <= 0
@@ -73,7 +74,7 @@ class ExplosionParticle:
         self.y += self.vy
         self.lifetime -= 1
 
-    def draw(self, screen):
+    def draw(self, screen, camera):
         if self.lifetime > 0:
             # 根据爆炸类型调整粒子的颜色
             if self.explosion_type == "player":
@@ -85,4 +86,5 @@ class ExplosionParticle:
             else:
                 color = YELLOW  # 默认颜色
 
-            pygame.draw.circle(screen, color, (int(self.x), int(self.y)), self.size)
+            pos = camera.apply(pygame.Rect(self.x, self.y, 0, 0)).center
+            pygame.draw.circle(screen, color, pos, self.size)
