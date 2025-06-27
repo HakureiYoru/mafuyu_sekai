@@ -49,7 +49,7 @@ def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("逃出真冬学姐的sekai")
     icon = pygame.image.load("img/player.png").convert_alpha()
-    camera = Camera(MAP_WIDTH, MAP_HEIGHT)
+    camera = Camera(MAP_WIDTH, MAP_HEIGHT, WIDTH, HEIGHT)
 
     pygame.display.set_icon(icon)
 
@@ -108,7 +108,6 @@ def main():
             keys = pygame.key.get_pressed()
             player.move(keys)
             player.draw(screen, camera)
-            player.draw_hp(screen)  # 在玩家头像上方显示血量
             camera.update(player)
 
             for bullet in bullets[:]:
