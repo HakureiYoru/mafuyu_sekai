@@ -19,7 +19,7 @@ class HealthPickUp:
         # 更大、更宽松的发光层，避免裁剪边缘
         self.glow_surface = pygame.Surface((120, 120), pygame.SRCALPHA)
 
-    def draw(self, screen):
+    def draw(self, screen, camera):
         t = time.time() - self.spawn_time
 
         # 悬浮动画
@@ -42,11 +42,12 @@ class HealthPickUp:
                 radius
             )
 
-        screen.blit(self.glow_surface, (draw_x - 60, draw_y - 60), special_flags=pygame.BLEND_RGBA_ADD)
+        glow_rect = pygame.Rect(draw_x - 60, draw_y - 60, self.glow_surface.get_width(), self.glow_surface.get_height())
+        screen.blit(self.glow_surface, camera.apply(glow_rect), special_flags=pygame.BLEND_RGBA_ADD)
 
         # 血球贴图
         rect = self.image.get_rect(center=(draw_x, draw_y))
-        screen.blit(self.image, rect)
+        screen.blit(self.image, camera.apply(rect))
 
         self.rect = rect
 

@@ -200,12 +200,15 @@ class Enemy:
         if self.y <= 0 or self.y >= pygame.display.get_surface().get_height():
             self.vy *= -1  # 垂直方向反转
 
-    def draw(self, screen):
-        screen.blit(self.image, (self.x - self.radius, self.y - self.radius))
+    def draw(self, screen, camera):
+        rect = camera.apply(self.rect)
+        screen.blit(self.image, rect)
 
         # 绘制血条：使用最大血量 (self.max_hp) 来绘制血条
-        pygame.draw.rect(screen, BLACK, (self.x - 15, self.y - 25, 30, 5))  # 背景
-        pygame.draw.rect(screen, RED, (self.x - 15, self.y - 25, 30 * self.hp / self.max_hp, 5))  # 当前血量
+        bar_back = pygame.Rect(self.x - 15, self.y - 25, 30, 5)
+        bar_front = pygame.Rect(self.x - 15, self.y - 25, 30 * self.hp / self.max_hp, 5)
+        pygame.draw.rect(screen, BLACK, camera.apply(bar_back))
+        pygame.draw.rect(screen, RED, camera.apply(bar_front))
 
     def collides_with(self, player):
         return math.hypot(self.x - player.x, self.y - player.y) < (self.radius + player.radius)

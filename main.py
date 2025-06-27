@@ -132,19 +132,19 @@ def main():
 
             for bullet in bullets[:]:
                 bullet.move()
-                bullet.draw(screen)
+                bullet.draw(screen, camera)
                 if bullet.off_screen():
                     bullets.remove(bullet)
 
             for ebullet in enemy_bullets[:]:
                 ebullet.move()
-                ebullet.draw(screen)
+                ebullet.draw(screen, camera)
                 if ebullet.off_screen():
                     enemy_bullets.remove(ebullet)
 
             for enemy in enemies[:]:
                 enemy.move_towards(player)
-                enemy.draw(screen)
+                enemy.draw(screen, camera)
                 if enemy.enemy_type == 'shooter' and enemy.can_shoot():
                     enemy_bullets.append(enemy.shoot(player))
 
@@ -198,7 +198,7 @@ def main():
                         break
 
             for pickup in pickups[:]:
-                pickup.draw(screen)
+                pickup.draw(screen, camera)
                 if pickup.check_collision(player):
                     if isinstance(pickup, HealthPickUp):
                         player.hp += 1
@@ -210,13 +210,13 @@ def main():
 
             for explosion in explosions[:]:
                 explosion.update()
-                explosion.draw(screen)
+                explosion.draw(screen, camera)
                 if explosion.is_finished():
                     explosions.remove(explosion)
 
             # 显示冷却槽
-            player.draw_hp(screen)
-            player.draw_cooldown_bar(screen)
+            player.draw_hp(screen, camera)
+            player.draw_cooldown_bar(screen, camera)
             player.draw_bomb_count(screen)
 
             elapsed_time = draw_timer(screen, start_time)

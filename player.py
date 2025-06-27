@@ -79,7 +79,7 @@ class Player:
             return True  # 如果血量小于等于0，表示死亡
         return False
 
-    def draw_cooldown_bar(self, screen):
+    def draw_cooldown_bar(self, screen, camera):
         cooldown_bar_width = 100  # 固定宽度
         cooldown_bar_height = 10
         cooldown_bar_x = self.x - cooldown_bar_width / 2
@@ -92,22 +92,24 @@ class Player:
         filled_width = min(cooldown_bar_width * progress, cooldown_bar_width)
 
         # 绘制背景冷却条
-        pygame.draw.rect(screen, (0, 0, 0), (cooldown_bar_x, cooldown_bar_y, cooldown_bar_width, cooldown_bar_height))
+        bar_back = pygame.Rect(cooldown_bar_x, cooldown_bar_y, cooldown_bar_width, cooldown_bar_height)
+        bar_front = pygame.Rect(cooldown_bar_x, cooldown_bar_y, filled_width, cooldown_bar_height)
+        pygame.draw.rect(screen, (0, 0, 0), camera.apply(bar_back))
+        pygame.draw.rect(screen, (0, 255, 0), camera.apply(bar_front))
 
-        # 绘制进度条
-        pygame.draw.rect(screen, (0, 255, 0), (cooldown_bar_x, cooldown_bar_y, filled_width, cooldown_bar_height))
-
-    def draw_hp(self, screen):
+    def draw_hp(self, screen, camera):
         hp_bar_width = 100
         hp_bar_height = 10
         hp_bar_x = self.x - hp_bar_width / 2
         hp_bar_y = self.y - self.radius - 40
 
-        pygame.draw.rect(screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height))
+        bar_back = pygame.Rect(hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height)
 
         # 防止血量超过最大值
         hp_progress = max(0, min(self.hp / 3, 1))  # 确保hp_progress在0到1之间
-        pygame.draw.rect(screen, (255, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width * hp_progress, hp_bar_height))
+        bar_front = pygame.Rect(hp_bar_x, hp_bar_y, hp_bar_width * hp_progress, hp_bar_height)
+        pygame.draw.rect(screen, (0, 0, 0), camera.apply(bar_back))
+        pygame.draw.rect(screen, (255, 0, 0), camera.apply(bar_front))
 
     def draw_bomb_count(self, screen):
         bomb_text = pygame.font.SysFont(None, 30).render(f"Bombs: {self.bomb_count}", True, (255, 255, 255))
