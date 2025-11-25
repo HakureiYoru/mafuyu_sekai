@@ -1,0 +1,14 @@
+{
+  "name": "mafuyu-sekai-desktop",
+  "version": "0.1.0",
+  "description": "Electron wrapper for Mafuyu Sekai: Neon Remake",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . MafuyuSekai --platform=win32 --arch=x64 --out=dist --overwrite --ignore=^/venv --ignore=^/\\.idea --ignore=^/dist"
+  },
+  "devDependencies": {
+    "electron": "^31.2.0",
+    "electron-packager": "^17.1.1"
+  }
+}

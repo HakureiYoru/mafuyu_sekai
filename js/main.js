@@ -846,13 +846,13 @@ function update() {
                 if (phase === 0) {
                     for(let k=0; k<3; k++) {
                         const a = frames*0.1 + (k*2);
-                        bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*5, vy:Math.sin(a)*5, life:150, color:'#ffaa00', size:6, owner:'enemy'});
+                        bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*5, vy:Math.sin(a)*5, life:600, color:'#ffaa00', size:6, owner:'enemy'});
                     }
                 } else if (phase === 1) {
                     if (frames % 60 === 0) {
                         for(let k=0; k<12; k++) {
                             const a = (Math.PI*2/12)*k;
-                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:150, color:'#ff3333', size:8, owner:'enemy'});
+                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff3333', size:8, owner:'enemy'});
                         }
                         AudioSys.boom('small');
                     }
@@ -861,7 +861,7 @@ function update() {
                         const spread = 0.3;
                         for(let k=-1; k<=1; k++) {
                             const a = angleToPlayer + k*spread;
-                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:140, color:'#ff00ff', size:8, owner:'enemy'});
+                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff00ff', size:8, owner:'enemy'});
                         }
                     }
                 }
@@ -1459,8 +1459,17 @@ function draw() {
             ctx.save();
             ctx.translate(e.x, e.y);
             ctx.rotate(facingPlayer);
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1000, 0); ctx.stroke();
+            const beamLen = 1200;
+            const beam = ctx.createLinearGradient(0, 0, beamLen, 0);
+            beam.addColorStop(0, 'rgba(255, 230, 255, 0.95)');
+            beam.addColorStop(0.3, 'rgba(255, 140, 255, 0.9)');
+            beam.addColorStop(1, 'rgba(170, 70, 255, 0.7)');
+            ctx.strokeStyle = beam;
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff66ff';
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(beamLen, 0); ctx.stroke();
             ctx.restore();
         } else if (e.type === 'minelayer') {
             ctx.save();

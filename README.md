@@ -1,10 +1,9 @@
-# Mafuyu Sekai: Neon Remake (Web)
+# Mafuyu Sekai: Neon Remake
 
-当前版本已完全移植为 HTML5/Canvas 单文件，入口在 `dx.html`，直接使用原项目素材（贴图、BGM、音效）。
-
-## 快速运行
-1. 直接在浏览器打开 `dx.html`；如需本地服务器可执行 `npx serve .` 后访问 `/dx.html`。
-2. 首次点击 “ENGAGE” 会初始化音频上下文，请允许页面播放声音。
+## Web 版
+- 入口：`dx.html`（HTML5/Canvas 单文件）。
+- 直接双击或浏览器打开；如需本地服务器，可运行 `npx serve .` 或 `python -m http.server 8000` 后访问 `/dx.html`。
+- 首次点击 “ENGAGE” 会初始化音频，请允许页面播放声音。
 
 ## 资源映射
 - 背景/角色/敌人/子弹/血包：`assets/images/bg.png`、`player.png`、`enemy.png`、`bullet.png`、`health.png`
@@ -17,4 +16,11 @@
 - 战术冲刺：R 或鼠标右键
 - 清屏炸弹：Space
 
-旧的 Python 版代码已移除，仅保留素材与新的 Web 架构。
+## 桌面版（Electron）
+- 安装依赖：`npm install`（会拉取 `electron` 与 `electron-packager`）。
+- 运行开发版：`npm start`。
+- 打包 Windows 桌面版：`npm run pack`（输出到 `dist/`，默认 64 位；如需 32 位在命令后加 `--arch=ia32`）。
+- 如需自定义图标，可将 `icon.ico` 放入 `assets/images/`，并在打包命令中追加 `--icon=assets/images/icon.ico`。
+
+## 其他
+- 旧的 Python 版已移除，仅保留素材与新的 Web/Electron 架构。 
