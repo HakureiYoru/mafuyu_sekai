@@ -1,0 +1,268 @@
+﻿body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #050510;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    color: white;
+    user-select: none;
+    cursor: crosshair;
+}
+canvas { display: block; }
+
+#ui-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    box-sizing: border-box;
+    transition: filter 0.1s;
+}
+
+/* Glitch Effect Class */
+.glitch-ui {
+    filter: drop-shadow(-2px 0 red) drop-shadow(2px 0 blue);
+    transform: translate(2px, -2px);
+}
+
+/* Top HUD */
+.hud-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+.score-box {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #00ffff, #ffffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.bomb-box {
+    font-size: 24px;
+    color: #ffaa00;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Wave Text */
+#wave-text {
+    position: absolute;
+    top: 25%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 100px;
+    font-weight: 900;
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.5s, transform 0.5s;
+    color: #fff;
+    text-shadow: 0 0 30px #00ccff;
+    pointer-events: none;
+    text-align: center;
+}
+#wave-sub {
+    font-size: 30px;
+    color: #ff3333;
+    display: block;
+    margin-top: 10px;
+}
+
+/* Bottom HUD */
+.hud-bottom {
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+    width: 100%;
+}
+.stats-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.bar-wrapper {
+    width: 250px;
+}
+.label {
+    font-size: 12px;
+    color: #88ccff;
+    margin-bottom: 4px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+.bar-container {
+    height: 12px;
+    background: rgba(0, 20, 40, 0.6);
+    border: 1px solid #004466;
+    transform: skewX(-20deg);
+    overflow: hidden;
+    position: relative;
+}
+.bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.1s linear;
+}
+.hp-fill { background: linear-gradient(90deg, #ff3333, #ff0000); box-shadow: 0 0 10px #ff0000; }
+.xp-fill { background: linear-gradient(90deg, #33ff33, #00ff00); box-shadow: 0 0 10px #00ff00; }
+
+/* Comms Panel */
+#comms-panel {
+    flex-grow: 1;
+    margin-left: 40px;
+    background: linear-gradient(120deg, rgba(0, 20, 40, 0.9), rgba(0, 0, 0, 0.4));
+    border-left: 4px solid #00ccff;
+    padding: 12px 18px;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    transition: opacity 0.5s, transform 0.3s;
+    text-shadow: 0 0 2px #00ccff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 20px rgba(0, 255, 255, 0.2);
+    position: relative;
+    min-height: 86px;
+    overflow: hidden;
+}
+#comms-panel::after {
+    content: "";
+    position: absolute;
+    left: 82px;
+    bottom: -12px;
+    border-width: 12px 10px 0 10px;
+    border-style: solid;
+    border-color: rgba(0, 20, 40, 0.9) transparent transparent transparent;
+    opacity: 0.6;
+    filter: blur(0.3px);
+}
+.comms-avatar-wrap {
+    width: 70px;
+    height: 70px;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 10px;
+    background: radial-gradient(circle at 30% 30%, rgba(0, 255, 255, 0.15), rgba(0, 0, 0, 0.6));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 12px rgba(0, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+#comms-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6));
+    opacity: 0.9;
+    transition: filter 0.3s ease, opacity 0.3s ease;
+}
+.comms-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#comms-sender {
+    font-size: 14px;
+    color: #00ffff;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 0;
+}
+#comms-text {
+    font-size: 18px;
+    color: #ffffff;
+    white-space: pre-line;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Screens */
+#start-screen, #game-over-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(5, 5, 10, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    backdrop-filter: blur(8px);
+    z-index: 100;
+}
+h1 {
+    font-size: 80px;
+    margin: 0;
+    background: linear-gradient(to right, #00ffff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 10px;
+    text-align: center;
+    filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.5));
+}
+h2 {
+    font-size: 24px;
+    color: #ccc;
+    margin-top: -10px;
+    margin-bottom: 40px;
+    letter-spacing: 5px;
+    font-weight: 300;
+}
+button {
+    padding: 15px 60px;
+    font-size: 24px;
+    font-weight: bold;
+    background: transparent;
+    color: #00ffff;
+    border: 2px solid #00ffff;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+button:hover {
+    background: #00ffff;
+    color: #000;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+    transform: scale(1.05);
+}
+button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+    transform: none;
+    box-shadow: none;
+}
+.controls {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 20px 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.key-row { color: #aaa; font-size: 14px; display: flex; align-items: center; gap: 10px;}
+.kbox {
+    background: #222;
+    border: 1px solid #444;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 2px 0 #000;
+}
+.highlight { color: #ffaa00; }
+

@@ -1,22 +1,20 @@
-# Mafuyu Sekai Shooter
+# Mafuyu Sekai: Neon Remake (Web)
 
-This is a simple top-down shooter written with **Pygame**. Survive as long as possible while fighting incoming enemies.
+当前版本已完全移植为 HTML5/Canvas 单文件，入口在 `dx.html`，直接使用原项目素材（贴图、BGM、音效）。
 
-## Requirements
-- Python 3
-- Pygame
+## 快速运行
+1. 直接在浏览器打开 `dx.html`；如需本地服务器可执行 `npx serve .` 后访问 `/dx.html`。
+2. 首次点击 “ENGAGE” 会初始化音频上下文，请允许页面播放声音。
 
-Install dependencies with:
-```bash
-pip install pygame
-```
+## 资源映射
+- 背景/角色/敌人/子弹/血包：`assets/images/bg.png`、`player.png`、`enemy.png`、`bullet.png`、`health.png`
+- 背景音乐：`assets/music/bg.mp3`
+- 射击音效：`sound/shot.wav`
 
-## Running the Game
-Execute:
-```bash
-python main.py
-```
+## 操作
+- 移动：W/A/S/D
+- 瞄准射击：鼠标移动 + 左键
+- 战术冲刺：R 或鼠标右键
+- 清屏炸弹：Space
 
-Use arrow keys to move, press **Space** to shoot. Press **B** to use a bomb when available. Pick up hearts to restore life and bombs to gain more bombs. Enemies grow stronger over time so stay alert!
-
-High scores are stored in `high_scores.txt`.
+旧的 Python 版代码已移除，仅保留素材与新的 Web 架构。
