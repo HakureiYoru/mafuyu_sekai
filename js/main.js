@@ -3,6 +3,33 @@ const WORLD_W = 3000;
 const WORLD_H = 3000;
 let animationFrameId = null; // Initialize as null
 
+const SPEAKER_PROFILES = {
+    MAFUYU: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    MAFUYU_SYSTEM: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    MAFUYU_MASKED: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    MAFUYU_HOLLOW: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    MAFUYU_GLITCH: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    MAFUYU_MOTHER: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
+    EMU: { alias: 'EMU', avatar: "assets/images/player.png" },
+    SYSTEM: { alias: 'SYSTEM', avatar: "assets/images/enemy.png" }
+};
+
+function resolveSpeaker(raw, avatarOverride = null) {
+    const name = raw || 'SYSTEM';
+    const upper = (name || '').toUpperCase();
+    const profile = SPEAKER_PROFILES[name]
+        || (upper.includes('MAFUYU') ? SPEAKER_PROFILES.MAFUYU : null)
+        || (upper.includes('EMU') ? SPEAKER_PROFILES.EMU : null)
+        || SPEAKER_PROFILES.SYSTEM;
+    return {
+        display: profile?.alias || name || 'SYSTEM',
+        avatar: avatarOverride || profile?.avatar || null
+    };
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
 /**
  * UI COMMUNICATOR
  */
@@ -14,14 +41,35 @@ const Comms = {
     queue: [],
     typing: false,
     timeout: null,
+    activeId: 0,
     defaultAvatar: "assets/images/enemy.png",
-    show(msg, from = "SYSTEM", color = "#00ccff", avatar = null) {
-        this.queue.push({ msg, from, color, avatar });
+    show(msg, from = "SYSTEM", color = "#00ccff", avatar = null, opts = {}) {
+        const options = opts || {};
+        const speaker = resolveSpeaker(from, avatar);
+        const payload = {
+            msg,
+            from: speaker.display,
+            color,
+            avatar: speaker.avatar,
+            priority: !!options.priority,
+            interrupt: !!options.interrupt,
+            allowInactive: !!options.allowInactive
+        };
+        if (payload.interrupt) {
+            if (this.timeout) clearTimeout(this.timeout);
+            this.activeId++;
+            this.queue = [];
+            this.typing = false;
+            this.text.innerText = "";
+        }
+        if (payload.priority) this.queue.unshift(payload);
+        else this.queue.push(payload);
         if (!this.typing) this.processQueue();
     },
     reset() {
         this.queue = [];
         this.typing = false;
+        this.activeId++;
         if(this.timeout) clearTimeout(this.timeout);
         this.text.innerText = "..."; // Reset to default
         this.panel.style.opacity = 0;
@@ -39,6 +87,7 @@ const Comms = {
         this.panel.style.opacity = 1;
         this.typing = true;
         const current = this.queue.shift();
+        const msgId = ++this.activeId;
         this.sender.innerText = current.from;
         this.sender.style.color = current.color;
         this.panel.style.borderLeftColor = current.color;
@@ -50,11 +99,11 @@ const Comms = {
         this.text.innerText = "";
         const chars = current.msg.split("");
         for (let i = 0; i < chars.length; i++) {
-            if(!gameActive) break; 
+            if((!gameActive && !current.allowInactive) || msgId !== this.activeId) { this.typing = false; return; } 
             this.text.innerText += chars[i];
             await new Promise(r => setTimeout(r, 20));
         }
-        if(gameActive) setTimeout(() => { this.typing = false; this.processQueue(); }, 2000);
+        if((gameActive || current.allowInactive) && msgId === this.activeId) setTimeout(() => { this.typing = false; this.processQueue(); }, 2000);
     }
 };
 
@@ -147,6 +196,27 @@ const DialogueSys = {
             { id: 'EL_A', sender: 'MAFUYU_MASKED', color: '#ccccff', text: '未来早就决定好了。只要听话就可以了。' },
             { id: 'EL_B', sender: 'MAFUYU_HOLLOW', color: '#aaaaaa', text: '……未来？那是一片……灰色的墙。' },
             { id: 'EL_C', sender: 'MAFUYU_GLITCH', color: '#ff00ff', text: '没有那种东西！如果是那种充满谎言的未来……我就全部破坏掉！' }
+        ],
+        LEVEL_UP_EVENT: [
+            { id: 'LV_UP_1', sender: 'MAFUYU_SYSTEM', color: '#a0a0ff', text: '数值上升……真的有意义吗？', maxed: false },
+            { id: 'LV_UP_2', sender: 'MAFUYU_GLITCH', color: '#ff00ff', text: '别得意……下一次会更痛。', maxed: false },
+            { id: 'LV_UP_MAX', sender: 'MAFUYU_GLITCH', color: '#ff00ff', text: '已经推到极限了……不要再逼我。', maxed: true }
+        ],
+        LEVEL_DOWN_EVENT: [
+            { id: 'LV_DN_1', sender: 'MAFUYU_SYSTEM', color: '#ff6688', text: '系统回退……这样才安静。' },
+            { id: 'LV_DN_2', sender: 'MAFUYU_HOLLOW', color: '#aaaaaa', text: '……温度下降。这样才对。' }
+        ],
+        PLAYER_DAMAGE: [
+            { id: 'DMG_1', sender: 'MAFUYU_SYSTEM', color: '#ff6688', text: '警告：装甲破损。请停止挣扎。' },
+            { id: 'DMG_2', sender: 'MAFUYU_MASKED', color: '#ccccff', text: '凤同学，安静一点会好受些。' }
+        ],
+        HP_RECOVER_EVENT: [
+            { id: 'HP_UP_1', sender: 'MAFUYU_HOLLOW', color: '#88ff88', text: '……温暖？只是一瞬间而已。' },
+            { id: 'HP_UP_2', sender: 'MAFUYU_SYSTEM', color: '#88ff88', text: '补丁完成。别以为这能改变什么。' }
+        ],
+        FAILURE_EVENT: [
+            { id: 'FAIL_1', sender: 'MAFUYU_SYSTEM', color: '#ff3333', text: '……系统关闭。Score {score}。' },
+            { id: 'FAIL_2', sender: 'MAFUYU_HOLLOW', color: '#ff3333', text: '……结束了。你可以休息了。' }
         ]
     },
     lastSpoken: {},
@@ -168,10 +238,10 @@ const DialogueSys = {
         if (tag) this.lastSpoken[tag] = now;
         return true;
     },
-    speak(group, filterFn, tag, cooldown = 2000) {
+    speak(group, filterFn, tag, cooldown = 2000, options = {}) {
         if (!this.canSpeak(tag, cooldown)) return;
         const line = this.pick(group, filterFn);
-        if (line) Comms.show(line.text, line.sender, line.color);
+        if (line) Comms.show(line.text, line.sender, line.color, options.avatar || null, options);
     },
     
     // --- TRIGGERS ---
@@ -198,9 +268,22 @@ const DialogueSys = {
     bossLowHp() { this.speak('BOSS_LOW_HP', null, 'boss_low', 10000); },
 
     // Emu Interactions
-    emuWonderhoy() { this.speak('EMU_WONDERHOY', null, 'wonderhoy', 2000); },
+    emuWonderhoy() { this.speak('EMU_WONDERHOY', null, 'wonderhoy', 2000, { interrupt: true }); },
     emuHeal() { this.speak('EMU_HEAL', null, 'heal', 5000); },
-    emuLevelUp() { this.speak('EMU_LEVELUP', null, 'levelup', 0); },
+    emuLevelUp() { this.speak('EMU_LEVELUP', null, 'emu_levelup', 0); },
+    levelUp(maxed = false) { this.speak('LEVEL_UP_EVENT', l => maxed ? l.maxed === true : l.maxed !== true, maxed ? 'levelup_max' : 'levelup', maxed ? 4000 : 2500); },
+    levelDown() { this.speak('LEVEL_DOWN_EVENT', null, 'leveldown', 3000); },
+    hpRecover() { this.speak('HP_RECOVER_EVENT', null, 'hp_recover', 3000); },
+    damage() { this.speak('PLAYER_DAMAGE', null, 'player_damage', 2000); },
+    failure(score = 0) { 
+        const line = this.pick('FAILURE_EVENT');
+        if (line) {
+            const msg = line.text.replace('{score}', score);
+            Comms.show(msg, line.sender, line.color, null, { interrupt: true, allowInactive: true });
+        } else {
+            Comms.show(`系统关闭。Score ${score}`, 'SYSTEM', '#ff3333', null, { interrupt: true, allowInactive: true });
+        }
+    },
     
     // Legacy mapping support if needed (optional)
     waveAlert(w) { /* No longer used in new design or mapped to generic system status if needed */ }
@@ -413,6 +496,7 @@ let score = 0;
 let wave = 1;
 let screenShake = 0;
 let flashScreen = 0;
+let bossActive = false;
 
 // Entities
 // HP set to 5. 
@@ -470,6 +554,21 @@ const uiWave = document.getElementById('wave-text');
 const uiWaveSub = document.getElementById('wave-sub');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const xpContainer = uiXp.parentElement;
+const uiXpLoss = document.createElement('div');
+uiXpLoss.className = 'bar-fill xp-loss';
+xpContainer.insertBefore(uiXpLoss, uiXp);
+const xpVisual = { current: 0, target: 0, loss: 0 };
+let xpHitTimer = 0;
+uiHp.style.width = '100%';
+uiXpLoss.style.width = '0%';
+uiXp.style.width = '0%';
+
+function triggerXpDropVisual() {
+    xpHitTimer = 12;
+    xpContainer.classList.add('xp-hit');
+    setTimeout(() => xpContainer.classList.remove('xp-hit'), 250);
+}
 
 // --- GAME LOGIC ---
 
@@ -489,6 +588,7 @@ function startGame() {
     score = 0;
     wave = 1;
     frames = 0;
+    bossActive = false;
     
     // Reset Player
     player.x = WORLD_W/2; player.y = WORLD_H/2;
@@ -496,6 +596,9 @@ function startGame() {
     player.weaponLvl = 1; player.weaponXp = 0; player.invinc = 60; player.glitchTime = 0;
     player.dashCd = 0; player.dashTime = 0;
     uiLayer.classList.remove('glitch-ui');
+    xpVisual.current = 0; xpVisual.target = 0; xpVisual.loss = 0; xpHitTimer = 0;
+    xpContainer.classList.remove('xp-hit');
+    uiXp.style.width = '0%'; uiXpLoss.style.width = '0%';
     
     // Reset Camera
     camera.x = player.x - width/2; camera.y = player.y - height/2;
@@ -560,7 +663,7 @@ function useBomb() {
         });
         
         bullets = bullets.filter(b => b.owner === 'player');
-        Comms.show("WONDERHOY!!", "EMU", "#ffaa00", "assets/images/player.png"); // Use player avatar if available
+        Comms.show("WONDERHOY!!", "EMU", "#ffaa00", "assets/images/player.png", { priority: true }); // Use player avatar if available
     }
 }
 
@@ -609,7 +712,8 @@ function update() {
     }
 
     // Spawning
-    const spawnRate = Math.max(30, 120 - wave * 5);
+    const baseSpawnRate = Math.max(30, 120 - wave * 5);
+    const spawnRate = bossActive ? baseSpawnRate * 10 : baseSpawnRate;
     if (frames % spawnRate === 0) prepareSpawn();
 
     // Slow down wave escalation: advance every 3600 frames instead of 1800
@@ -754,7 +858,11 @@ function update() {
                     }
                 } else {
                     if (frames % 20 === 0) {
-                         bullets.push({x:e.x, y:e.y, vx:Math.cos(angleToPlayer)*7, vy:Math.sin(angleToPlayer)*7, life:120, color:'#ff00ff', size:8, owner:'enemy', homing:true});
+                        const spread = 0.3;
+                        for(let k=-1; k<=1; k++) {
+                            const a = angleToPlayer + k*spread;
+                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:140, color:'#ff00ff', size:8, owner:'enemy'});
+                        }
                     }
                 }
             }
@@ -897,7 +1005,18 @@ function update() {
     uiBomb.innerText = `BOMB x${player.bombs}`;
     uiHp.style.width = `${(player.hp/player.maxHp)*100}%`;
     const nextXp = getXpThreshold(player.weaponLvl);
-    uiXp.style.width = `${(player.weaponXp/nextXp)*100}%`;
+    xpVisual.target = clamp(player.weaponXp / nextXp, 0, 1);
+    xpVisual.current = lerp(xpVisual.current, xpVisual.target, xpVisual.target < xpVisual.current ? 0.18 : 0.35);
+    if (xpVisual.loss < xpVisual.current) xpVisual.loss = xpVisual.current;
+    xpVisual.loss = lerp(xpVisual.loss, xpVisual.target, xpVisual.loss > xpVisual.target ? 0.08 : 0.3);
+    uiXpLoss.style.width = `${(xpVisual.loss*100).toFixed(1)}%`;
+    uiXp.style.width = `${(xpVisual.current*100).toFixed(1)}%`;
+    if (xpHitTimer > 0) {
+        xpHitTimer--;
+        xpContainer.style.filter = 'drop-shadow(0 0 10px rgba(255, 120, 120, 0.5))';
+    } else {
+        xpContainer.style.filter = '';
+    }
     uiLvl.innerText = player.weaponLvl >= 10 ? "MAX" : player.weaponLvl;
 }
 
@@ -949,7 +1068,11 @@ function spawnEnemy(x, y, type) {
         if(Math.random() < 0.1) DialogueSys.typeBSpawn();
     }
     if (type === 'boss') {
-        stats = { hp: 500 + wave*50, speed: 0.5, color: '#ffaa00', radius: 120, id: Math.random()*100 };
+        bossActive = true;
+        enemies = [];
+        bullets = bullets.filter(b => b.owner === 'player');
+        spawnIndicators = [];
+        stats = { hp: (500 + wave*50) * 10, speed: 0.5, color: '#ffaa00', radius: 120, id: Math.random()*100 };
         DialogueSys.bossEntry();
         screenShake = 60;
         flashScreen = 20;
@@ -1010,6 +1133,7 @@ function takeDamage(e, dmg) {
 
     if (e.hp <= 0) {
         enemies.splice(enemies.indexOf(e), 1);
+        if (e.type === 'boss') bossActive = enemies.some(en => en.type === 'boss');
         
         // Death Dialogue
         if (Math.random() < 0.4) {
@@ -1032,7 +1156,8 @@ function takeDamage(e, dmg) {
 function takePlayerDamage() {
     player.hp--;
     // PENALTY: Lose 25% of current XP; can trigger level-down
-    const xpLoss = player.weaponXp > 0 ? Math.max(1, Math.floor(player.weaponXp * 0.25)) : 0;
+    const lossBase = getXpThreshold(player.weaponLvl);
+    const xpLoss = Math.max(1, Math.floor(lossBase * 0.25));
     player.weaponXp -= xpLoss;
 
     let leveledDown = false;
@@ -1044,7 +1169,13 @@ function takePlayerDamage() {
         player.weaponXp = Math.max(0, player.weaponXp);
     }
 
-    if (xpLoss > 0 || leveledDown) DialogueSys.levelDown();
+    if (xpLoss > 0 || leveledDown) {
+        DialogueSys.levelDown();
+        triggerXpDropVisual();
+        const nextThresh = getXpThreshold(player.weaponLvl);
+        xpVisual.target = clamp(player.weaponXp / nextThresh, 0, 1);
+        xpVisual.loss = Math.max(xpVisual.loss, xpVisual.current || 0.001);
+    }
 
     player.invinc = 40; // Reduced from 60 (0.66s iframe)
     player.glitchTime = 20; // Glitch FX
@@ -1434,5 +1565,3 @@ async function launchGame(triggerBtn) {
 
 startBtn.addEventListener('click', () => launchGame(startBtn));
 restartBtn.addEventListener('click', () => launchGame(restartBtn));
-
-

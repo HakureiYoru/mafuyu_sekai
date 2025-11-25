@@ -105,11 +105,22 @@ canvas { display: block; }
 }
 .bar-fill {
     height: 100%;
-    width: 100%;
-    transition: width 0.1s linear;
+    width: 0%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: width 0.2s ease-out;
 }
 .hp-fill { background: linear-gradient(90deg, #ff3333, #ff0000); box-shadow: 0 0 10px #ff0000; }
 .xp-fill { background: linear-gradient(90deg, #33ff33, #00ff00); box-shadow: 0 0 10px #00ff00; }
+.xp-loss { background: linear-gradient(90deg, rgba(255, 120, 120, 0.45), rgba(255, 0, 0, 0.25)); z-index: 1; filter: saturate(1.1); }
+#xp-bar { z-index: 2; }
+.bar-container.xp-hit { animation: xpHit 0.35s ease; box-shadow: 0 0 12px rgba(255, 120, 120, 0.5); }
+@keyframes xpHit {
+    0% { transform: skewX(-20deg) scale(1); }
+    40% { transform: skewX(-18deg) scale(1.05) translateX(-2px); }
+    100% { transform: skewX(-20deg) scale(1); }
+}
 
 /* Comms Panel */
 #comms-panel {
@@ -265,4 +276,3 @@ button:disabled {
     box-shadow: 0 2px 0 #000;
 }
 .highlight { color: #ffaa00; }
-
