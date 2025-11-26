@@ -1,19 +1,152 @@
 ﻿// --- GLOBAL CONFIG ---
-const WORLD_W = 4000;
-const WORLD_H = 4000;
-const HEAT_MAX = 200;
-const HEAT_PER_SHOT = 5;
-const HEAT_COOLDOWN_RATE = 20 / 60; // 20 points per second
-const OVERHEAT_LOCK_TIME = 180; // 3 seconds at 60fps
-const AMMO_MAX = 200;
-const AMMO_REGEN_PER_SEC = 2;
-const AMMO_REGEN_BOSS_PER_SEC = 5;
-const SPECIAL_AMMO_LEVEL_REQ = 4;
-const SPECIAL_AMMO_COOLDOWN = 120; // 3 seconds
-const SPECIAL_AMMO_WINDUP = 18;
-const SPECIAL_AMMO_DAMAGE_MULT = 5;
-const SPECIAL_AMMO_SPEED = 22;
+const GAME_CONFIG = {
+    world: {
+        width: 4000, // 世界宽度，决定边界和背景渲染范围
+        height: 4000 // 世界高度，决定边界和背景渲染范围
+    },
+    player: {
+        baseHp: 5, // 玩家基础血量
+        baseBombs: 3, // 开局炸弹数
+        speed: 3.5, // 玩家基础移动速度
+        radius: 15, // 玩家碰撞半径
+        startInvincFrames: 60, // 开局无敌帧数
+        movementLockPenalty: 0.9, // 过热/缺弹时的移速倍率
+        dash: {
+            duration: 10, // 冲刺持续帧数
+            cooldown: 50, // 冲刺冷却帧数
+            invincFrames: 15, // 冲刺过程提供的无敌帧
+            speedMultiplier: 3, // 冲刺时的移速倍率
+            perfectWindow: 120 // 冲刺结束后可触发强化射击的窗口帧
+        },
+        bomb: {
+            invincFrames: 120, // 投放炸弹时的无敌帧数
+            bossDamage: 200, // 炸弹对Boss造成的伤害
+            normalDamage: 9999, // 炸弹对普通怪物造成的伤害
+            screenShake: 40, // 炸弹爆炸产生的震屏幅度
+            flash: 10 // 炸弹爆炸的屏幕闪烁帧数
+        },
+        miniBomb: {
+            burstCount: 10, // 小炸弹释放的追踪弹数量
+            color: '#ffbb55', // 视觉主色
+            shockwaveRadius: 140, // 触发时的冲击波半径
+            shockwave: { speed: 12, fade: 0.05, spread: 26 }, // 冲击波参数
+            sfx: 'small', // 使用的音效 key
+            text: 'HOMING BURST' // 浮空文字
+        },
+        ammo: {
+            max: 200, // 弹药上限
+            regenPerSec: 2, // 普通波次每秒回弹量
+            bossRegenPerSec: 5, // Boss波次每秒回弹量
+            lockUnlockRatio: 0.8, // 热量恢复到该比例以下解除过热锁
+            special: {
+                levelReq: 4, // 解锁特殊弹的武器等级
+                cooldown: 180, // 特殊弹冷却（帧）
+                windup: 18, // 特殊弹预瞄/蓄力帧数
+                damageMult: 3, // 特殊弹伤害倍率
+                speed: 6, // 特殊弹飞行速度
+                lockRange: 220 // 特殊弹追踪锁定范围（缩小）
+            }
+        },
+        heat: {
+            max: 250, // 过热槽上限
+            perShot: 5, // 每发射击增加的热量
+            cooldownPerSec: 20, // 每秒自然冷却的热量
+            lockDuration: 180 // 过热/缺弹锁定持续帧数
+        },
+        weapon: {
+            fireRate: { 
+                base: 10, // 初始射击间隔（帧），等级越高越低
+                min: 5, // 射速下限帧数
+                fastLevelThreshold: 8, // 达到该等级后使用快速射击间隔
+                fastFrameInterval: 4, // 高等级时的射击间隔
+                levelStepDivisor: 2 // 低等级阶段每提升多少等级减少1帧间隔
+            },
+            homingLockRange: 220, // 追踪弹的锁定范围（高等级解锁的追踪弹用更小范围）
+            xp: { 
+                base: 100, // 升级所需基础经验
+                perLevel: 50, // 每级额外需求经验
+                pickupGain: 10, // 拾取经验球获得的经验值
+                lossPercentOnHit: 0.25, // 受伤扣除当前等级需求的比例
+                levelCap: 10 // 武器等级上限
+            } // 升级/掉级参数
+        }
+    },
+    enemies: {
+        perWaveHpBonus: 2, // 每波额外血量成长
+        scorePerHp: 10, // 每点血量对应的得分倍率
+        dasherChargeWeakness: 1.3, // 突进怪蓄力时的受伤害倍率
+        boss: {
+            baseHp: 1000, // Boss基础血量
+            hpPerWave: 100, // Boss每波额外血量
+            hpMultiplier: 10, // Boss额外血量倍率
+            speed: 0.5, // Boss移动速度
+            radius: 200, // Boss体型半径
+            color: '#ffaa00', // Boss渲染颜色
+            laser: {
+                angularSpeed: 0.00001, // 每帧旋转角速度（默认慢转圈）
+                length: 2000, // 激光长度
+                width: 100, // 激光宽度
+                warmup: 600, // 预警帧数
+                duration: 5000, // 持续帧数
+                cooldown: 600, // 两次激光之间冷却
+                initialCooldown: 240, // 初次出招延迟
+                color: '#ffbb33' // 主体颜色
+            }
+        },
+        types: {
+            basic: { hp: 5, speed: 1.5, radius: 15, color: '#ff0000' }, // 普通杂兵数值
+            dasher: { hp: 20, speed: 1, radius: 18, color: '#ffff00' }, // 突进怪数值
+            sniper: { hp: 10, speed: 1, radius: 18, color: '#cc00ff' }, // 狙击怪数值
+            sprayer: { hp: 100, speed: 0.75, radius: 50, color: '#00ffff' }, // 扫射怪数值
+            minelayer: { hp: 25, speed: 1.25, radius: 40, color: '#33ff33' }, // 布雷怪数值
+            mine: { hp: 1, speed: 0, radius: 20, color: '#00ff00' } // 地雷数值
+        },
+        drops: {
+            ammoCoreChance: 0.0375, // 普通敌人掉落弹药核心的概率
+            ammoCoreChanceMinelayer: 0.075, // 布雷怪掉落弹药核心的概率
+            coolantChanceFromElites: 0.2, // 突进/狙击掉落冷却液的概率
+            bombChance: 0.05, // 掉落炸弹的概率
+            miniBombChance: 0.08, // 掉落小炸弹的概率（释放追踪弹幕）
+            hpChance: 0.2 // 掉落血包的概率（在未掉弹药/冷却时）
+        }
+    },
+    spawn: {
+        indicatorTime: 60, // 预警提示持续帧数
+        baseInterval: 120, // 初始出怪间隔
+        minInterval: 30, // 出怪间隔下限
+        waveAccel: 5, // 每波减少的出怪间隔
+        bossSlowMultiplier: 10, // Boss战时出怪间隔倍率
+        bossStoryWave: 5, // 剧情模式Boss出现波次
+        bossEndlessInterval: 10, // 无尽模式Boss间隔波次
+        bossChance: 0.05 // 满足条件时刷Boss的概率
+    },
+    waves: {
+        advanceIntervalFrames: 9600, // 提升波次的帧间隔
+        endlessDifficultyStepInterval: 10, // 无尽模式提升难度的波次间隔
+        endlessDifficultyStep: 0.2 // 无尽模式每次提升的难度倍率
+    },
+    endlessScaling: {
+        hpPerWaveRatio: 0.3, // 无尽模式血量百分比成长
+        speedPerWaveRatio: 0.02, // 无尽模式速度百分比成长
+        speedCap: 5, // 无尽模式速度封顶
+        radiusPerWaveRatio: 0.05, // 无尽模式体型百分比成长
+        radiusCap: 3 // 无尽模式体型成长封顶倍数
+    }
+};
 let animationFrameId = null; // Initialize as null
+
+// 拆出的便捷引用，方便在逻辑中使用配置
+const WORLD_CFG = GAME_CONFIG.world;
+const PLAYER_CFG = GAME_CONFIG.player;
+const ENEMY_CFG = GAME_CONFIG.enemies;
+const SPAWN_CFG = GAME_CONFIG.spawn;
+const WAVE_CFG = GAME_CONFIG.waves;
+const ENDLESS_CFG = GAME_CONFIG.endlessScaling;
+const WORLD_W = WORLD_CFG.width;
+const WORLD_H = WORLD_CFG.height;
+const FPS = 60;
+const XP_CFG = PLAYER_CFG.weapon.xp;
+const LEVEL_CAP = XP_CFG.levelCap;
 
 const SPEAKER_PROFILES = {
     MAFUYU: { alias: 'MAFUYU', avatar: "assets/images/enemy.png" },
@@ -41,6 +174,16 @@ function resolveSpeaker(raw, avatarOverride = null) {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const withAlpha = (hex, alpha) => {
+    if (!hex) return `rgba(255, 255, 255, ${alpha})`;
+    const h = hex.replace('#', '');
+    const normalized = h.length === 3 ? h.split('').map(ch => ch + ch).join('') : h.padEnd(6, '0');
+    const num = parseInt(normalized, 16);
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 /**
  * UI COMMUNICATOR
@@ -653,17 +796,17 @@ let specialAmmoCooldown = 0;
 let specialAimLock = null;
 
 // Entities
-// HP set to 5. 
+// 玩家基础属性全部来自配置，便于统一调数
 const player = { 
     x: 0, y: 0, 
-    hp: 5, maxHp: 5, 
-    bombs: 3, 
+    hp: PLAYER_CFG.baseHp, maxHp: PLAYER_CFG.baseHp, 
+    bombs: PLAYER_CFG.baseBombs, 
     weaponLvl: 1, weaponXp: 0, 
     invinc: 0, 
     dashCd: 0, dashTime: 0, perfectDashWindow: 0, 
-    angle: 0, speed: 3.5, radius: 15, glitchTime: 0,
-    ammo: AMMO_MAX, maxAmmo: AMMO_MAX,
-    heat: 0, heatMax: HEAT_MAX,
+    angle: 0, speed: PLAYER_CFG.speed, radius: PLAYER_CFG.radius, glitchTime: 0,
+    ammo: PLAYER_CFG.ammo.max, maxAmmo: PLAYER_CFG.ammo.max,
+    heat: 0, heatMax: PLAYER_CFG.heat.max,
     weaponLock: 0, lockReason: null
 };
 const camera = { x: 0, y: 0 };
@@ -683,19 +826,15 @@ function canFireWeapon() {
 }
 
 function applyWeaponLock(reason) {
-    player.weaponLock = Math.max(player.weaponLock, OVERHEAT_LOCK_TIME);
+    player.weaponLock = Math.max(player.weaponLock, PLAYER_CFG.heat.lockDuration);
     player.lockReason = reason;
 }
 
 function consumeShotResources() {
     player.ammo = Math.max(0, player.ammo - 1);
-    player.heat = Math.min(player.heatMax, player.heat + HEAT_PER_SHOT);
-    if (player.heat >= player.heatMax) {
-        applyWeaponLock('heat');
-    }
-    if (player.ammo <= 0) {
-        applyWeaponLock('ammo');
-    }
+    player.heat = Math.min(player.heatMax, player.heat + PLAYER_CFG.heat.perShot);
+    if (player.heat >= player.heatMax) applyWeaponLock('heat');
+    if (player.ammo <= 0) applyWeaponLock('ammo');
 }
 
 function applyAmmoRegen(ratePerSec) {
@@ -703,7 +842,7 @@ function applyAmmoRegen(ratePerSec) {
         ammoRegenBuffer = 0;
         return;
     }
-    ammoRegenBuffer += ratePerSec / 60;
+    ammoRegenBuffer += ratePerSec / FPS;
     const gained = Math.floor(ammoRegenBuffer);
     if (gained > 0) {
         player.ammo = Math.min(player.maxAmmo, player.ammo + gained);
@@ -725,7 +864,13 @@ function findNearestEnemy(x, y) {
 }
 
 function getXpThreshold(level) {
-    return 100 + (level * 50);
+    return XP_CFG.base + (level * XP_CFG.perLevel);
+}
+
+function getWeaponBaseDamage(level) {
+    if (level >= 8) return 3;
+    if (level >= 2) return 2;
+    return 1;
 }
 
 function resize() {
@@ -822,9 +967,11 @@ function startGame() {
     
     // Reset Player
     player.x = WORLD_W/2; player.y = WORLD_H/2;
-    player.hp = player.maxHp; player.bombs = 3; 
-    player.weaponLvl = 1; player.weaponXp = 0; player.invinc = 60; player.glitchTime = 0;
+    player.maxHp = PLAYER_CFG.baseHp;
+    player.hp = player.maxHp; player.bombs = PLAYER_CFG.baseBombs; 
+    player.weaponLvl = 1; player.weaponXp = 0; player.invinc = PLAYER_CFG.startInvincFrames; player.glitchTime = 0;
     player.dashCd = 0; player.dashTime = 0; player.perfectDashWindow = 0;
+    player.maxAmmo = PLAYER_CFG.ammo.max; player.heatMax = PLAYER_CFG.heat.max; player.speed = PLAYER_CFG.speed;
     player.ammo = player.maxAmmo; player.heat = 0; player.weaponLock = 0; player.lockReason = null;
     uiLayer.classList.remove('glitch-ui');
     xpVisual.current = 0; xpVisual.target = 0; xpVisual.loss = 0; xpHitTimer = 0;
@@ -869,9 +1016,9 @@ function showWave(w, sub) {
 
 function doDash() {
     if (player.dashCd <= 0) {
-        player.dashTime = 10;
-        player.dashCd = 50;
-        player.invinc = 15; 
+        player.dashTime = PLAYER_CFG.dash.duration;
+        player.dashCd = PLAYER_CFG.dash.cooldown;
+        player.invinc = PLAYER_CFG.dash.invincFrames; 
         AudioSys.dash();
         for(let i=0; i<8; i++) createParticle(player.x, player.y, '#00ffff', 4, 8);
     }
@@ -879,18 +1026,19 @@ function doDash() {
 
 function useBomb() {
     if (player.bombs > 0) {
+        const bombCfg = PLAYER_CFG.bomb;
         player.bombs--;
-        player.invinc = 120; 
-        screenShake = 40;
-        flashScreen = 10;
+        player.invinc = bombCfg.invincFrames; 
+        screenShake = bombCfg.screenShake;
+        flashScreen = bombCfg.flash;
         AudioSys.boom('big');
         createShockwave(player.x, player.y, 1000, '#ffaa00');
         
         DialogueSys.emuWonderhoy();
 
         enemies.forEach(e => {
-            if (e.type === 'boss') takeDamage(e, 200);
-            else takeDamage(e, 9999);
+            if (e.type === 'boss') takeDamage(e, bombCfg.bossDamage);
+            else takeDamage(e, bombCfg.normalDamage);
         });
         
         bullets = bullets.filter(b => b.owner === 'player');
@@ -910,8 +1058,8 @@ function update() {
 
     // Player Move
     const locked = player.weaponLock > 0 || player.ammo <= 0;
-    const speedPenalty = locked ? 0.9 : 1;
-    let spd = player.dashTime > 0 ? player.speed * 3 : player.speed * speedPenalty;
+    const speedPenalty = locked ? PLAYER_CFG.movementLockPenalty : 1;
+    let spd = player.dashTime > 0 ? player.speed * PLAYER_CFG.dash.speedMultiplier : player.speed * speedPenalty;
     if (keys['KeyW']) player.y -= spd;
     if (keys['KeyS']) player.y += spd;
     if (keys['KeyA']) player.x -= spd;
@@ -927,7 +1075,7 @@ function update() {
         player.dashTime--;
         createParticle(player.x, player.y, '#00ffff', 2, 0);
         if (player.dashTime === 0) {
-            player.perfectDashWindow = 120; // 1 second window (60 frames)
+            player.perfectDashWindow = PLAYER_CFG.dash.perfectWindow; // 冲刺结束后的强化射击窗口
             // Visual cue for perfect dash window start
             createShockwave(player.x, player.y, 60, '#00ffcc'); 
         } 
@@ -955,7 +1103,10 @@ function update() {
     }
     
     // Shoot
-    const fireRate = player.weaponLvl >= 8 ? 4 : Math.max(5, 10 - Math.floor(player.weaponLvl/2));
+    const fireCfg = PLAYER_CFG.weapon.fireRate;
+    const fireRate = player.weaponLvl >= fireCfg.fastLevelThreshold
+        ? fireCfg.fastFrameInterval
+        : Math.max(fireCfg.min, fireCfg.base - Math.floor(player.weaponLvl / fireCfg.levelStepDivisor));
     if (mouse.down && frames % fireRate === 0 && canFireWeapon()) {
         playerShoot();
         consumeShotResources();
@@ -963,14 +1114,15 @@ function update() {
     }
 
     // Passive Ammo Regen (boss waves regen faster)
-    const regenRate = bossActive ? AMMO_REGEN_BOSS_PER_SEC : AMMO_REGEN_PER_SEC;
+    const regenRate = bossActive ? PLAYER_CFG.ammo.bossRegenPerSec : PLAYER_CFG.ammo.regenPerSec;
     applyAmmoRegen(regenRate);
 
     // Special auto-aimed shot once weapon level is high enough
-    if (player.weaponLvl >= SPECIAL_AMMO_LEVEL_REQ && !specialAimLock && specialAmmoCooldown <= 0 && canFireWeapon() && enemies.length > 0) {
+    const specialCfg = PLAYER_CFG.ammo.special;
+    if (player.weaponLvl >= specialCfg.levelReq && !specialAimLock && specialAmmoCooldown <= 0 && canFireWeapon() && enemies.length > 0) {
         const { target } = findNearestEnemy(player.x, player.y);
         if (target) {
-            specialAimLock = { targetId: target.id, timer: SPECIAL_AMMO_WINDUP, duration: SPECIAL_AMMO_WINDUP };
+            specialAimLock = { targetId: target.id, timer: specialCfg.windup, duration: specialCfg.windup };
         }
     }
     if (specialAimLock) {
@@ -980,7 +1132,7 @@ function update() {
         } else if (specialAimLock.timer <= 0) {
             if (fireSpecialAmmo(lockTarget)) {
                 firedThisFrame = true;
-                specialAmmoCooldown = SPECIAL_AMMO_COOLDOWN;
+                specialAmmoCooldown = specialCfg.cooldown;
             }
             specialAimLock = null;
         } else {
@@ -990,8 +1142,9 @@ function update() {
 
     // Passive Cooling
     if (!firedThisFrame) {
-        player.heat = Math.max(0, player.heat - HEAT_COOLDOWN_RATE);
-        if (player.weaponLock <= 0 && player.heat < player.heatMax * 0.8 && player.lockReason === 'heat') {
+        const cooldownPerFrame = PLAYER_CFG.heat.cooldownPerSec / FPS;
+        player.heat = Math.max(0, player.heat - cooldownPerFrame);
+        if (player.weaponLock <= 0 && player.heat < player.heatMax * PLAYER_CFG.ammo.lockUnlockRatio && player.lockReason === 'heat') {
             player.lockReason = null;
         }
     }
@@ -1000,20 +1153,20 @@ function update() {
     }
 
     // Spawning
-    const baseSpawnRate = Math.max(30, 120 - wave * 5);
-    const spawnRate = bossActive ? baseSpawnRate * 10 : baseSpawnRate;
+    const baseSpawnRate = Math.max(SPAWN_CFG.minInterval, SPAWN_CFG.baseInterval - wave * SPAWN_CFG.waveAccel);
+    const spawnRate = bossActive ? baseSpawnRate * SPAWN_CFG.bossSlowMultiplier : baseSpawnRate;
     if (frames % spawnRate === 0) prepareSpawn();
 
     // Slow down wave escalation: advance every 9600 frames instead of 1800
-    if (frames % 9600 === 0) {
+    if (frames % WAVE_CFG.advanceIntervalFrames === 0) {
         wave++;
         showWave(wave);
         DialogueSys.waveAlert(wave);
         
         if (endlessMode) {
             // Increase difficulty every 10 waves in endless
-            if (wave % 10 === 0) {
-                difficultyMultiplier += 0.2;
+            if (wave % WAVE_CFG.endlessDifficultyStepInterval === 0) {
+                difficultyMultiplier += WAVE_CFG.endlessDifficultyStep;
                 Comms.show(`DIFFICULTY UP: x${difficultyMultiplier.toFixed(1)}`, "SYSTEM", "#ff0000", null, { priority: true });
             }
         }
@@ -1159,8 +1312,38 @@ function update() {
         else if (e.type === 'boss') {
             e.phaseTimer = (e.phaseTimer || 0) + 1;
             const phase = Math.floor(e.phaseTimer / 300) % 3;
+            if (e.laserCooldown === undefined) e.laserCooldown = 240; // Delay first beam a bit
+            if (e.laserWarmup > 0) e.laserWarmup--;
+            if (e.laserCooldown > 0) e.laserCooldown--;
+            const laserActive = bullets.some(b => b.laserBeam && b.anchorId === e.id);
             e.x += Math.cos(angleToPlayer) * 0.5; 
             e.y += Math.sin(angleToPlayer) * 0.5;
+
+            // New Skill: Orbiting mega-laser that sweeps 360 degrees
+            if (phase === 2 && e.laserCooldown <= 0 && !laserActive) {
+                if (e.laserWarmup === undefined) {
+                    e.laserWarmup = 60; // Telegraph before firing
+                    createShockwave(e.x, e.y, 260, '#ff6600', { soft: true, speed: 12, fade: 0.05, spread: 28, lineWidth: 7 });
+                    DialogueSys.bossAttack();
+                } else if (e.laserWarmup === 0) {
+                    bullets.push({
+                        x: e.x,
+                        y: e.y,
+                        owner: 'enemy',
+                        laserBeam: true,
+                        anchorId: e.id,
+                        angle: angleToPlayer,
+                        angularSpeed: 0.04,
+                        length: 2000,
+                        width: 70,
+                        color: '#ffbb33',
+                        life: 240
+                    });
+                    e.laserCooldown = 600;
+                    e.laserWarmup = undefined;
+                }
+            }
+
             if (frames % 10 === 0) {
                 if(Math.random() < 0.02) DialogueSys.bossAttack();
                 if (phase === 0) {
@@ -1225,10 +1408,35 @@ function update() {
     // Bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
+        if (b.laserBeam) {
+            const anchor = enemies.find(en => en.id === b.anchorId && en.type === 'boss');
+            if (!anchor) { bullets.splice(i, 1); continue; }
+            b.life--;
+            b.angle += b.angularSpeed || 0;
+            b.x = anchor.x;
+            b.y = anchor.y;
+
+            const startX = anchor.x;
+            const startY = anchor.y;
+            const endX = startX + Math.cos(b.angle) * b.length;
+            const endY = startY + Math.sin(b.angle) * b.length;
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const denom = dx*dx + dy*dy || 1;
+            const t = clamp(((player.x - startX) * dx + (player.y - startY) * dy) / denom, 0, 1);
+            const closestX = startX + dx * t;
+            const closestY = startY + dy * t;
+            if (Math.hypot(player.x - closestX, player.y - closestY) < player.radius + (b.width || 0) / 2) {
+                if (player.invinc <= 0) takePlayerDamage();
+            }
+
+            if (b.life <= 0) { bullets.splice(i, 1); }
+            continue;
+        }
         if (b.homing) {
             let target = player;
             if (b.owner === 'player') {
-                const lockRange = b.lockRange || 500;
+                const lockRange = b.lockRange || PLAYER_CFG.weapon.homingLockRange || 500;
                 let minDist = lockRange;
                 target = null;
                 for(const e of enemies) {
@@ -1260,7 +1468,8 @@ function update() {
                 const hitRadius = b.isPerfect ? b.size * 1.2 : b.size;
                 
                 if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius + hitRadius) {
-                    const dmg = b.damageMult ? Math.floor(player.weaponLvl * b.damageMult) : player.weaponLvl;
+                    const baseDmg = getWeaponBaseDamage(player.weaponLvl);
+                    const dmg = b.damageMult ? Math.floor(baseDmg * b.damageMult) : baseDmg;
                     takeDamage(e, dmg);  
                     createParticle(b.x, b.y, b.color, 2, 2);
                     if (!b.pierce || b.pierce <= 0) {
@@ -1285,8 +1494,15 @@ function update() {
     // Particles
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        if (p.shockwave) { p.radius += p.speed; p.life -= 0.02; }
-        else { p.x += p.vx; p.y += p.vy; p.life -= 0.05; }
+        if (p.shockwave) {
+            const growth = p.speed !== undefined ? p.speed : 20;
+            const fade = p.fade !== undefined ? p.fade : 0.02;
+            p.radius += growth;
+            p.life -= fade;
+            if (p.maxR && p.radius >= p.maxR) p.life = 0;
+        } else {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+        }
         if (p.life <= 0) particles.splice(i, 1);
     }
 
@@ -1307,21 +1523,21 @@ function update() {
             }
             if (p.type==='xp') { 
                 const prevLvl = player.weaponLvl;
-                player.weaponXp+=10; 
+                player.weaponXp += XP_CFG.pickupGain; 
                 // Higher threshold per level
                 const threshold = getXpThreshold(player.weaponLvl);
                 if(player.weaponXp>=threshold) { 
-                    if(player.weaponLvl < 10) {
+                    if(player.weaponLvl < LEVEL_CAP) {
                         player.weaponLvl++; 
                         player.weaponXp=0; 
                         createText(player.x, player.y, "LEVEL UP!", "#ffff00"); 
                         AudioSys.powerup();
-                        DialogueSys.levelUp(player.weaponLvl >= 10);
+                        DialogueSys.levelUp(player.weaponLvl >= LEVEL_CAP);
                         DialogueSys.emuLevelUp();
                     } else {
                         player.weaponXp = threshold; // Maxed
                         createText(player.x, player.y, "MAX PWR", "#ffaa00");
-                        if (prevLvl < 10) {
+                        if (prevLvl < LEVEL_CAP) {
                             DialogueSys.levelUp(true);
                             DialogueSys.emuLevelUp();
                         }
@@ -1379,7 +1595,7 @@ function update() {
     } else {
         xpContainer.style.filter = '';
     }
-    uiLvl.innerText = player.weaponLvl >= 10 ? "MAX" : player.weaponLvl;
+    uiLvl.innerText = player.weaponLvl >= LEVEL_CAP ? "MAX" : player.weaponLvl;
 }
 
 // --- SPAWN SYSTEM ---
@@ -1402,34 +1618,32 @@ function prepareSpawn() {
     
     // Boss Logic: Wave 5 in Story, or Every 10 Waves in Endless
     let bossWave = false;
-    if (!endlessMode && wave === 5) bossWave = true;
-    if (endlessMode && wave % 10 === 0) bossWave = true;
+    if (!endlessMode && wave === SPAWN_CFG.bossStoryWave) bossWave = true;
+    if (endlessMode && wave % SPAWN_CFG.bossEndlessInterval === 0) bossWave = true;
 
-    if (bossWave && Math.random() > 0.95 && !enemies.some(e=>e.type==='boss')) type = 'boss';
+    if (bossWave && Math.random() < SPAWN_CFG.bossChance && !enemies.some(e=>e.type==='boss')) type = 'boss';
 
-    spawnIndicators.push({ x: sx, y: sy, type: type, timer: 60 });
+    spawnIndicators.push({ x: sx, y: sy, type: type, timer: SPAWN_CFG.indicatorTime });
 }
 
 function spawnEnemy(x, y, type) {
-    let stats = { hp: 5, speed: 1.5, color: '#ff0000', radius: 15, id: Math.random()*100 };
+    const typeCfg = ENEMY_CFG.types[type] || ENEMY_CFG.types.basic;
+    let stats = { ...typeCfg, id: Math.random()*100 };
     if (type === 'dasher') {
-        stats = { hp: 15, speed: 1, color: '#ffff00', radius: 18, state: 'chase', cd: 0, id: Math.random()*100 };
+        stats = { ...stats, state: 'chase', cd: 0 };
         if(Math.random() < 0.3) DialogueSys.typeCSpawn();
     }
     if (type === 'sniper') {
-        stats = { hp: 10, speed: 1, color: '#cc00ff', radius: 18, id: Math.random()*100 };
         if(Math.random() < 0.3) DialogueSys.typeASpawn();
     }
     if (type === 'sprayer') {
-        stats = { hp: 20, speed: 0.75, color: '#00ffff', radius: 22, id: Math.random()*100 };
         if(Math.random() < 0.3) DialogueSys.typeASpawn();
     }
     if (type === 'minelayer') {
-        stats = { hp: 25, speed: 1.25, color: '#33ff33', radius: 20, angle: 0, id: Math.random()*100 };
+        stats = { ...stats, angle: 0 };
         if(Math.random() < 0.3) DialogueSys.typeBSpawn();
     }
     if (type === 'mine') {
-        stats = { hp: 1, speed: 0, color: '#00ff00', radius: 10, id: Math.random()*100 }; 
         // No dialogue for mines usually
     }
     if (type === 'basic') {
@@ -1440,34 +1654,41 @@ function spawnEnemy(x, y, type) {
         enemies = [];
         bullets = bullets.filter(b => b.owner === 'player');
         spawnIndicators = [];
-        stats = { hp: (500 + wave*50) * 10, speed: 0.5, color: '#ffaa00', radius: 120, id: Math.random()*100 };
+        const bossCfg = ENEMY_CFG.boss;
+        stats = { 
+            hp: (bossCfg.baseHp + wave * bossCfg.hpPerWave) * bossCfg.hpMultiplier, 
+            speed: bossCfg.speed, 
+            color: bossCfg.color, 
+            radius: bossCfg.radius, 
+            id: Math.random()*100 
+        };
         DialogueSys.bossEntry();
         screenShake = 60;
         flashScreen = 20;
         AudioSys.boom('big');
         createShockwave(x, y, 2000, '#ff0000');
     }
-    if (type !== 'mine') stats.hp += wave * 2; 
+    if (type !== 'mine') stats.hp += wave * ENEMY_CFG.perWaveHpBonus; 
     
     // Endless Mode Scaling
     if (endlessMode) {
         // Endless Wave Count (Starting from 0 when Endless begins after Wave 5)
-        const endlessWave = Math.max(0, wave - 5);
+        const endlessWave = Math.max(0, wave - SPAWN_CFG.bossStoryWave);
         
         // HP Scaling:
         // Multiplier (stepped) * Linear growth per wave (30% per wave)
-        const hpGrowth = 1 + (endlessWave * 0.3); 
+        const hpGrowth = 1 + (endlessWave * ENDLESS_CFG.hpPerWaveRatio); 
         stats.hp *= difficultyMultiplier * hpGrowth;
 
         // Speed Scaling:
         // Capped at 5 to prevent unplayable speed
-        stats.speed = Math.min(stats.speed * (1 + endlessWave * 0.02), 5); 
+        stats.speed = Math.min(stats.speed * (1 + endlessWave * ENDLESS_CFG.speedPerWaveRatio), ENDLESS_CFG.speedCap); 
 
         // Size (Volume) Scaling:
         // Significant permanent increase per wave (5% per wave)
         // Cap at 3x original size to keep game playable
-        const sizeGrowth = 1 + (endlessWave * 0.05);
-        stats.radius *= Math.min(sizeGrowth, 3.0);
+        const sizeGrowth = 1 + (endlessWave * ENDLESS_CFG.radiusPerWaveRatio);
+        stats.radius *= Math.min(sizeGrowth, ENDLESS_CFG.radiusCap);
     }
 
     enemies.push({ x, y, type, ...stats, maxHp: stats.hp });
@@ -1475,6 +1696,7 @@ function spawnEnemy(x, y, type) {
 
 function fireSpecialAmmo(target) {
     if (!target || !canFireWeapon()) return false;
+    const specialCfg = PLAYER_CFG.ammo.special;
     consumeShotResources();
     AudioSys.shoot();
     AudioSys.playTone(520, 'triangle', 0.22, 0.05);
@@ -1482,20 +1704,20 @@ function fireSpecialAmmo(target) {
     bullets.push({
         x: player.x + Math.cos(ang) * 20,
         y: player.y + Math.sin(ang) * 20,
-        vx: Math.cos(ang) * SPECIAL_AMMO_SPEED,
-        vy: Math.sin(ang) * SPECIAL_AMMO_SPEED,
+        vx: Math.cos(ang) * specialCfg.speed,
+        vy: Math.sin(ang) * specialCfg.speed,
         life: 140,
         size: 9,
         color: '#ff66ff',
         owner: 'player',
         homing: true,
-        lockRange: 1400,
+        lockRange: specialCfg.lockRange,
         targetId: target.id,
         pierce: 1,
-        damageMult: SPECIAL_AMMO_DAMAGE_MULT,
+        damageMult: specialCfg.damageMult,
         special: true
     });
-    createShockwave(player.x, player.y, 70, '#ff66ff');
+    createShockwave(player.x, player.y, 50, '#ff66ff', { soft: true, speed: 10, fade: 0.04, spread: 22 });
     return true;
 }
 
@@ -1527,7 +1749,7 @@ function playerShoot() {
     let pierce = 0;
     let size = 4;
 
-    // --- EXPANDED WEAPON PROGRESSION (10 Levels) ---
+    // --- EXPANDED WEAPON PROGRESSION (按等级逐步解锁) ---
     const lv = player.weaponLvl;
     
     if (lv === 1) { count=1; speed=15; }
@@ -1539,7 +1761,7 @@ function playerShoot() {
     if (lv === 7) { count=3; spread=0.3; speed=15; color='#aa00ff'; homing=true; }
     if (lv === 8) { count=4; spread=0.3; speed=16; color='#aa00ff'; homing=true; }
     if (lv === 9) { count=5; spread=0.4; speed=16; color='#aa00ff'; homing=true; }
-    if (lv >= 10) { count=5; spread=0.4; speed=20; color='#ffaa00'; homing=true; pierce=1; size=6; }
+    if (lv >= LEVEL_CAP) { count=5; spread=0.4; speed=20; color='#ffaa00'; homing=true; pierce=1; size=6; }
 
     for(let i=0; i<count; i++) {
         let a = player.angle;
@@ -1550,7 +1772,7 @@ function playerShoot() {
             x: player.x + Math.cos(a)*20, y: player.y + Math.sin(a)*20,
             vx: Math.cos(a)*speed, vy: Math.sin(a)*speed,
             life: 80, size: size, color: color, owner: 'player', 
-            homing: homing, pierce: pierce
+            homing: homing, pierce: pierce, lockRange: homing ? PLAYER_CFG.weapon.homingLockRange : undefined
         });
     }
 }
@@ -1559,7 +1781,7 @@ function takeDamage(e, dmg) {
     let finalDmg = dmg;
     // Dasher Weakness: 30% more damage during Charge state
     if (e.type === 'dasher' && e.state === 'charge') {
-        finalDmg = Math.ceil(dmg * 1.3);
+        finalDmg = Math.ceil(dmg * ENEMY_CFG.dasherChargeWeakness);
         createText(e.x, e.y - 10, "CRIT!", "#ff0000");
     }
 
@@ -1575,14 +1797,14 @@ function takeDamage(e, dmg) {
 
         if (e.hp <= 0) {
             enemies.splice(enemies.indexOf(e), 1);
-            if (e.type === 'boss') {
-                bossActive = enemies.some(en => en.type === 'boss');
-                // Story Mode Completion
-                // Use >= 5 to catch cases where wave might advance slightly past 5 during fight
-                if (!bossActive && !endlessMode && wave >= 5) {
-                    gameActive = false;
-                    AudioSys.stopShots();
-                    missionCompleteScreen.style.display = 'flex';
+                if (e.type === 'boss') {
+                    bossActive = enemies.some(en => en.type === 'boss');
+                    // Story Mode Completion
+                    // Use >= 5 to catch cases where wave might advance slightly past 5 during fight
+                    if (!bossActive && !endlessMode && wave >= SPAWN_CFG.bossStoryWave) {
+                        gameActive = false;
+                        AudioSys.stopShots();
+                        missionCompleteScreen.style.display = 'flex';
                     // Stop loop explicitly
                     if(animationFrameId) {
                          cancelAnimationFrame(animationFrameId);
@@ -1599,25 +1821,26 @@ function takeDamage(e, dmg) {
             else if (e.type === 'minelayer' || e.type === 'basic') DialogueSys.typeBDeath();
         }
 
-        if(e.type === 'mine') { AudioSys.boom('small'); createShockwave(e.x, e.y, 50, '#00ff00'); return; }
+        if(e.type === 'mine') { AudioSys.boom('small'); createShockwave(e.x, e.y, 32, '#00ff00', { soft: true, speed: 9, fade: 0.05, spread: 14 }); return; }
         
-        score += e.maxHp * 10;
+        score += e.maxHp * ENEMY_CFG.scorePerHp;
         AudioSys.boom(e.type==='boss'?'big':'small');
 
         // Drop logic with Ammo/Coolant priorities
         let dropped = false;
-        const ammoChance = e.type === 'minelayer' ? 0.075 : 0.0375;
+        const drops = ENEMY_CFG.drops;
+        const ammoChance = e.type === 'minelayer' ? drops.ammoCoreChanceMinelayer : drops.ammoCoreChance;
         if (Math.random() < ammoChance) {
             pickups.push({x:e.x, y:e.y, type:'ammo', color:'#33ffaa'});
             dropped = true;
-        } else if ((e.type === 'dasher' || e.type === 'sniper') && Math.random() < 0.20) {
+        } else if ((e.type === 'dasher' || e.type === 'sniper') && Math.random() < drops.coolantChanceFromElites) {
             pickups.push({x:e.x, y:e.y, type:'coolant', color:'#66ccff'});
             dropped = true;
         }
 
         if (!dropped) {
-            if (Math.random() < 0.05) pickups.push({x:e.x, y:e.y, type:'bomb', color:'#ffaa00'});
-            else if (Math.random() < 0.2) pickups.push({x:e.x, y:e.y, type:'hp', color:'#00ff00'});
+            if (Math.random() < drops.bombChance) pickups.push({x:e.x, y:e.y, type:'bomb', color:'#ffaa00'});
+            else if (Math.random() < drops.hpChance) pickups.push({x:e.x, y:e.y, type:'hp', color:'#00ff00'});
             else pickups.push({x:e.x, y:e.y, type:'xp', color:'#00ffff'});
         }
         for(let i=0; i<10; i++) createParticle(e.x, e.y, e.color, 4, 4);
@@ -1626,9 +1849,10 @@ function takeDamage(e, dmg) {
 
 function takePlayerDamage() {
     player.hp--;
-    // PENALTY: Lose 25% of current XP; can trigger level-down
+    // PENALTY: 按配置扣除当前等级经验，可触发掉级
     const lossBase = getXpThreshold(player.weaponLvl);
-    const xpLoss = Math.max(1, Math.floor(lossBase * 0.25));
+    const lossPercent = XP_CFG.lossPercentOnHit;
+    const xpLoss = Math.max(1, Math.floor(lossBase * lossPercent));
     player.weaponXp -= xpLoss;
 
     let leveledDown = false;
@@ -1673,8 +1897,20 @@ function takePlayerDamage() {
 function createParticle(x, y, col, size, spd) {
     particles.push({x, y, vx: (Math.random()-0.5)*spd, vy: (Math.random()-0.5)*spd, life: 1, color: col, size});
 }
-function createShockwave(x, y, r, col) {
-    particles.push({x, y, radius: 10, maxR: r, life: 1, color: col, shockwave: true, speed: 20});
+function createShockwave(x, y, r, col, opts = {}) {
+    particles.push({
+        x, y,
+        radius: opts.startRadius ?? 8,
+        maxR: r,
+        life: 1,
+        color: col,
+        shockwave: true,
+        speed: opts.speed ?? 20,
+        fade: opts.fade ?? 0.02,
+        soft: !!opts.soft,
+        spread: opts.spread ?? 16,
+        lineWidth: opts.lineWidth ?? 5
+    });
 }
 function createText(x, y, txt, col) {
     floats.push({x, y, text: txt, color: col, life: 40});
@@ -1766,7 +2002,7 @@ function draw() {
 
     // 4. Spawn Indicators (MINIMALIST - NO BIG RING)
     spawnIndicators.forEach(ind => {
-        const maxTimer = 60;
+        const maxTimer = SPAWN_CFG.indicatorTime;
         const progress = ind.timer / maxTimer;
         let color = '#ff0000';
         
@@ -2117,6 +2353,36 @@ function draw() {
 
     // 8. Bullets (Dynamic Colors)
     bullets.forEach(b => {
+        if (b.laserBeam) {
+            const startX = b.x;
+            const startY = b.y;
+            const endX = startX + Math.cos(b.angle) * b.length;
+            const endY = startY + Math.sin(b.angle) * b.length;
+            ctx.save();
+            ctx.lineWidth = b.width;
+            ctx.lineCap = 'round';
+            const grad = ctx.createLinearGradient(startX, startY, endX, endY);
+            grad.addColorStop(0, withAlpha(b.color, 0.15));
+            grad.addColorStop(0.5, withAlpha('#ff6600', 0.85));
+            grad.addColorStop(1, '#ffffff');
+            ctx.strokeStyle = grad;
+            ctx.shadowBlur = 35;
+            ctx.shadowColor = '#ff6600';
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            // Core line for extra brightness
+            ctx.lineWidth = Math.max(8, b.width * 0.35);
+            ctx.strokeStyle = withAlpha('#ffffff', 0.9);
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
         ctx.shadowBlur = 10; 
         ctx.shadowColor = b.color; 
         ctx.fillStyle = b.color;
@@ -2201,8 +2467,27 @@ function draw() {
     ctx.globalCompositeOperation = 'lighter';
     particles.forEach(p => {
         if (p.shockwave) {
-            ctx.strokeStyle = p.color; ctx.lineWidth = 5;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.stroke();
+            ctx.globalAlpha = 1;
+            const alpha = Math.max(0, p.life);
+            if (p.soft) {
+                const spread = p.spread || 16;
+                const innerR = Math.max(0, p.radius - spread * 0.6);
+                const outerR = p.radius + spread;
+                const grad = ctx.createRadialGradient(p.x, p.y, innerR, p.x, p.y, outerR);
+                grad.addColorStop(0, withAlpha(p.color, 0.28 * alpha));
+                grad.addColorStop(0.6, withAlpha(p.color, 0.14 * alpha));
+                grad.addColorStop(1, withAlpha(p.color, 0));
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, outerR, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = withAlpha(p.color, 0.8 * alpha);
+                ctx.lineWidth = p.lineWidth || 5;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                ctx.stroke();
+            }
         } else {
             ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
             ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
