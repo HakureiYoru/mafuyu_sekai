@@ -1,14 +1,21 @@
 {
-  "name": "mafuyu-sekai-desktop",
+  "name": "mafuyu-sekai-web",
   "version": "0.1.0",
-  "description": "Electron wrapper for Mafuyu Sekai: Neon Remake",
-  "main": "electron-main.js",
+  "private": true,
+  "description": "Next.js web build for Mafuyu Sekai: Neon Remake",
   "scripts": {
-    "start": "electron .",
-    "pack": "electron-packager . MafuyuSekai --platform=win32 --arch=x64 --out=dist --overwrite --ignore=^/venv --ignore=^/\\.idea --ignore=^/dist"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "electron": "^31.2.0",
-    "electron-packager": "^17.1.1"
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0"
   }
 }

@@ -18,7 +18,9 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'dx.html'));
+  // Serve the static HTML from the new public directory so the Electron build
+  // stays compatible with the Next.js layout we use for web deployment.
+  mainWindow.loadFile(path.join(__dirname, 'public', 'dx.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
