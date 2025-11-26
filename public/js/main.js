@@ -83,11 +83,11 @@ const GAME_CONFIG = {
             radius: 200, // Boss体型半径
             color: '#ffaa00', // Boss渲染颜色
             laser: {
-                angularSpeed: 0.00001, // 每帧旋转角速度（默认慢转圈）
+                angularSpeed: 0.015, // 每帧旋转角速度（默认慢转圈）
                 length: 2000, // 激光长度
-                width: 100, // 激光宽度
-                warmup: 600, // 预警帧数
-                duration: 5000, // 持续帧数
+                width: 70, // 激光宽度
+                warmup: 60, // 预警帧数
+                duration: 420, // 持续帧数 (2PI / 0.015 ≈ 418)
                 cooldown: 600, // 两次激光之间冷却
                 initialCooldown: 240, // 初次出招延迟
                 color: '#ffbb33' // 主体颜色
@@ -1332,14 +1332,14 @@ function update() {
                         owner: 'enemy',
                         laserBeam: true,
                         anchorId: e.id,
-                        angle: angleToPlayer,
-                        angularSpeed: 0.04,
-                        length: 2000,
-                        width: 70,
-                        color: '#ffbb33',
-                        life: 240
+                        angle: angleToPlayer + Math.PI, // Start opposite to player
+                        angularSpeed: ENEMY_CFG.boss.laser.angularSpeed,
+                        length: ENEMY_CFG.boss.laser.length,
+                        width: ENEMY_CFG.boss.laser.width,
+                        color: ENEMY_CFG.boss.laser.color,
+                        life: ENEMY_CFG.boss.laser.duration
                     });
-                    e.laserCooldown = 600;
+                    e.laserCooldown = ENEMY_CFG.boss.laser.cooldown;
                     e.laserWarmup = undefined;
                 }
             }
