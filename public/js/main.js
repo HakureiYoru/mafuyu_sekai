@@ -87,9 +87,9 @@ const GAME_CONFIG = {
             laser: {
                 angularSpeed: 0.004, // 每帧旋转角速度（默认慢转圈）
                 length: 4000, // 激光长度
-                width: 140, // 激光宽度
+                width: 500, // 激光宽度
                 warmup: 60, // 预警帧数
-                duration: 1200, // 持续帧数，缩短以避免长时间锁场
+                duration: 800, // 持续帧数，缩短以避免长时间锁场
                 cooldown: 600, // 两次激光之间冷却
                 initialCooldown: 240, // 初次出招延迟
                 color: '#ffbb33' // 主体颜色
@@ -118,10 +118,10 @@ const GAME_CONFIG = {
         baseInterval: 120, // 初始出怪间隔
         minInterval: 30, // 出怪间隔下限
         waveAccel: 5, // 每波减少的出怪间隔
-        bossSlowMultiplier: 10, // Boss战时出怪间隔倍率
+        bossSlowMultiplier: 5, // Boss战时出怪间隔倍率（提高刷怪频率）
         bossStoryWave: 5, // 剧情模式Boss出现波次
         bossEndlessInterval: 10, // 无尽模式Boss间隔波次
-        bossChance: 0.05 // 满足条件时刷Boss的概率
+        bossChance: 0.05 // 满足条件时刷Boss的概率（已不再使用随机）
     },
     waves: {
         advanceIntervalFrames: 9600, // 提升波次的帧间隔
@@ -807,6 +807,8 @@ let wave = 1;
 let screenShake = 0;
 let flashScreen = 0;
 let bossActive = false;
+let bossStagePending = false;
+let bossSpawnQueued = false;
 let endlessMode = false;
 let difficultyMultiplier = 1.0;
 let ammoRegenBuffer = 0;
@@ -1266,11 +1268,13 @@ function update() {
 
     // Spawning
     const baseSpawnRate = Math.max(SPAWN_CFG.minInterval, SPAWN_CFG.baseInterval - wave * SPAWN_CFG.waveAccel);
+    const inBossPhase = bossActive || bossStagePending || bossSpawnQueued;
     const spawnRate = bossActive ? baseSpawnRate * SPAWN_CFG.bossSlowMultiplier : baseSpawnRate;
-    if (frames % spawnRate === 0) prepareSpawn();
+    if (!bossStagePending && !bossSpawnQueued && frames % spawnRate === 0) prepareSpawn();
 
     // Slow down wave escalation: advance every 9600 frames instead of 1800
     if (frames % WAVE_CFG.advanceIntervalFrames === 0) {
+        const prevWave = wave;
         wave++;
         showWave(wave);
         DialogueSys.waveAlert(wave);
@@ -1282,9 +1286,25 @@ function update() {
                 Comms.show(`DIFFICULTY UP: x${difficultyMultiplier.toFixed(1)}`, "SYSTEM", "#ff0000", null, { priority: true });
             }
         }
+
+        // Queue boss stage after finishing specific waves (story and endless)
+        if (!bossActive && !bossStagePending && !bossSpawnQueued) {
+            if (!endlessMode && prevWave === SPAWN_CFG.bossStoryWave) {
+                bossStagePending = true;
+            } else if (endlessMode && prevWave > 0 && prevWave % SPAWN_CFG.bossEndlessInterval === 0) {
+                bossStagePending = true;
+            }
+        }
     }
 
     // Indicators - NO SHOCKWAVE ON SPAWN
+    if (bossStagePending && !bossSpawnQueued) {
+        bossSpawnQueued = true;
+        const bx = WORLD_W / 2;
+        const by = WORLD_H / 2;
+        spawnIndicators.push({ x: bx, y: by, type: 'boss', timer: SPAWN_CFG.indicatorTime });
+    }
+
     for (let i = spawnIndicators.length - 1; i >= 0; i--) {
         const ind = spawnIndicators[i];
         ind.timer--;
@@ -1779,6 +1799,7 @@ function update() {
 // --- SPAWN SYSTEM ---
 
 function prepareSpawn() {
+    if (bossStagePending || bossSpawnQueued) return; // Hold normal spawns while preparing boss
     if (enemies.length >= PERF_CFG.maxEnemies) return; // Skip spawning when at cap
 
     const dist = Math.max(width, height) / 2 + 100;
@@ -1796,13 +1817,6 @@ function prepareSpawn() {
     if (wave > 3 && roll > 0.85) type = 'sniper';
     if (wave > 4 && roll > 0.92) type = 'sprayer';
     
-    // Boss Logic: Wave 5 in Story, or Every 10 Waves in Endless
-    let bossWave = false;
-    if (!endlessMode && wave === SPAWN_CFG.bossStoryWave) bossWave = true;
-    if (endlessMode && wave % SPAWN_CFG.bossEndlessInterval === 0) bossWave = true;
-
-    if (bossWave && Math.random() < SPAWN_CFG.bossChance && !enemies.some(e=>e.type==='boss')) type = 'boss';
-
     // Reduce minelayer/sniper spawn rate to 30% of original
     if (type === 'minelayer' && Math.random() < 0.7) type = 'basic';
     if (type === 'sniper' && Math.random() < 0.7) type = 'basic';
