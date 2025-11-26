@@ -12,18 +12,20 @@ const GAME_CONFIG = {
         startInvincFrames: 60, // 开局无敌帧数
         movementLockPenalty: 0.9, // 过热/缺弹时的移速倍率
         dash: {
-            duration: 10, // 冲刺持续帧数
-            cooldown: 50, // 冲刺冷却帧数
+            duration: 20, // 冲刺持续帧数
+            cooldown: 300, // 冲刺冷却帧数
             invincFrames: 15, // 冲刺过程提供的无敌帧
-            speedMultiplier: 3, // 冲刺时的移速倍率
-            perfectWindow: 120 // 冲刺结束后可触发强化射击的窗口帧
+            speedMultiplier: 5, // 冲刺时的移速倍率
+            perfectWindow: 150 // 冲刺结束后可触发强化射击的窗口帧
         },
         bomb: {
             invincFrames: 120, // 投放炸弹时的无敌帧数
-            bossDamage: 200, // 炸弹对Boss造成的伤害
-            normalDamage: 9999, // 炸弹对普通怪物造成的伤害
+            bossDamage: 80, // 炸弹对Boss造成的伤害
+            normalDamage: 80, // 炸弹对普通怪物造成的伤害
             screenShake: 40, // 炸弹爆炸产生的震屏幅度
-            flash: 10 // 炸弹爆炸的屏幕闪烁帧数
+            flash: 10, // 炸弹爆炸的屏幕闪烁帧数
+            width: 750, // 炸弹作用范围宽度
+            height: 750 // 炸弹作用范围高度
         },
         miniBomb: {
             burstCount: 15, // 小炸弹释放的追踪弹数量
@@ -34,9 +36,9 @@ const GAME_CONFIG = {
             text: 'HOMING BURST' // 浮空文字
         },
         ammo: {
-            max: 200, // 弹药上限
-            regenPerSec: 2, // 普通波次每秒回弹量
-            bossRegenPerSec: 5, // Boss波次每秒回弹量
+            max: 100, // 弹药上限
+            regenPerSec: 0.5, // 普通波次每秒回弹量
+            bossRegenPerSec: 1.5, // Boss波次每秒回弹量
             lockUnlockRatio: 0.8, // 热量恢复到该比例以下解除过热锁
             special: {
                 levelReq: 4, // 解锁特殊弹的武器等级
@@ -49,8 +51,8 @@ const GAME_CONFIG = {
         },
         heat: {
             max: 250, // 过热槽上限
-            perShot: 5, // 每发射击增加的热量
-            cooldownPerSec: 20, // 每秒自然冷却的热量
+            perShot: 10, // 每发射击增加的热量
+            cooldownPerSec: 10, // 每秒自然冷却的热量
             lockDuration: 180 // 过热/缺弹锁定持续帧数
         },
         weapon: {
@@ -94,8 +96,8 @@ const GAME_CONFIG = {
             }
         },
         types: {
-            basic: { hp: 5, speed: 1.5, radius: 30, color: '#ff0000' }, // 普通杂兵数值
-            dasher: { hp: 20, speed: 1, radius: 36, color: '#ffff00' }, // 突进怪数值
+            basic: { hp: 5, speed: 3, radius: 30, color: '#ff0000' }, // 普通杂兵数值
+            dasher: { hp: 20, speed: 3, radius: 36, color: '#ffff00' }, // 突进怪数值
             sniper: { hp: 10, speed: 1, radius: 36, color: '#cc00ff' }, // 狙击怪数值
             sprayer: { hp: 100, speed: 0.75, radius: 100, color: '#00ffff' }, // 扫射怪数值
             minelayer: { hp: 25, speed: 1.25, radius: 80, color: '#33ff33' }, // 布雷怪数值
@@ -107,7 +109,8 @@ const GAME_CONFIG = {
             coolantChanceFromElites: 0.2, // 突进/狙击掉落冷却液的概率
             bombChance: 0.05, // 掉落炸弹的概率
             miniBombChance: 0.08, // 掉落小炸弹的概率（释放追踪弹幕）
-            hpChance: 0.2 // 掉落血包的概率（在未掉弹药/冷却时）
+            hpChance: 0.2, // 掉落血包的概率（在未掉弹药/冷却时）
+            blackHoleChance: 0.002 // 黑洞：极低概率稀有掉落，全图吸附道具
         }
     },
     spawn: {
@@ -142,6 +145,21 @@ const ENEMY_CFG = GAME_CONFIG.enemies;
 const SPAWN_CFG = GAME_CONFIG.spawn;
 const WAVE_CFG = GAME_CONFIG.waves;
 const ENDLESS_CFG = GAME_CONFIG.endlessScaling;
+const PERF_CFG = {
+    maxEnemies: 180, // Hard cap for all live enemies (skip spawns when exceeded)
+    maxMines: 70, // Separate cap for static mines
+    maxParticles: 900, // Avoid runaway particle counts during mass kills
+    softCollisionLimit: 140, // Skip O(n^2) enemy separation when above this count
+    farUpdateThrottle: 2, // Offscreen enemies update every N frames
+    cullPadding: 320 // Extra padding for draw culling around the viewport
+};
+const ENEMY_MOTION = {
+    baseBlend: 0.1, // How quickly enemies lerp toward their desired velocity
+    baseDrag: 0.88, // Passive slow-down to keep some glide
+    dashBlend: 0.15, // Faster response for dash bursts
+    dashDrag: 0.98, // Preserve dash momentum a bit longer
+    speedCapMult: 3 // Prevent runaway speeds when steering adds up
+};
 const WORLD_W = WORLD_CFG.width;
 const WORLD_H = WORLD_CFG.height;
 const FPS = 60;
@@ -794,6 +812,7 @@ let difficultyMultiplier = 1.0;
 let ammoRegenBuffer = 0;
 let specialAmmoCooldown = 0;
 let specialAimLock = null;
+let blackHolePull = 0; // 黑洞吸附剩余帧数
 
 // Entities
 // 玩家基础属性全部来自配置，便于统一调数
@@ -820,17 +839,78 @@ let pickups = [];
 let floats = [];
 let spawnIndicators = [];
 let stars = [];
+let enemyCounts = {};
+
+function resetEnemyCounts() {
+    enemyCounts = {};
+}
+function trackEnemySpawn(type) {
+    enemyCounts[type] = (enemyCounts[type] || 0) + 1;
+}
+function trackEnemyDeath(type) {
+    if (enemyCounts[type]) enemyCounts[type]--;
+}
+function getEnemyCount(type) {
+    return enemyCounts[type] || 0;
+}
+function addEnemy(entity) {
+    if (entity.vx === undefined) entity.vx = 0;
+    if (entity.vy === undefined) entity.vy = 0;
+    enemies.push(entity);
+    trackEnemySpawn(entity.type);
+}
+function removeEnemy(entity) {
+    const idx = enemies.indexOf(entity);
+    if (idx !== -1) enemies.splice(idx, 1);
+    trackEnemyDeath(entity.type);
+}
+// Smoothly pushes an enemy toward the target velocity to give motion some inertia
+function steerEnemy(e, targetVx, targetVy, opts = {}) {
+    if (e.vx === undefined) e.vx = 0;
+    if (e.vy === undefined) e.vy = 0;
+    const blend = opts.blend ?? ENEMY_MOTION.baseBlend;
+    const drag = opts.drag ?? ENEMY_MOTION.baseDrag;
+    const cap = opts.maxSpeed ?? (e.speed * (opts.speedMult ?? ENEMY_MOTION.speedCapMult));
+
+    e.vx = lerp(e.vx * drag, targetVx, blend);
+    e.vy = lerp(e.vy * drag, targetVy, blend);
+
+    const mag = Math.hypot(e.vx, e.vy);
+    if (cap && mag > cap) {
+        e.vx = (e.vx / mag) * cap;
+        e.vy = (e.vy / mag) * cap;
+    }
+
+    e.x += e.vx;
+    e.y += e.vy;
+}
+
+function isOnScreen(x, y, pad = PERF_CFG.cullPadding) {
+    return x > camera.x - pad && x < camera.x + width + pad &&
+           y > camera.y - pad && y < camera.y + height + pad;
+}
 
 function canFireWeapon() {
     return player.weaponLock <= 0 && player.ammo > 0;
 }
 
-function isSpecialReady() {
-    const specialCfg = PLAYER_CFG.ammo.special;
-    return player.weaponLvl >= specialCfg.levelReq &&
-           specialAmmoCooldown <= 0 &&
-           player.weaponLock <= 0 &&
-           player.ammo > 0;
+function getDashLaserState() {
+    // Ready while perfect dash window is active; otherwise show dash cooldown fill
+    const windowMax = PLAYER_CFG.dash.perfectWindow || 1;
+    if (player.perfectDashWindow > 0) {
+        return {
+            ready: true,
+            ratio: clamp(player.perfectDashWindow / windowMax, 0, 1),
+            label: 'READY'
+        };
+    }
+    const cdMax = PLAYER_CFG.dash.cooldown || 1;
+    const ratio = clamp(1 - (player.dashCd / cdMax), 0, 1);
+    return {
+        ready: false,
+        ratio,
+        label: player.dashCd > 0 ? `${(player.dashCd / FPS).toFixed(1)}s` : 'DASH'
+    };
 }
 
 function applyWeaponLock(reason) {
@@ -940,11 +1020,13 @@ uiXpLoss.style.width = '0%';
 uiXp.style.width = '0%';
 uiAmmo.style.width = '100%';
 uiHeat.style.width = '0%';
-uiSpecial.style.width = '0%';
+if (uiSpecial) uiSpecial.style.width = '0%';
 uiAmmoText.innerText = `${player.maxAmmo}/${player.maxAmmo}`;
 uiHeatText.innerText = '0%';
 uiHeatStatus.innerText = 'STABLE';
-uiSpecialText.innerText = `LV ${PLAYER_CFG.ammo.special.levelReq}`;
+if (uiSpecialText) uiSpecialText.innerText = 'DASH';
+if (uiSpecialText) uiSpecialText.classList.remove('pill-ready');
+if (uiSpecialBox) uiSpecialBox.classList.remove('special-ready');
 
 function triggerXpDropVisual() {
     xpHitTimer = 12;
@@ -977,6 +1059,7 @@ function startGame() {
     ammoRegenBuffer = 0;
     specialAmmoCooldown = 0;
     specialAimLock = null;
+    blackHolePull = 0;
     
     // Reset Player
     player.x = WORLD_W/2; player.y = WORLD_H/2;
@@ -996,6 +1079,7 @@ function startGame() {
 
     // Clear Arrays
     bullets = []; enemies = []; particles = []; pickups = []; floats = []; spawnIndicators = [];
+    resetEnemyCounts();
     
     Comms.reset();
     DialogueSys.lastSpoken = {};
@@ -1040,19 +1124,27 @@ function doDash() {
 function useBomb() {
     if (player.bombs > 0) {
         const bombCfg = PLAYER_CFG.bomb;
+        const bombW = bombCfg.width ?? 1000;
+        const bombH = bombCfg.height ?? 1000;
+        const halfW = bombW / 2;
+        const halfH = bombH / 2;
         player.bombs--;
         player.invinc = bombCfg.invincFrames; 
         screenShake = bombCfg.screenShake;
         flashScreen = bombCfg.flash;
         AudioSys.boom('big');
-        createShockwave(player.x, player.y, 1000, '#ffaa00');
+        const fxRadius = Math.hypot(bombW, bombH) / 2;
+        createShockwave(player.x, player.y, fxRadius, '#ffaa00');
         
         DialogueSys.emuWonderhoy();
 
-        enemies.forEach(e => {
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            if (Math.abs(e.x - player.x) > halfW) continue;
+            if (Math.abs(e.y - player.y) > halfH) continue;
             if (e.type === 'boss') takeDamage(e, bombCfg.bossDamage);
             else takeDamage(e, bombCfg.normalDamage);
-        });
+        }
         
         bullets = bullets.filter(b => b.owner === 'player');
         Comms.show("WONDERHOY!!", "EMU", "#ffaa00", "assets/images/player.png", { priority: true }); // Use player avatar if available
@@ -1106,6 +1198,7 @@ function update() {
     if (player.weaponLock > 0) player.weaponLock--;
     if (player.invinc > 0) player.invinc--;
     if (specialAmmoCooldown > 0) specialAmmoCooldown--;
+    if (blackHolePull > 0) blackHolePull--;
     
     // Glitch Logic
     if (player.glitchTime > 0) {
@@ -1121,7 +1214,13 @@ function update() {
     const fireRate = player.weaponLvl >= fireCfg.fastLevelThreshold
         ? fireCfg.fastFrameInterval
         : Math.max(fireCfg.min, fireCfg.base - Math.floor(player.weaponLvl / fireCfg.levelStepDivisor));
-    if (mouse.down && frames % fireRate === 0 && canFireWeapon()) {
+
+    // Perfect dash beam: fire instantly after dash regardless of normal fire cadence
+    if (mouse.down && player.perfectDashWindow > 0 && canFireWeapon()) {
+        playerShoot();
+        consumeShotResources();
+        firedThisFrame = true;
+    } else if (mouse.down && frames % fireRate === 0 && canFireWeapon()) {
         playerShoot();
         consumeShotResources();
         firedThisFrame = true;
@@ -1200,13 +1299,24 @@ function update() {
         const e = enemies[i];
         const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
         const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+        const offscreen = !isOnScreen(e.x, e.y);
+        const throttled = offscreen && enemies.length > PERF_CFG.softCollisionLimit && (frames % PERF_CFG.farUpdateThrottle !== 0) && e.type !== 'boss';
+        if (throttled) {
+            if (e.cd > 0) e.cd--;
+            if (e.stun > 0) e.stun--;
+            if (e.timer > 0) e.timer--;
+            continue;
+        }
 
         // AI Behaviors
+        const move = (vx, vy, opts = {}) => {
+            steerEnemy(e, vx, vy, opts);
+        };
+
         if (e.type === 'dasher') {
             if (e.state === 'chase') {
                 e.color = '#ffff00';
-                e.x += Math.cos(angleToPlayer) * e.speed;
-                e.y += Math.sin(angleToPlayer) * e.speed;
+                move(Math.cos(angleToPlayer) * e.speed, Math.sin(angleToPlayer) * e.speed, { maxSpeed: e.speed * 1.5 });
                 if (distToPlayer < 300 && e.cd <= 0) { 
                     e.state = 'charge'; 
                     e.timer = 40; 
@@ -1220,6 +1330,7 @@ function update() {
                 const g = Math.floor(255 * (1-t)).toString(16).padStart(2, '0');
                 e.color = `#ff${g}00`;
 
+                move(0, 0, { drag: ENEMY_MOTION.dashDrag });
                 e.timer--;
                 if (e.timer <= 0) { 
                     e.state = 'dash'; 
@@ -1227,8 +1338,7 @@ function update() {
                     AudioSys.dash(); 
                 }
             } else if (e.state === 'dash') {
-                e.x += Math.cos(e.dashAngle) * 7;
-                e.y += Math.sin(e.dashAngle) * 7;
+                move(Math.cos(e.dashAngle) * 7, Math.sin(e.dashAngle) * 7, { blend: ENEMY_MOTION.dashBlend, drag: ENEMY_MOTION.dashDrag, maxSpeed: 9 });
                 createParticle(e.x, e.y, e.color, 3, 0);
                 e.timer--;
                 if(Math.random() < 0.05) DialogueSys.typeCAttack(); // Attack Bark
@@ -1238,8 +1348,7 @@ function update() {
                 }
             } else if (e.state === 'cooldown') {
                 // Slide
-                e.x += Math.cos(e.dashAngle) * 1;
-                e.y += Math.sin(e.dashAngle) * 1;
+                move(Math.cos(e.dashAngle) * 0.8, Math.sin(e.dashAngle) * 0.8, { drag: 0.9 });
                 e.timer--;
                 if (e.timer <= 0) {
                     e.state = 'chase';
@@ -1261,15 +1370,20 @@ function update() {
             const side = Math.sin(frames * 0.02 + (e.id || 0)) * strafeSpeed;
             
             // Random Micro-move check
+            let targetVx;
+            let targetVy;
             if (e.microMove) {
-                 e.x += e.microMove.vx;
-                 e.y += e.microMove.vy;
+                 targetVx = e.microMove.vx;
+                 targetVy = e.microMove.vy;
                  e.microMove.life--;
                  if (e.microMove.life <= 0) e.microMove = null;
             } else {
-                 e.x += Math.cos(angleToPlayer) * forward + Math.cos(angleToPlayer + Math.PI/2) * side;
-                 e.y += Math.sin(angleToPlayer) * forward + Math.sin(angleToPlayer + Math.PI/2) * side;
+                 targetVx = Math.cos(angleToPlayer) * forward + Math.cos(angleToPlayer + Math.PI/2) * side;
+                 targetVy = Math.sin(angleToPlayer) * forward + Math.sin(angleToPlayer + Math.PI/2) * side;
             }
+
+            const maxSpeed = e.microMove ? 2.4 : e.speed * 1.4;
+            move(targetVx, targetVy, { maxSpeed });
 
             if (frames % 120 === 0) {
                 bullets.push({x:e.x, y:e.y, vx:Math.cos(angleToPlayer)*10, vy:Math.sin(angleToPlayer)*10, life:100, color:'#cc00ff', size:12, owner:'enemy'});
@@ -1284,8 +1398,7 @@ function update() {
             }
         }
         else if (e.type === 'sprayer') {
-            e.x += Math.cos(angleToPlayer + 0.5) * e.speed;
-            e.y += Math.sin(angleToPlayer + 0.5) * e.speed;
+            move(Math.cos(angleToPlayer + 0.5) * e.speed, Math.sin(angleToPlayer + 0.5) * e.speed);
             if (frames % 10 === 0) {
                 const sprayAngle = frames * 0.1;
                 bullets.push({x:e.x, y:e.y, vx:Math.cos(sprayAngle)*4, vy:Math.sin(sprayAngle)*4, life:100, color:'#00ffff', size:8, owner:'enemy'});
@@ -1294,6 +1407,7 @@ function update() {
         else if (e.type === 'minelayer') {
             if (e.stun > 0) {
                 e.stun--;
+                move(0, 0);
             } else {
                 // Smooth wander with boundary avoid
                 if (!e.wanderAngle) e.wanderAngle = Math.random() * Math.PI * 2;
@@ -1311,8 +1425,7 @@ function update() {
                 }
                 e.wanderAngle = targetA;
                 
-                e.x += Math.cos(e.wanderAngle) * e.speed;
-                e.y += Math.sin(e.wanderAngle) * e.speed;
+                move(Math.cos(e.wanderAngle) * e.speed, Math.sin(e.wanderAngle) * e.speed, { maxSpeed: e.speed * 1.2 });
             }
 
             if (frames % 120 === 0) {
@@ -1329,8 +1442,7 @@ function update() {
             if (e.laserWarmup > 0) e.laserWarmup--;
             if (e.laserCooldown > 0) e.laserCooldown--;
             const laserActive = bullets.some(b => b.laserBeam && b.anchorId === e.id);
-            e.x += Math.cos(angleToPlayer) * 0.5; 
-            e.y += Math.sin(angleToPlayer) * 0.5;
+            move(Math.cos(angleToPlayer) * 0.5, Math.sin(angleToPlayer) * 0.5, { blend: 0.1, drag: 0.92, maxSpeed: 1 });
 
             // New Skill: Orbiting mega-laser that sweeps 360 degrees
             if (phase === 2 && e.laserCooldown <= 0 && !laserActive) {
@@ -1394,19 +1506,23 @@ function update() {
             // But we can add a slight tangent bias
             const tangent = Math.cos(frames * 0.01 + (e.id||0)) * 0.2;
 
-            e.x += Math.cos(angleToPlayer + tangent) * e.speed + Math.cos(angleToPlayer + Math.PI/2) * evade;
-            e.y += Math.sin(angleToPlayer + tangent) * e.speed + Math.sin(angleToPlayer + Math.PI/2) * evade;
+            const targetVx = Math.cos(angleToPlayer + tangent) * e.speed + Math.cos(angleToPlayer + Math.PI/2) * evade;
+            const targetVy = Math.sin(angleToPlayer + tangent) * e.speed + Math.sin(angleToPlayer + Math.PI/2) * evade;
+            move(targetVx, targetVy);
         }
 
-        // Soft Collision
-        for (let j=i+1; j<enemies.length; j++) {
-            const o = enemies[j];
-            if (e.type === 'mine' || o.type === 'mine') continue;
-            const dx = e.x - o.x; const dy = e.y - o.y;
-            const d = Math.hypot(dx, dy);
-            if (d < e.radius + o.radius) {
-                const force = 0.5; 
-                e.x += (dx/d) * force; e.y += (dy/d) * force;
+        // Soft Collision (skip when enemy count is high to avoid O(n^2) blowup)
+        const skipSoftCollision = enemies.length > PERF_CFG.softCollisionLimit || e.type === 'mine';
+        if (!skipSoftCollision) {
+            for (let j=i+1; j<enemies.length; j++) {
+                const o = enemies[j];
+                if (o.type === 'mine') continue;
+                const dx = e.x - o.x; const dy = e.y - o.y;
+                const d = Math.hypot(dx, dy);
+                if (d > 0 && d < e.radius + o.radius) {
+                    const force = 0.5; 
+                    e.x += (dx/d) * force; e.y += (dy/d) * force;
+                }
             }
         }
 
@@ -1476,6 +1592,7 @@ function update() {
         if (b.owner === 'player') {
             for (let j = enemies.length - 1; j >= 0; j--) {
                 const e = enemies[j];
+                if (Math.abs(b.x - e.x) > 800 || Math.abs(b.y - e.y) > 800) continue;
                 // Collision Logic
                 // For Perfect Shot (large laser), we use a slightly more generous collision circle
                 const hitRadius = b.isPerfect ? b.size * 1.2 : b.size;
@@ -1523,8 +1640,23 @@ function update() {
     for (let i = pickups.length - 1; i >= 0; i--) {
         const p = pickups[i];
         const d = Math.hypot(player.x - p.x, player.y - p.y);
-        if (d < 150) { p.x += (player.x - p.x)*0.1; p.y += (player.y - p.y)*0.1; }
-        if (d < 20) {
+        const pullActive = blackHolePull > 0;
+        const pullRange = pullActive ? Math.max(WORLD_W, WORLD_H) : 150;
+        const pullStrength = pullActive ? 0.18 + (blackHolePull / 900) : 0.1;
+        const collectDist = pullActive ? 40 : 20;
+        if (d < pullRange) { 
+            p.x += (player.x - p.x) * pullStrength; 
+            p.y += (player.y - p.y) * pullStrength; 
+        }
+        if (d < collectDist) {
+            if (p.type === 'blackHole') {
+                blackHolePull = Math.max(blackHolePull, 180);
+                createShockwave(player.x, player.y, 260, '#5511aa', { fade: 0.06, speed: 18, spread: 30, lineWidth: 8 });
+                AudioSys.boom('big');
+                createText(player.x, player.y, "BLACK HOLE", "#aa88ff");
+                pickups.splice(i, 1);
+                continue;
+            }
             if (p.type==='hp') { 
                 const wasFull = player.hp >= player.maxHp;
                 player.hp=Math.min(player.hp+1, player.maxHp); 
@@ -1611,17 +1743,13 @@ function update() {
     const ammoRatio = clamp(player.ammo / player.maxAmmo, 0, 1);
     uiAmmo.style.width = `${(ammoRatio*100).toFixed(1)}%`;
     uiAmmoText.innerText = `${Math.floor(player.ammo)}/${player.maxAmmo}`;
-    const specialReady = isSpecialReady();
-    const specialBlocked = player.weaponLock > 0 || player.ammo <= 0;
-    const specialRatio = player.weaponLvl >= specialCfg.levelReq
-        ? clamp(1 - (specialAmmoCooldown / specialCfg.cooldown), 0, 1)
-        : 0;
-    uiSpecial.style.width = `${(specialRatio*100).toFixed(1)}%`;
-    uiSpecialText.innerText = specialReady ? 'READY'
-        : (player.weaponLvl < specialCfg.levelReq ? `LV ${specialCfg.levelReq}`
-        : (specialBlocked ? 'LOCKED' : `${(specialAmmoCooldown / FPS).toFixed(1)}s`));
-    uiSpecialText.classList.toggle('pill-ready', specialReady);
-    if (uiSpecialBox) uiSpecialBox.classList.toggle('special-ready', specialReady);
+    if (uiSpecial && uiSpecialText) {
+        const dashLaser = getDashLaserState();
+        uiSpecial.style.width = `${(dashLaser.ratio*100).toFixed(1)}%`;
+        uiSpecialText.innerText = dashLaser.label;
+        uiSpecialText.classList.toggle('pill-ready', dashLaser.ready);
+        if (uiSpecialBox) uiSpecialBox.classList.toggle('special-ready', dashLaser.ready);
+    }
     const heatRatio = clamp(player.heat / player.heatMax, 0, 1);
     uiHeat.style.width = `${(heatRatio*100).toFixed(1)}%`;
     uiHeatText.innerText = `${Math.round(heatRatio*100)}%`;
@@ -1645,6 +1773,8 @@ function update() {
 // --- SPAWN SYSTEM ---
 
 function prepareSpawn() {
+    if (enemies.length >= PERF_CFG.maxEnemies) return; // Skip spawning when at cap
+
     const dist = Math.max(width, height) / 2 + 100;
     const ang = Math.random() * Math.PI * 2;
     let sx = player.x + Math.cos(ang) * dist;
@@ -1671,6 +1801,9 @@ function prepareSpawn() {
 }
 
 function spawnEnemy(x, y, type) {
+    if (type !== 'boss' && enemies.length >= PERF_CFG.maxEnemies) return;
+    if (type === 'mine' && getEnemyCount('mine') >= PERF_CFG.maxMines) return;
+
     const typeCfg = ENEMY_CFG.types[type] || ENEMY_CFG.types.basic;
     let stats = { ...typeCfg, id: Math.random()*100 };
     if (type === 'dasher') {
@@ -1696,6 +1829,7 @@ function spawnEnemy(x, y, type) {
     if (type === 'boss') {
         bossActive = true;
         enemies = [];
+        resetEnemyCounts();
         bullets = bullets.filter(b => b.owner === 'player');
         spawnIndicators = [];
         const bossCfg = ENEMY_CFG.boss;
@@ -1735,7 +1869,7 @@ function spawnEnemy(x, y, type) {
         stats.radius *= Math.min(sizeGrowth, ENDLESS_CFG.radiusCap);
     }
 
-    enemies.push({ x, y, type, ...stats, maxHp: stats.hp });
+    addEnemy({ x, y, type, ...stats, maxHp: stats.hp });
 }
 
 function fireSpecialAmmo(target) {
@@ -1839,26 +1973,26 @@ function takeDamage(e, dmg) {
         DialogueSys.bossLowHp();
     }
 
-        if (e.hp <= 0) {
-            enemies.splice(enemies.indexOf(e), 1);
-                if (e.type === 'boss') {
-                    bossActive = enemies.some(en => en.type === 'boss');
-                    // Story Mode Completion
-                    // Use >= 5 to catch cases where wave might advance slightly past 5 during fight
-                    if (!bossActive && !endlessMode && wave >= SPAWN_CFG.bossStoryWave) {
-                        gameActive = false;
-                        AudioSys.stopShots();
-                        missionCompleteScreen.style.display = 'flex';
-                    // Stop loop explicitly
-                    if(animationFrameId) {
-                         cancelAnimationFrame(animationFrameId);
-                         animationFrameId = null;
-                    }
-                    return;
+    if (e.hp <= 0) {
+        removeEnemy(e);
+        if (e.type === 'boss') {
+            bossActive = enemies.some(en => en.type === 'boss');
+            // Story Mode Completion
+            // Use >= 5 to catch cases where wave might advance slightly past 5 during fight
+            if (!bossActive && !endlessMode && wave >= SPAWN_CFG.bossStoryWave) {
+                gameActive = false;
+                AudioSys.stopShots();
+                missionCompleteScreen.style.display = 'flex';
+                // Stop loop explicitly
+                if(animationFrameId) {
+                     cancelAnimationFrame(animationFrameId);
+                     animationFrameId = null;
                 }
+                return;
             }
-            
-            // Death Dialogue
+        }
+        
+        // Death Dialogue
         if (Math.random() < 0.4) {
             if (e.type === 'dasher') DialogueSys.typeCDeath();
             else if (e.type === 'sniper' || e.type === 'sprayer') DialogueSys.typeADeath();
@@ -1873,13 +2007,20 @@ function takeDamage(e, dmg) {
         // Drop logic with Ammo/Coolant priorities
         let dropped = false;
         const drops = ENEMY_CFG.drops;
-        const ammoChance = e.type === 'minelayer' ? drops.ammoCoreChanceMinelayer : drops.ammoCoreChance;
-        if (Math.random() < ammoChance) {
-            pickups.push({x:e.x, y:e.y, type:'ammo', color:'#33ffaa'});
+        if (Math.random() < drops.blackHoleChance) {
+            pickups.push({x:e.x, y:e.y, type:'blackHole', color:'#111122'});
             dropped = true;
-        } else if ((e.type === 'dasher' || e.type === 'sniper') && Math.random() < drops.coolantChanceFromElites) {
-            pickups.push({x:e.x, y:e.y, type:'coolant', color:'#66ccff'});
-            dropped = true;
+        }
+
+        if (!dropped) {
+            const ammoChance = e.type === 'minelayer' ? drops.ammoCoreChanceMinelayer : drops.ammoCoreChance;
+            if (Math.random() < ammoChance) {
+                pickups.push({x:e.x, y:e.y, type:'ammo', color:'#33ffaa'});
+                dropped = true;
+            } else if ((e.type === 'dasher' || e.type === 'sniper') && Math.random() < drops.coolantChanceFromElites) {
+                pickups.push({x:e.x, y:e.y, type:'coolant', color:'#66ccff'});
+                dropped = true;
+            }
         }
 
         if (!dropped) {
@@ -1940,9 +2081,11 @@ function takePlayerDamage() {
 // --- RENDER ---
 
 function createParticle(x, y, col, size, spd) {
+    if (particles.length >= PERF_CFG.maxParticles) return;
     particles.push({x, y, vx: (Math.random()-0.5)*spd, vy: (Math.random()-0.5)*spd, life: 1, color: col, size});
 }
 function createShockwave(x, y, r, col, opts = {}) {
+    if (particles.length >= PERF_CFG.maxParticles) return;
     particles.push({
         x, y,
         radius: opts.startRadius ?? 8,
@@ -2083,6 +2226,7 @@ function draw() {
 
     // 5. Pickups (Enhanced Visibility)
     pickups.forEach(p => {
+        if (!isOnScreen(p.x, p.y)) return;
         const bob = Math.sin(frames*0.1)*3;
         
         // 1. Draw "Item Container" Effect (Rotating Box)
@@ -2093,7 +2237,7 @@ function draw() {
         ctx.lineWidth = 2;
         ctx.shadowBlur = 5;
         ctx.shadowColor = p.color || '#ffffff';
-        const boxSize = p.type === 'xp' ? 18 : 26;
+        const boxSize = p.type === 'xp' ? 18 : (p.type === 'blackHole' ? 30 : 26);
         ctx.strokeRect(-boxSize/2, -boxSize/2, boxSize, boxSize);
         ctx.restore();
 
@@ -2136,6 +2280,25 @@ function draw() {
             sprite = Assets.images.bullet;
             tint = '#00ffff';
             size = 18;
+        } else if (p.type === 'blackHole') {
+            ctx.save();
+            ctx.translate(p.x, p.y + bob);
+            ctx.rotate(frames * 0.03);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#aa88ff';
+            ctx.fillStyle = '#050510';
+            ctx.strokeStyle = '#5522aa';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = '#aa88ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 9, frames * 0.05, Math.PI + frames * 0.05);
+            ctx.stroke();
+            ctx.restore();
         }
 
         if (p.type === 'ammo') {
@@ -2187,7 +2350,8 @@ function draw() {
                       p.type === 'bomb' ? 'BOMB' : 
                       p.type === 'miniBomb' ? 'MINI' : 
                       p.type === 'ammo' ? 'AMMO' : 
-                      p.type === 'coolant' ? 'COOL' : 'XP';
+                      p.type === 'coolant' ? 'COOL' : 
+                      p.type === 'blackHole' ? 'VOID' : 'XP';
         ctx.fillText(label, p.x, p.y + bob - 20);
     });
     ctx.shadowBlur = 0;
@@ -2263,6 +2427,21 @@ function draw() {
     // 6. Player (sprite with fallback)
     ctx.shadowBlur = 15; ctx.shadowColor = '#00ffff';
 
+    // Black Hole vacuum aura
+    if (blackHolePull > 0) {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        const t = blackHolePull / 180;
+        ctx.shadowBlur = 24;
+        ctx.shadowColor = '#aa88ff';
+        ctx.strokeStyle = `rgba(170, 136, 255, ${0.2 + t * 0.4})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius * 2.5 + Math.sin(frames * 0.25) * 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     // Perfect Dash Charge Indicator
     if (player.perfectDashWindow > 0) {
         ctx.save();
@@ -2301,10 +2480,11 @@ function draw() {
         ctx.restore();
     }
 
-    if (isSpecialReady()) {
+    if (player.perfectDashWindow > 0) {
         ctx.save();
         const pulse = 1 + Math.sin(frames * 0.15) * 0.08;
-        ctx.strokeStyle = `rgba(0, 180, 255, ${0.55 + Math.sin(frames*0.12)*0.2})`;
+        const readyAlpha = 0.55 + Math.sin(frames*0.12)*0.2;
+        ctx.strokeStyle = `rgba(0, 180, 255, ${readyAlpha})`;
         ctx.lineWidth = 3;
         ctx.shadowBlur = 22;
         ctx.shadowColor = '#33ccff';
@@ -2342,6 +2522,7 @@ function draw() {
     
     // 7. Enemies
     enemies.forEach(e => {
+        if (!isOnScreen(e.x, e.y)) return;
         // Hit Feedback Interpolation
         if (e.hitScale) {
             e.hitScale = lerp(e.hitScale, 1.0, 0.2);
@@ -2425,6 +2606,7 @@ function draw() {
 
     // 8. Bullets (Dynamic Colors)
     bullets.forEach(b => {
+        if (!b.laserBeam && !isOnScreen(b.x, b.y)) return;
         if (b.laserBeam) {
             const startX = b.x;
             const startY = b.y;
@@ -2538,6 +2720,12 @@ function draw() {
     // 9. Particles
     ctx.globalCompositeOperation = 'lighter';
     particles.forEach(p => {
+        if (p.shockwave) {
+            const pad = (p.radius || 0) + PERF_CFG.cullPadding;
+            if (!isOnScreen(p.x, p.y, pad)) return;
+        } else if (!isOnScreen(p.x, p.y)) {
+            return;
+        }
         if (p.shockwave) {
             ctx.globalAlpha = 1;
             const alpha = Math.max(0, p.life);
