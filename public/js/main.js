@@ -28,7 +28,7 @@ const GAME_CONFIG = {
             height: 750 // 炸弹作用范围高度
         },
         miniBomb: {
-            burstCount: 15, // 小炸弹释放的追踪弹数量
+            burstCount: 20, // 小炸弹释放的追踪弹数量
             color: '#ffbb55', // 视觉主色
             shockwaveRadius: 140, // 触发时的冲击波半径
             shockwave: { speed: 12, fade: 0.05, spread: 26 }, // 冲击波参数
@@ -97,11 +97,11 @@ const GAME_CONFIG = {
         },
         types: {
             basic: { hp: 5, speed: 3, radius: 30, color: '#ff0000' }, // 普通杂兵数值
-            dasher: { hp: 20, speed: 3, radius: 36, color: '#ffff00' }, // 突进怪数值
+            dasher: { hp: 20, speed: 5, radius: 36, color: '#ffff00' }, // 突进怪数值
             sniper: { hp: 10, speed: 1, radius: 36, color: '#cc00ff' }, // 狙击怪数值
             sprayer: { hp: 100, speed: 0.75, radius: 100, color: '#00ffff' }, // 扫射怪数值
-            minelayer: { hp: 25, speed: 1.25, radius: 80, color: '#33ff33' }, // 布雷怪数值
-            mine: { hp: 1, speed: 0, radius: 40, color: '#00ff00' } // 地雷数值
+            minelayer: { hp: 25, speed: 2, radius: 80, color: '#33ff33' }, // 布雷怪数值
+            mine: { hp: 1, speed: 0, radius: 50, color: '#00ff00' } // 地雷数值
         },
         drops: {
             ammoCoreChance: 0.0375, // 普通敌人掉落弹药核心的概率
@@ -154,9 +154,9 @@ const PERF_CFG = {
     cullPadding: 320 // Extra padding for draw culling around the viewport
 };
 const ENEMY_MOTION = {
-    baseBlend: 0.1, // How quickly enemies lerp toward their desired velocity
-    baseDrag: 0.88, // Passive slow-down to keep some glide
-    dashBlend: 0.15, // Faster response for dash bursts
+    baseBlend: 0.05, // How quickly enemies lerp toward their desired velocity (降低值增强惯性)
+    baseDrag: 0.95, // Passive slow-down to keep some glide (提高值增强滑行)
+    dashBlend: 0.12, // Faster response for dash bursts (稍微降低使冲刺更平滑)
     dashDrag: 0.98, // Preserve dash momentum a bit longer
     speedCapMult: 3 // Prevent runaway speeds when steering adds up
 };
@@ -1796,6 +1796,10 @@ function prepareSpawn() {
     if (endlessMode && wave % SPAWN_CFG.bossEndlessInterval === 0) bossWave = true;
 
     if (bossWave && Math.random() < SPAWN_CFG.bossChance && !enemies.some(e=>e.type==='boss')) type = 'boss';
+
+    // Reduce minelayer/sniper spawn rate to 30% of original
+    if (type === 'minelayer' && Math.random() < 0.7) type = 'basic';
+    if (type === 'sniper' && Math.random() < 0.7) type = 'basic';
 
     spawnIndicators.push({ x: sx, y: sy, type: type, timer: SPAWN_CFG.indicatorTime });
 }

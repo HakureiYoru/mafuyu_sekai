@@ -158,20 +158,20 @@ canvas { display: block; }
     font-family: 'Courier New', monospace;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 18px;
     opacity: 0;
     transition: opacity 0.5s, transform 0.3s;
     text-shadow: 0 0 2px #00ccff;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 20px rgba(0, 255, 255, 0.2);
     position: relative;
-    min-height: 86px;
+    min-height: 172px;
     overflow: hidden;
 }
 #comms-panel::after {
     content: "";
     position: absolute;
-    left: 82px;
+    left: 120px;
     bottom: -12px;
     border-width: 12px 10px 0 10px;
     border-style: solid;
@@ -180,8 +180,8 @@ canvas { display: block; }
     filter: blur(0.3px);
 }
 .comms-avatar-wrap {
-    width: 70px;
-    height: 70px;
+    width: 110px;
+    height: 110px;
     border: 1px solid rgba(0, 255, 255, 0.2);
     border-radius: 10px;
     background: radial-gradient(circle at 30% 30%, rgba(0, 255, 255, 0.15), rgba(0, 0, 0, 0.6));
@@ -206,14 +206,15 @@ canvas { display: block; }
     min-width: 0;
 }
 #comms-sender {
-    font-size: 14px;
+    font-size: 18px;
     color: #00ffff;
     font-weight: bold;
     letter-spacing: 2px;
     margin-bottom: 0;
 }
 #comms-text {
-    font-size: 18px;
+    font-size: 24px;
+    line-height: 1.4;
     color: #ffffff;
     white-space: pre-line;
     overflow: hidden;
