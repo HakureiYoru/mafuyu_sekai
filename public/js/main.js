@@ -44,29 +44,29 @@ const GAME_CONFIG = {
                 levelReq: 4, // 解锁特殊弹的武器等级
                 cooldown: 180, // 特殊弹冷却（帧）
                 windup: 18, // 特殊弹预瞄/蓄力帧数
-                damageMult: 3, // 特殊弹伤害倍率
+                damageMult: 5, // 特殊弹伤害倍率
                 speed: 6, // 特殊弹飞行速度
                 lockRange: 220 // 特殊弹追踪锁定范围（缩小）
             }
         },
         heat: {
-            max: 250, // 过热槽上限
+            max: 300, // 过热槽上限
             perShot: 10, // 每发射击增加的热量
-            cooldownPerSec: 10, // 每秒自然冷却的热量
+            cooldownPerSec: 17.5, // 每秒自然冷却的热量
             lockDuration: 180 // 过热/缺弹锁定持续帧数
         },
         weapon: {
             fireRate: { 
-                base: 30, // 初始射击间隔（帧），等级越高越低
+                base: 25, // 初始射击间隔（帧），等级越高越低
                 min: 5, // 射速下限帧数
                 fastLevelThreshold: 8, // 达到该等级后使用快速射击间隔
                 fastFrameInterval: 15, // 高等级时的射击间隔
                 levelStepDivisor: 1 // 低等级阶段每提升多少等级减少1帧间隔
             },
-            homingLockRange: 220, // 追踪弹的锁定范围（高等级解锁的追踪弹用更小范围）
+            homingLockRange: 300, // 追踪弹的锁定范围（高等级解锁的追踪弹用更小范围）
             xp: { 
                 base: 100, // 升级所需基础经验
-                perLevel: 50, // 每级额外需求经验
+                perLevel: 30, // 每级额外需求经验
                 pickupGain: 10, // 拾取经验球获得的经验值
                 lossPercentOnHit: 0.25, // 受伤扣除当前等级需求的比例
                 levelCap: 10 // 武器等级上限
@@ -78,18 +78,18 @@ const GAME_CONFIG = {
         scorePerHp: 10, // 每点血量对应的得分倍率
         dasherChargeWeakness: 1.3, // 突进怪蓄力时的受伤害倍率
         boss: {
-            baseHp: 1000, // Boss基础血量
+            baseHp: 500, // Boss基础血量
             hpPerWave: 100, // Boss每波额外血量
             hpMultiplier: 10, // Boss额外血量倍率
             speed: 0.5, // Boss移动速度
-            radius: 400, // Boss体型半径
+            radius: 350, // Boss体型半径
             color: '#ffaa00', // Boss渲染颜色
             laser: {
-                angularSpeed: 0.005, // 每帧旋转角速度（默认慢转圈）
+                angularSpeed: 0.004, // 每帧旋转角速度（默认慢转圈）
                 length: 4000, // 激光长度
                 width: 140, // 激光宽度
                 warmup: 60, // 预警帧数
-                duration: 2580, // 持续帧数 (2PI / 0.015 ≈ 418)
+                duration: 1200, // 持续帧数，缩短以避免长时间锁场
                 cooldown: 600, // 两次激光之间冷却
                 initialCooldown: 240, // 初次出招延迟
                 color: '#ffbb33' // 主体颜色
@@ -1334,12 +1334,16 @@ function update() {
                 e.timer--;
                 if (e.timer <= 0) { 
                     e.state = 'dash'; 
-                    e.timer = 20; 
-                    AudioSys.dash(); 
+                    e.timer = 60; // 3x dash duration for longer rush distance
+                    AudioSys.dash();
+                    createShockwave(e.x, e.y, 90, '#ffff66', { soft: true, speed: 14, fade: 0.06, spread: 22, lineWidth: 6 });
                 }
             } else if (e.state === 'dash') {
-                move(Math.cos(e.dashAngle) * 7, Math.sin(e.dashAngle) * 7, { blend: ENEMY_MOTION.dashBlend, drag: ENEMY_MOTION.dashDrag, maxSpeed: 9 });
-                createParticle(e.x, e.y, e.color, 3, 0);
+                move(Math.cos(e.dashAngle) * 7, Math.sin(e.dashAngle) * 7, { blend: ENEMY_MOTION.dashBlend, drag: ENEMY_MOTION.dashDrag, maxSpeed: 11 });
+                createParticle(e.x, e.y, '#ffff88', 3, 0);
+                if (frames % 3 === 0) {
+                    createParticle(e.x, e.y, '#ffdd55', 5, 0);
+                }
                 e.timer--;
                 if(Math.random() < 0.05) DialogueSys.typeCAttack(); // Attack Bark
                 if (e.timer <= 0) { 
@@ -1442,6 +1446,7 @@ function update() {
             if (e.laserWarmup > 0) e.laserWarmup--;
             if (e.laserCooldown > 0) e.laserCooldown--;
             const laserActive = bullets.some(b => b.laserBeam && b.anchorId === e.id);
+            const laserBusy = (e.laserWarmup !== undefined) || laserActive; // Prevent other attacks during laser
             move(Math.cos(angleToPlayer) * 0.5, Math.sin(angleToPlayer) * 0.5, { blend: 0.1, drag: 0.92, maxSpeed: 1 });
 
             // New Skill: Orbiting mega-laser that sweeps 360 degrees
@@ -1469,7 +1474,8 @@ function update() {
                 }
             }
 
-            if (frames % 10 === 0) {
+            // Skip normal bullet patterns while the laser is charging/firing
+            if (!laserBusy && frames % 10 === 0) {
                 if(Math.random() < 0.02) DialogueSys.bossAttack();
                 if (phase === 0) {
                     for(let k=0; k<3; k++) {
@@ -2206,24 +2212,52 @@ function draw() {
 
         ctx.save();
         ctx.translate(ind.x, ind.y);
-        
-        // Tiny Crosshair instead of ring
-        ctx.globalAlpha = 0.5 + Math.sin(frames * 0.5) * 0.5;
+
+        // Advance warning: pulsing gradient dome that appears early
+        const warnStrength = 1 - progress; // stronger when just spawned
+        const baseRadius = 80 + Math.sin(frames * 0.2) * 8;
+        const radius = baseRadius * (1 + warnStrength * 0.8);
+        const grad = ctx.createRadialGradient(0, 0, radius * 0.25, 0, 0, radius);
+        grad.addColorStop(0, withAlpha('#ffffff', 0.45 * warnStrength));
+        grad.addColorStop(0.35, withAlpha(color, 0.35 + 0.2 * warnStrength));
+        grad.addColorStop(1, withAlpha(color, 0));
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Crosshair + rotating frame
+        ctx.globalAlpha = 0.6 + Math.sin(frames * 0.5) * 0.4;
         ctx.strokeStyle = color;
         ctx.lineWidth = 2; 
         
         // Cross
-        const size = 5;
+        const size = 5 + warnStrength * 6;
         ctx.beginPath();
         ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
         ctx.moveTo(0, -size); ctx.lineTo(0, size);
         ctx.stroke();
 
+        // Rotating rhombus frame
+        ctx.save();
+        ctx.rotate(frames * 0.05);
+        const rhombus = 14 + warnStrength * 10;
+        ctx.beginPath();
+        ctx.moveTo(0, -rhombus);
+        ctx.lineTo(rhombus, 0);
+        ctx.lineTo(0, rhombus);
+        ctx.lineTo(-rhombus, 0);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
         // Tiny text
         ctx.fillStyle = color;
         ctx.font = '8px Courier New';
         ctx.textAlign = 'center';
-        ctx.fillText("TARGET", 0, -10);
+        ctx.fillText("TARGET", 0, -10 - warnStrength * 6);
 
         ctx.restore();
     });
@@ -2569,6 +2603,38 @@ function draw() {
         }
 
         // Type overlays
+        if (e.type === 'dasher' && e.state === 'dash') {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            const dashPulse = 1 + Math.sin(frames * 0.3) * 0.08;
+            const dashR = e.radius * 2.2 * dashPulse;
+            const dashGrad = ctx.createRadialGradient(0, 0, e.radius * 0.6, 0, 0, dashR);
+            dashGrad.addColorStop(0, withAlpha('#ffffaa', 0.25));
+            dashGrad.addColorStop(0.5, withAlpha('#ffdd55', 0.18));
+            dashGrad.addColorStop(1, withAlpha('#ffdd55', 0));
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = dashGrad;
+            ctx.beginPath(); ctx.arc(0, 0, dashR, 0, Math.PI * 2); ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.restore();
+        }
+        const bossLaserRelease = e.type === 'boss' && (e.laserWarmup !== undefined || bullets.some(b => b.laserBeam && b.anchorId === e.id));
+        if (bossLaserRelease) {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            const pulse = 1.05 + Math.sin(frames * 0.18) * 0.08;
+            const outerR = e.radius * 2.8 * pulse;
+            const grad = ctx.createRadialGradient(0, 0, e.radius * 0.8, 0, 0, outerR);
+            grad.addColorStop(0, withAlpha('#ffffff', 0.18));
+            grad.addColorStop(0.35, withAlpha('#88ffdd', 0.2));
+            grad.addColorStop(0.7, withAlpha('#ff66ff', 0.14));
+            grad.addColorStop(1, withAlpha('#ff66ff', 0));
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(0, 0, outerR, 0, Math.PI * 2); ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.restore();
+        }
         if (e.type === 'sniper') {
             ctx.save();
             ctx.translate(e.x, e.y);

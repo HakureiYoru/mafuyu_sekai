@@ -1,6 +1,10 @@
 import Script from 'next/script';
+import changelog from '../public/data/changelog.json';
 
 export default function HomePage() {
+  const logEntries = Array.isArray(changelog) ? changelog : [];
+  const latestEntry = logEntries[0];
+
   return (
     <main>
       <canvas id="gameCanvas"></canvas>
@@ -81,24 +85,59 @@ export default function HomePage() {
 
       <div id="start-screen">
         <h1>MAFUYU SEKAI</h1>
-        <h2>NEON OVERDRIVE v2.5</h2>
+        <h2>NEON OVERDRIVE {latestEntry?.version || 'v2.x'}</h2>
         <button id="start-btn">ENGAGE</button>
-        <div className="controls">
-          <div className="key-row">
-            <span className="kbox">W</span>
-            <span className="kbox">A</span>
-            <span className="kbox">S</span>
-            <span className="kbox">D</span> <span>移动 (Move)</span>
+
+        <div className="start-panels">
+          <div className="controls">
+            <div className="key-row">
+              <span className="kbox">W</span>
+              <span className="kbox">A</span>
+              <span className="kbox">S</span>
+              <span className="kbox">D</span> <span>移动 (Move)</span>
+            </div>
+            <div className="key-row">
+              <span className="kbox">MOUSE</span> <span>瞄准和射击 (Aim &amp; Shoot)</span>
+            </div>
+            <div className="key-row">
+              <span className="kbox">R</span> / <span className="kbox">R-CLICK</span>{' '}
+              <span>战术冲刺 (Dash)</span>
+            </div>
+            <div className="key-row">
+              <span className="kbox highlight">SPACE</span> <span>清屏核弹 (Nuke)</span>
+            </div>
           </div>
-          <div className="key-row">
-            <span className="kbox">MOUSE</span> <span>瞄准和射击 (Aim &amp; Shoot)</span>
-          </div>
-          <div className="key-row">
-            <span className="kbox">R</span> / <span className="kbox">R-CLICK</span>{' '}
-            <span>战术冲刺 (Dash)</span>
-          </div>
-          <div className="key-row">
-            <span className="kbox highlight">SPACE</span> <span>清屏核弹 (Nuke)</span>
+
+          <div className="changelog-panel">
+            <div className="changelog-header">
+              <div>
+                <div className="changelog-eyebrow">更新日志</div>
+                <div className="changelog-version">{latestEntry?.version || '--'}</div>
+                <div className="changelog-date">{latestEntry?.date || ''}</div>
+              </div>
+              <div className="changelog-pill">最新</div>
+            </div>
+
+            {latestEntry?.title ? <div className="changelog-title">{latestEntry.title}</div> : null}
+            <ul className="changelog-list">
+              {(latestEntry?.highlights || []).map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+
+            {logEntries.length > 1 ? (
+              <div className="changelog-history">
+                {logEntries.slice(1, 4).map((entry) => (
+                  <div key={`${entry.version}-${entry.date}`} className="changelog-history-row">
+                    <div>
+                      <div className="changelog-history-version">{entry.version}</div>
+                      <div className="changelog-history-date">{entry.date}</div>
+                    </div>
+                    <div className="changelog-history-title">{entry.title}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
