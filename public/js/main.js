@@ -28,7 +28,7 @@ const GAME_CONFIG = {
             height: 750 // 炸弹作用范围高度
         },
         miniBomb: {
-            burstCount: 20, // 小炸弹释放的追踪弹数量
+            burstCount: 25, // 小炸弹释放的追踪弹数量
             color: '#ffbb55', // 视觉主色
             shockwaveRadius: 140, // 触发时的冲击波半径
             shockwave: { speed: 12, fade: 0.05, spread: 26 }, // 冲击波参数
@@ -36,7 +36,7 @@ const GAME_CONFIG = {
             text: 'HOMING BURST' // 浮空文字
         },
         ammo: {
-            max: 100, // 弹药上限
+            max: 200, // 弹药上限
             regenPerSec: 0.5, // 普通波次每秒回弹量
             bossRegenPerSec: 1.5, // Boss波次每秒回弹量
             lockUnlockRatio: 0.8, // 热量恢复到该比例以下解除过热锁
@@ -65,9 +65,9 @@ const GAME_CONFIG = {
             },
             homingLockRange: 300, // 追踪弹的锁定范围（高等级解锁的追踪弹用更小范围）
             xp: { 
-                base: 100, // 升级所需基础经验
-                perLevel: 30, // 每级额外需求经验
-                pickupGain: 10, // 拾取经验球获得的经验值
+                base: 100, // 升级所需基础经验 100
+                perLevel: 30, // 每级额外需求经验 30
+                pickupGain: 10, // 拾取经验球获得的经验值10
                 lossPercentOnHit: 0.25, // 受伤扣除当前等级需求的比例
                 levelCap: 10 // 武器等级上限
             } // 升级/掉级参数
@@ -78,29 +78,29 @@ const GAME_CONFIG = {
         scorePerHp: 10, // 每点血量对应的得分倍率
         dasherChargeWeakness: 1.3, // 突进怪蓄力时的受伤害倍率
         boss: {
-            baseHp: 500, // Boss基础血量
+            baseHp: 400, // Boss基础血量400
             hpPerWave: 100, // Boss每波额外血量
-            hpMultiplier: 10, // Boss额外血量倍率
+            hpMultiplier: 5, // Boss额外血量倍率
             speed: 0.5, // Boss移动速度
             radius: 350, // Boss体型半径
             color: '#ffaa00', // Boss渲染颜色
             laser: {
-                angularSpeed: 0.004, // 每帧旋转角速度（默认慢转圈）
+                angularSpeed: 0.005, // 每帧旋转角速度（默认慢转圈）
                 length: 4000, // 激光长度
                 width: 500, // 激光宽度
                 warmup: 60, // 预警帧数
                 duration: 800, // 持续帧数，缩短以避免长时间锁场
-                cooldown: 600, // 两次激光之间冷却
+                cooldown: 8000, // 两次激光之间冷却
                 initialCooldown: 240, // 初次出招延迟
                 color: '#ffbb33' // 主体颜色
             }
         },
         types: {
             basic: { hp: 5, speed: 3, radius: 30, color: '#ff0000' }, // 普通杂兵数值
-            dasher: { hp: 20, speed: 5, radius: 36, color: '#ffff00' }, // 突进怪数值
-            sniper: { hp: 10, speed: 1, radius: 36, color: '#cc00ff' }, // 狙击怪数值
-            sprayer: { hp: 100, speed: 0.75, radius: 100, color: '#00ffff' }, // 扫射怪数值
-            minelayer: { hp: 25, speed: 2, radius: 80, color: '#33ff33' }, // 布雷怪数值
+            dasher: { hp: 20, speed: 7, radius: 36, color: '#ffff00' }, // 突进怪数值
+            sniper: { hp: 50, speed: 1, radius: 36, color: '#cc00ff' }, // 狙击怪数值
+            sprayer: { hp: 200, speed: 0.75, radius: 100, color: '#00ffff' }, // 扫射怪数值
+            minelayer: { hp: 50, speed: 2, radius: 80, color: '#33ff33' }, // 布雷怪数值
             mine: { hp: 1, speed: 0, radius: 50, color: '#00ff00' } // 地雷数值
         },
         drops: {
@@ -109,7 +109,7 @@ const GAME_CONFIG = {
             coolantChanceFromElites: 0.2, // 突进/狙击掉落冷却液的概率
             bombChance: 0.05, // 掉落炸弹的概率
             miniBombChance: 0.08, // 掉落小炸弹的概率（释放追踪弹幕）
-            hpChance: 0.2, // 掉落血包的概率（在未掉弹药/冷却时）
+            hpChance: 0.1, // 掉落血包的概率（在未掉弹药/冷却时）
             blackHoleChance: 0.002 // 黑洞：极低概率稀有掉落，全图吸附道具
         }
     },
@@ -118,14 +118,14 @@ const GAME_CONFIG = {
         baseInterval: 120, // 初始出怪间隔
         minInterval: 30, // 出怪间隔下限
         waveAccel: 5, // 每波减少的出怪间隔
-        bossSlowMultiplier: 5, // Boss战时出怪间隔倍率（提高刷怪频率）
+        bossSlowMultiplier: 4, // Boss战时出怪间隔倍率
         bossStoryWave: 5, // 剧情模式Boss出现波次
         bossEndlessInterval: 10, // 无尽模式Boss间隔波次
         bossChance: 0.05 // 满足条件时刷Boss的概率（已不再使用随机）
     },
     waves: {
-        advanceIntervalFrames: 9600, // 提升波次的帧间隔
-        endlessDifficultyStepInterval: 10, // 无尽模式提升难度的波次间隔
+        advanceIntervalFrames: 9600, // 提升波次的帧间隔9600
+        endlessDifficultyStepInterval: 1, // 无尽模式提升难度的波次间隔
         endlessDifficultyStep: 0.2 // 无尽模式每次提升的难度倍率
     },
     endlessScaling: {
@@ -809,6 +809,8 @@ let flashScreen = 0;
 let bossActive = false;
 let bossStagePending = false;
 let bossSpawnQueued = false;
+let waveAdvanceQueued = false;
+let pendingWaveTarget = null;
 let endlessMode = false;
 let difficultyMultiplier = 1.0;
 let ammoRegenBuffer = 0;
@@ -1270,29 +1272,33 @@ function update() {
     const baseSpawnRate = Math.max(SPAWN_CFG.minInterval, SPAWN_CFG.baseInterval - wave * SPAWN_CFG.waveAccel);
     const inBossPhase = bossActive || bossStagePending || bossSpawnQueued;
     const spawnRate = bossActive ? baseSpawnRate * SPAWN_CFG.bossSlowMultiplier : baseSpawnRate;
-    if (!bossStagePending && !bossSpawnQueued && frames % spawnRate === 0) prepareSpawn();
+    const spawnInterval = Math.max(1, Math.round(spawnRate));
+    if (!bossStagePending && !bossSpawnQueued && frames % spawnInterval === 0) prepareSpawn();
 
     // Slow down wave escalation: advance every 9600 frames instead of 1800
-    if (frames % WAVE_CFG.advanceIntervalFrames === 0) {
+    if (!inBossPhase && frames % WAVE_CFG.advanceIntervalFrames === 0) {
+        waveAdvanceQueued = true;
+    }
+
+    if (waveAdvanceQueued && !inBossPhase) {
+        waveAdvanceQueued = false;
         const prevWave = wave;
-        wave++;
-        showWave(wave);
-        DialogueSys.waveAlert(wave);
-        
-        if (endlessMode) {
-            // Increase difficulty every 10 waves in endless
-            if (wave % WAVE_CFG.endlessDifficultyStepInterval === 0) {
+        const targetWave = wave + 1;
+        const triggerBoss = (!endlessMode && prevWave === SPAWN_CFG.bossStoryWave)
+            || (endlessMode && prevWave > 0 && prevWave % SPAWN_CFG.bossEndlessInterval === 0);
+
+        if (triggerBoss) {
+            bossStagePending = true;
+            bossSpawnQueued = false;
+            pendingWaveTarget = targetWave;
+        } else {
+            wave = targetWave;
+            showWave(wave);
+            DialogueSys.waveAlert(wave);
+
+            if (endlessMode && wave % WAVE_CFG.endlessDifficultyStepInterval === 0) {
                 difficultyMultiplier += WAVE_CFG.endlessDifficultyStep;
                 Comms.show(`DIFFICULTY UP: x${difficultyMultiplier.toFixed(1)}`, "SYSTEM", "#ff0000", null, { priority: true });
-            }
-        }
-
-        // Queue boss stage after finishing specific waves (story and endless)
-        if (!bossActive && !bossStagePending && !bossSpawnQueued) {
-            if (!endlessMode && prevWave === SPAWN_CFG.bossStoryWave) {
-                bossStagePending = true;
-            } else if (endlessMode && prevWave > 0 && prevWave % SPAWN_CFG.bossEndlessInterval === 0) {
-                bossStagePending = true;
             }
         }
     }
@@ -1425,7 +1431,7 @@ function update() {
             move(Math.cos(angleToPlayer + 0.5) * e.speed, Math.sin(angleToPlayer + 0.5) * e.speed);
             if (frames % 10 === 0) {
                 const sprayAngle = frames * 0.1;
-                bullets.push({x:e.x, y:e.y, vx:Math.cos(sprayAngle)*4, vy:Math.sin(sprayAngle)*4, life:100, color:'#00ffff', size:8, owner:'enemy'});
+                bullets.push({x:e.x, y:e.y, vx:Math.cos(sprayAngle)*4, vy:Math.sin(sprayAngle)*4, life: Infinity, color:'#00ffff', size:8, owner:'enemy'});
             }
         }
         else if (e.type === 'minelayer') {
@@ -1851,7 +1857,12 @@ function spawnEnemy(x, y, type) {
         if(Math.random() < 0.1) DialogueSys.typeBSpawn();
     }
     if (type === 'boss') {
+        // Force boss to arena center
+        x = WORLD_W / 2;
+        y = WORLD_H / 2;
         bossActive = true;
+        bossStagePending = false;
+        bossSpawnQueued = false;
         enemies = [];
         resetEnemyCounts();
         bullets = bullets.filter(b => b.owner === 'player');
@@ -2000,10 +2011,14 @@ function takeDamage(e, dmg) {
     if (e.hp <= 0) {
         removeEnemy(e);
         if (e.type === 'boss') {
+            const hadPendingWave = pendingWaveTarget !== null;
             bossActive = enemies.some(en => en.type === 'boss');
-            // Story Mode Completion
-            // Use >= 5 to catch cases where wave might advance slightly past 5 during fight
-            if (!bossActive && !endlessMode && wave >= SPAWN_CFG.bossStoryWave) {
+            bossStagePending = false;
+            bossSpawnQueued = false;
+
+            if (!bossActive && !endlessMode) {
+                // Story mode: boss defeat triggers victory
+                pendingWaveTarget = null;
                 gameActive = false;
                 AudioSys.stopShots();
                 missionCompleteScreen.style.display = 'flex';
@@ -2013,6 +2028,16 @@ function takeDamage(e, dmg) {
                      animationFrameId = null;
                 }
                 return;
+            } else if (!bossActive && endlessMode && hadPendingWave) {
+                // Endless: continue to queued wave after boss
+                wave = pendingWaveTarget;
+                pendingWaveTarget = null;
+                showWave(wave);
+                DialogueSys.waveAlert(wave);
+                if (wave % WAVE_CFG.endlessDifficultyStepInterval === 0) {
+                    difficultyMultiplier += WAVE_CFG.endlessDifficultyStep;
+                    Comms.show(`DIFFICULTY UP: x${difficultyMultiplier.toFixed(1)}`, "SYSTEM", "#ff0000", null, { priority: true });
+                }
             }
         }
         
