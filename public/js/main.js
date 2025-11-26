@@ -8,7 +8,7 @@ const GAME_CONFIG = {
         baseHp: 5, // 玩家基础血量
         baseBombs: 3, // 开局炸弹数
         speed: 3.5, // 玩家基础移动速度
-        radius: 15, // 玩家碰撞半径
+        radius: 30, // 玩家碰撞半径
         startInvincFrames: 60, // 开局无敌帧数
         movementLockPenalty: 0.9, // 过热/缺弹时的移速倍率
         dash: {
@@ -55,11 +55,11 @@ const GAME_CONFIG = {
         },
         weapon: {
             fireRate: { 
-                base: 10, // 初始射击间隔（帧），等级越高越低
+                base: 30, // 初始射击间隔（帧），等级越高越低
                 min: 5, // 射速下限帧数
                 fastLevelThreshold: 8, // 达到该等级后使用快速射击间隔
-                fastFrameInterval: 4, // 高等级时的射击间隔
-                levelStepDivisor: 2 // 低等级阶段每提升多少等级减少1帧间隔
+                fastFrameInterval: 15, // 高等级时的射击间隔
+                levelStepDivisor: 1 // 低等级阶段每提升多少等级减少1帧间隔
             },
             homingLockRange: 220, // 追踪弹的锁定范围（高等级解锁的追踪弹用更小范围）
             xp: { 
@@ -80,12 +80,12 @@ const GAME_CONFIG = {
             hpPerWave: 100, // Boss每波额外血量
             hpMultiplier: 10, // Boss额外血量倍率
             speed: 0.5, // Boss移动速度
-            radius: 200, // Boss体型半径
+            radius: 400, // Boss体型半径
             color: '#ffaa00', // Boss渲染颜色
             laser: {
                 angularSpeed: 0.005, // 每帧旋转角速度（默认慢转圈）
-                length: 2000, // 激光长度
-                width: 70, // 激光宽度
+                length: 4000, // 激光长度
+                width: 140, // 激光宽度
                 warmup: 60, // 预警帧数
                 duration: 2580, // 持续帧数 (2PI / 0.015 ≈ 418)
                 cooldown: 600, // 两次激光之间冷却
@@ -94,12 +94,12 @@ const GAME_CONFIG = {
             }
         },
         types: {
-            basic: { hp: 5, speed: 1.5, radius: 15, color: '#ff0000' }, // 普通杂兵数值
-            dasher: { hp: 20, speed: 1, radius: 18, color: '#ffff00' }, // 突进怪数值
-            sniper: { hp: 10, speed: 1, radius: 18, color: '#cc00ff' }, // 狙击怪数值
-            sprayer: { hp: 100, speed: 0.75, radius: 50, color: '#00ffff' }, // 扫射怪数值
-            minelayer: { hp: 25, speed: 1.25, radius: 40, color: '#33ff33' }, // 布雷怪数值
-            mine: { hp: 1, speed: 0, radius: 20, color: '#00ff00' } // 地雷数值
+            basic: { hp: 5, speed: 1.5, radius: 30, color: '#ff0000' }, // 普通杂兵数值
+            dasher: { hp: 20, speed: 1, radius: 36, color: '#ffff00' }, // 突进怪数值
+            sniper: { hp: 10, speed: 1, radius: 36, color: '#cc00ff' }, // 狙击怪数值
+            sprayer: { hp: 100, speed: 0.75, radius: 100, color: '#00ffff' }, // 扫射怪数值
+            minelayer: { hp: 25, speed: 1.25, radius: 80, color: '#33ff33' }, // 布雷怪数值
+            mine: { hp: 1, speed: 0, radius: 40, color: '#00ff00' } // 地雷数值
         },
         drops: {
             ammoCoreChance: 0.0375, // 普通敌人掉落弹药核心的概率
@@ -825,6 +825,14 @@ function canFireWeapon() {
     return player.weaponLock <= 0 && player.ammo > 0;
 }
 
+function isSpecialReady() {
+    const specialCfg = PLAYER_CFG.ammo.special;
+    return player.weaponLvl >= specialCfg.levelReq &&
+           specialAmmoCooldown <= 0 &&
+           player.weaponLock <= 0 &&
+           player.ammo > 0;
+}
+
 function applyWeaponLock(reason) {
     player.weaponLock = Math.max(player.weaponLock, PLAYER_CFG.heat.lockDuration);
     player.lockReason = reason;
@@ -907,6 +915,9 @@ const uiHp = document.getElementById('hp-bar');
 const uiXp = document.getElementById('xp-bar');
 const uiAmmo = document.getElementById('ammo-bar');
 const uiHeat = document.getElementById('heat-bar');
+const uiSpecial = document.getElementById('special-bar');
+const uiSpecialText = document.getElementById('special-text');
+const uiSpecialBox = document.getElementById('special-bar-container');
 const uiAmmoText = document.getElementById('ammo-text');
 const uiHeatText = document.getElementById('heat-text');
 const uiHeatStatus = document.getElementById('heat-status');
@@ -929,9 +940,11 @@ uiXpLoss.style.width = '0%';
 uiXp.style.width = '0%';
 uiAmmo.style.width = '100%';
 uiHeat.style.width = '0%';
+uiSpecial.style.width = '0%';
 uiAmmoText.innerText = `${player.maxAmmo}/${player.maxAmmo}`;
 uiHeatText.innerText = '0%';
 uiHeatStatus.innerText = 'STABLE';
+uiSpecialText.innerText = `LV ${PLAYER_CFG.ammo.special.levelReq}`;
 
 function triggerXpDropVisual() {
     xpHitTimer = 12;
@@ -1049,6 +1062,7 @@ function useBomb() {
 function update() {
     frames++;
     let firedThisFrame = false;
+    const specialCfg = PLAYER_CFG.ammo.special;
     
     // Camera
     camera.x += (player.x - width/2 - camera.x) * 0.1;
@@ -1118,7 +1132,6 @@ function update() {
     applyAmmoRegen(regenRate);
 
     // Special auto-aimed shot once weapon level is high enough
-    const specialCfg = PLAYER_CFG.ammo.special;
     if (player.weaponLvl >= specialCfg.levelReq && !specialAimLock && specialAmmoCooldown <= 0 && canFireWeapon() && enemies.length > 0) {
         const { target } = findNearestEnemy(player.x, player.y);
         if (target) {
@@ -1259,7 +1272,7 @@ function update() {
             }
 
             if (frames % 120 === 0) {
-                bullets.push({x:e.x, y:e.y, vx:Math.cos(angleToPlayer)*10, vy:Math.sin(angleToPlayer)*10, life:100, color:'#cc00ff', size:6, owner:'enemy'});
+                bullets.push({x:e.x, y:e.y, vx:Math.cos(angleToPlayer)*10, vy:Math.sin(angleToPlayer)*10, life:100, color:'#cc00ff', size:12, owner:'enemy'});
                 AudioSys.enemyShoot();
                 if(Math.random() < 0.2) DialogueSys.typeAAttack();
                 
@@ -1275,7 +1288,7 @@ function update() {
             e.y += Math.sin(angleToPlayer + 0.5) * e.speed;
             if (frames % 10 === 0) {
                 const sprayAngle = frames * 0.1;
-                bullets.push({x:e.x, y:e.y, vx:Math.cos(sprayAngle)*4, vy:Math.sin(sprayAngle)*4, life:100, color:'#00ffff', size:4, owner:'enemy'});
+                bullets.push({x:e.x, y:e.y, vx:Math.cos(sprayAngle)*4, vy:Math.sin(sprayAngle)*4, life:100, color:'#00ffff', size:8, owner:'enemy'});
             }
         }
         else if (e.type === 'minelayer') {
@@ -1349,13 +1362,13 @@ function update() {
                 if (phase === 0) {
                     for(let k=0; k<3; k++) {
                         const a = frames*0.1 + (k*2);
-                        bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*5, vy:Math.sin(a)*5, life:600, color:'#ffaa00', size:6, owner:'enemy'});
+                        bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*5, vy:Math.sin(a)*5, life:600, color:'#ffaa00', size:12, owner:'enemy'});
                     }
                 } else if (phase === 1) {
                     if (frames % 60 === 0) {
                         for(let k=0; k<12; k++) {
                             const a = (Math.PI*2/12)*k;
-                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff3333', size:8, owner:'enemy'});
+                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff3333', size:16, owner:'enemy'});
                         }
                         AudioSys.boom('small');
                     }
@@ -1364,7 +1377,7 @@ function update() {
                         const spread = 0.3;
                         for(let k=-1; k<=1; k++) {
                             const a = angleToPlayer + k*spread;
-                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff00ff', size:8, owner:'enemy'});
+                            bullets.push({x:e.x, y:e.y, vx:Math.cos(a)*6, vy:Math.sin(a)*6, life:600, color:'#ff00ff', size:16, owner:'enemy'});
                         }
                     }
                 }
@@ -1571,7 +1584,7 @@ function update() {
                         vy: Math.sin(angle) * 10, 
                         life: 300, 
                         color: mb.color, 
-                        size: 6, 
+                        size: 12, 
                         owner: 'player', 
                         homing: true
                     });
@@ -1598,6 +1611,17 @@ function update() {
     const ammoRatio = clamp(player.ammo / player.maxAmmo, 0, 1);
     uiAmmo.style.width = `${(ammoRatio*100).toFixed(1)}%`;
     uiAmmoText.innerText = `${Math.floor(player.ammo)}/${player.maxAmmo}`;
+    const specialReady = isSpecialReady();
+    const specialBlocked = player.weaponLock > 0 || player.ammo <= 0;
+    const specialRatio = player.weaponLvl >= specialCfg.levelReq
+        ? clamp(1 - (specialAmmoCooldown / specialCfg.cooldown), 0, 1)
+        : 0;
+    uiSpecial.style.width = `${(specialRatio*100).toFixed(1)}%`;
+    uiSpecialText.innerText = specialReady ? 'READY'
+        : (player.weaponLvl < specialCfg.levelReq ? `LV ${specialCfg.levelReq}`
+        : (specialBlocked ? 'LOCKED' : `${(specialAmmoCooldown / FPS).toFixed(1)}s`));
+    uiSpecialText.classList.toggle('pill-ready', specialReady);
+    if (uiSpecialBox) uiSpecialBox.classList.toggle('special-ready', specialReady);
     const heatRatio = clamp(player.heat / player.heatMax, 0, 1);
     uiHeat.style.width = `${(heatRatio*100).toFixed(1)}%`;
     uiHeatText.innerText = `${Math.round(heatRatio*100)}%`;
@@ -1727,7 +1751,7 @@ function fireSpecialAmmo(target) {
         vx: Math.cos(ang) * specialCfg.speed,
         vy: Math.sin(ang) * specialCfg.speed,
         life: 140,
-        size: 9,
+        size: 18,
         color: '#ff66ff',
         owner: 'player',
         homing: true,
@@ -1750,7 +1774,7 @@ function playerShoot() {
         bullets.push({
             x: player.x + Math.cos(player.angle)*20, y: player.y + Math.sin(player.angle)*20,
             vx: Math.cos(player.angle)*9, vy: Math.sin(player.angle)*9, // Slower speed
-            life: 150, size: 25, color: '#00ffcc', owner: 'player', // Size increased
+            life: 150, size: 50, color: '#00ffcc', owner: 'player', // Size increased
             homing: false, pierce: 20, damageMult: 25, isPerfect: true 
         });
         
@@ -1791,7 +1815,7 @@ function playerShoot() {
         bullets.push({
             x: player.x + Math.cos(a)*20, y: player.y + Math.sin(a)*20,
             vx: Math.cos(a)*speed, vy: Math.sin(a)*speed,
-            life: 80, size: size, color: color, owner: 'player', 
+            life: 80, size: size * 2, color: color, owner: 'player', 
             homing: homing, pierce: pierce, lockRange: homing ? PLAYER_CFG.weapon.homingLockRange : undefined
         });
     }
@@ -2274,6 +2298,19 @@ function draw() {
         ctx.rotate(player.angle);
         ctx.fillStyle = (player.invinc > 0 && Math.floor(frames/4)%2===0) ? '#fff' : '#00ffff';
         ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-15, 15); ctx.lineTo(-10, 0); ctx.lineTo(-15, -15); ctx.fill();
+        ctx.restore();
+    }
+
+    if (isSpecialReady()) {
+        ctx.save();
+        const pulse = 1 + Math.sin(frames * 0.15) * 0.08;
+        ctx.strokeStyle = `rgba(0, 180, 255, ${0.55 + Math.sin(frames*0.12)*0.2})`;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = '#33ccff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius * 1.9 * pulse, 0, Math.PI*2);
+        ctx.stroke();
         ctx.restore();
     }
     ctx.shadowBlur = 0;

@@ -50,6 +50,14 @@ export default function HomePage() {
             </div>
             <div className="bar-wrapper">
               <div className="label">
+                DASH LASER <span id="special-text" className="hud-pill">LOCKED</span>
+              </div>
+              <div className="bar-container" id="special-bar-container">
+                <div id="special-bar" className="bar-fill special-fill" style={{ width: '0%' }}></div>
+              </div>
+            </div>
+            <div className="bar-wrapper">
+              <div className="label">
                 THERMAL LOAD <span id="heat-text" className="hud-pill">0%</span>{' '}
                 <span id="heat-status" className="hud-pill status-pill">STABLE</span>
               </div>
