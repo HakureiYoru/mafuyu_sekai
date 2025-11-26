@@ -83,7 +83,7 @@ const GAME_CONFIG = {
             radius: 200, // Boss体型半径
             color: '#ffaa00', // Boss渲染颜色
             laser: {
-                angularSpeed: 0.015, // 每帧旋转角速度（默认慢转圈）
+                angularSpeed: 0.003, // 每帧旋转角速度（默认慢转圈）
                 length: 2000, // 激光长度
                 width: 70, // 激光宽度
                 warmup: 60, // 预警帧数
@@ -801,6 +801,7 @@ const player = {
     x: 0, y: 0, 
     hp: PLAYER_CFG.baseHp, maxHp: PLAYER_CFG.baseHp, 
     bombs: PLAYER_CFG.baseBombs, 
+    miniBombs: 0,
     weaponLvl: 1, weaponXp: 0, 
     invinc: 0, 
     dashCd: 0, dashTime: 0, perfectDashWindow: 0, 
@@ -887,6 +888,7 @@ DialogueSys.ensureData();
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Space' && gameActive) useBomb();
+    if (e.code === 'KeyE' && gameActive) useMiniBomb();
     if (e.code === 'KeyR' && gameActive) doDash();
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
@@ -903,6 +905,7 @@ window.addEventListener('contextmenu', e => e.preventDefault());
 // UI Refs
 const uiScore = document.getElementById('score-display');
 const uiBomb = document.getElementById('bomb-display');
+const uiMiniBomb = document.getElementById('minibomb-display');
 const uiHp = document.getElementById('hp-bar');
 const uiXp = document.getElementById('xp-bar');
 const uiAmmo = document.getElementById('ammo-bar');
@@ -968,7 +971,7 @@ function startGame() {
     // Reset Player
     player.x = WORLD_W/2; player.y = WORLD_H/2;
     player.maxHp = PLAYER_CFG.baseHp;
-    player.hp = player.maxHp; player.bombs = PLAYER_CFG.baseBombs; 
+    player.hp = player.maxHp; player.bombs = PLAYER_CFG.baseBombs; player.miniBombs = 0;
     player.weaponLvl = 1; player.weaponXp = 0; player.invinc = PLAYER_CFG.startInvincFrames; player.glitchTime = 0;
     player.dashCd = 0; player.dashTime = 0; player.perfectDashWindow = 0;
     player.maxAmmo = PLAYER_CFG.ammo.max; player.heatMax = PLAYER_CFG.heat.max; player.speed = PLAYER_CFG.speed;
@@ -1043,6 +1046,43 @@ function useBomb() {
         
         bullets = bullets.filter(b => b.owner === 'player');
         Comms.show("WONDERHOY!!", "EMU", "#ffaa00", "assets/images/player.png", { priority: true }); // Use player avatar if available
+    }
+}
+
+function useMiniBomb() {
+    if (player.miniBombs > 0) {
+        const miniBombCfg = PLAYER_CFG.miniBomb;
+        player.miniBombs--;
+        AudioSys.boom(miniBombCfg.sfx);
+        createShockwave(player.x, player.y, miniBombCfg.shockwaveRadius, miniBombCfg.color, miniBombCfg.shockwave);
+        createText(player.x, player.y, miniBombCfg.text, miniBombCfg.color);
+        
+        // 释放追踪弹幕
+        for (let i = 0; i < miniBombCfg.burstCount; i++) {
+            const angle = (Math.PI * 2 * i) / miniBombCfg.burstCount;
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                vx: Math.cos(angle) * 8,
+                vy: Math.sin(angle) * 8,
+                life: 180,
+                size: 5,
+                color: miniBombCfg.color,
+                owner: 'player',
+                homing: true,
+                pierce: 0,
+                damageMult: 2
+            });
+        }
+        
+        // 清除附近的敌方子弹
+        bullets = bullets.filter(b => {
+            if (b.owner === 'enemy') {
+                const dist = Math.hypot(b.x - player.x, b.y - player.y);
+                return dist > miniBombCfg.shockwaveRadius;
+            }
+            return true;
+        });
     }
 }
 
@@ -1545,6 +1585,7 @@ function update() {
                 } else createText(player.x, player.y, "+XP", "#00ffff");
             }
             if (p.type==='bomb') { player.bombs++; createText(player.x, player.y, "+BOMB", "#ffaa00"); AudioSys.powerup(); }
+            if (p.type==='minibomb') { player.miniBombs++; createText(player.x, player.y, "+MINI BOMB", "#ffbb55"); AudioSys.powerup(); }
             if (p.type==='ammo') { 
                 player.ammo = player.maxAmmo; 
                 player.weaponLock = 0; 
@@ -1574,6 +1615,7 @@ function update() {
 
     uiScore.innerText = score.toString().padStart(6, '0');
     uiBomb.innerText = `BOMB x${player.bombs}`;
+    uiMiniBomb.innerText = `MINI x${player.miniBombs}`;
     uiHp.style.width = `${(player.hp/player.maxHp)*100}%`;
     const ammoRatio = clamp(player.ammo / player.maxAmmo, 0, 1);
     uiAmmo.style.width = `${(ammoRatio*100).toFixed(1)}%`;
@@ -1840,6 +1882,7 @@ function takeDamage(e, dmg) {
 
         if (!dropped) {
             if (Math.random() < drops.bombChance) pickups.push({x:e.x, y:e.y, type:'bomb', color:'#ffaa00'});
+            else if (Math.random() < drops.miniBombChance) pickups.push({x:e.x, y:e.y, type:'minibomb', color:'#ffbb55'});
             else if (Math.random() < drops.hpChance) pickups.push({x:e.x, y:e.y, type:'hp', color:'#00ff00'});
             else pickups.push({x:e.x, y:e.y, type:'xp', color:'#00ffff'});
         }
