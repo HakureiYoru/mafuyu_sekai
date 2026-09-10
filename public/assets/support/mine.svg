@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <title>Hostile contact mine</title>
+  <path d="M35 5h10l2 12 7 3 10-7 7 7-7 10 3 7 8 3v9l-11 2-3 6 7 11-7 7-11-8-7 3-3 8H31l-2-11-6-3-11 7-7-7 8-11-3-7-8-3v-9l11-2 3-6-7-11 7-7 11 8 7-3Z" transform="translate(2 -1) scale(.95)" fill="#354458" stroke="#becad7" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="40" cy="40" r="22" fill="#192432" stroke="#72879b" stroke-width="4"/>
+  <circle cx="40" cy="40" r="14" fill="#e76169" stroke="#ffc9c6" stroke-width="3"/>
+  <path d="M40 31v10" stroke="#fff4e8" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="40" cy="48" r="2.5" fill="#fff4e8"/>
+</svg>

@@ -4,3 +4,6 @@ out
 .next
 .vercel
 *.log
+test-results
+playwright-report
+.tmp

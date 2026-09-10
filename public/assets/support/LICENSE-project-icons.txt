@@ -1,0 +1,12 @@
+The following repository-native vector icons are dedicated under CC0 1.0 Universal:
+bomb.svg, mini-bomb.svg, black-hole.svg, mine.svg.
+
+These SVG paths were created for Mafuyu Sekai v3.1 without third-party graphics,
+logos, fonts, embedded images, external references, or AI image generation.
+
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Legal code: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+This dedication covers only the four files named above. It does not change the
+license or ownership of the original five game PNGs, game code, or other assets.
+Kenney PNGs in this directory are covered separately by LICENSE-Kenney.txt.

@@ -1,21 +1,41 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "0.1.0",
+  "version": "3.1.0",
   "private": true,
-  "description": "Next.js web build for Mafuyu Sekai: Neon Remake",
+  "type": "module",
+  "description": "Mafuyu Sekai — Neon Overdrive, a fixed-step WebGL arcade shooter",
+  "engines": { "node": ">=22.13.0" },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "start": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests scripts vite.config.ts playwright.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:assets": "node scripts/verify-assets.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "test:soak": "node scripts/soak.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run test:assets && npm run build"
   },
   "dependencies": {
-    "next": "^14.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "pixi.js": "8.20.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.0"
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.10.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
   }
 }

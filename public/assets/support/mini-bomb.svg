@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <title>Homing burst supply</title>
+  <path d="m14 61 12-13m6 21 7-19m22 11-9-13" fill="none" stroke="#ed9142" stroke-width="5" stroke-linecap="round"/>
+  <path d="m40 8-11 23 6 3v13h10V34l6-3Z" fill="#ffe0a2" stroke="#a75532" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M13 25 10 49l8-1 9 12 8-6-10-12 4-6Z" fill="#ffb568" stroke="#a75532" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m67 25 3 24-8-1-9 12-8-6 10-12-4-6Z" fill="#ffb568" stroke="#a75532" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m40 17-4 10h8Zm-23 18-1 7 6-3Zm46 0 1 7-6-3Z" fill="#fff7de"/>
+</svg>
