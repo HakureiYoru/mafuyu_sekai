@@ -1,6 +1,6 @@
 # Mafuyu Sekai · Neon Overdrive
 
-**v3.1.0 · Mafuyu Sekai**
+**v3.1.1 · Mafuyu Sekai**
 
 面向 PC 键鼠的霓虹街机射击游戏。五个一分钟波次之后进入独立 Boss 战，通关可保留成长并继续无尽挑战。角色、背景、子弹、血包五张原始 PNG 及原有 21 组对话完整保留。
 
@@ -23,6 +23,8 @@ npm run preview
 ```
 
 `npm start` 同样用于预览构建。发布时将整个 `dist/` 目录交给静态 HTTP 服务，不将 Vite preview 当作生产服务器。资源使用相对 base，支持托管于子目录。旧 `/dx.html` 自动跳转首页并保留查询参数。需要浏览器启用硬件加速和 WebGL；图形初始化失败会显示可重试的错误页。
+
+Vercel 部署由根目录 `vercel.json` 固定为 **Vite**：安装 `npm ci --include=dev`，构建 `npm run build`，输出 `dist`。该文件覆盖旧项目保存的框架、安装／构建命令和输出目录；项目 Root Directory 应为仓库根目录。部署后检查对应提交的 Vercel 状态以及线上页面，本地构建成功不等于远端部署成功。
 
 ## 操作与战斗
 
@@ -81,4 +83,4 @@ npm run test:soak
 
 **每次功能、平衡或资源改动必须更新 `public/data/changelog.json`。** 它是唯一日志来源，Vite 将其提供给界面，静态地址也保留。最新版本放在数组开头，包含 `version`、`date`、`title`、1–5 条 `highlights`。发布前确认菜单版本号、完整日志弹窗和本次改动一致。
 
-当前版本：**v3.1.0（2026-09-11）**。本轮仅构建浏览器版本，不包含 Electron 安装包或触屏操作。
+当前版本：**v3.1.1（2026-09-11）**。本轮仅构建浏览器版本，不包含 Electron 安装包或触屏操作。
