@@ -102,6 +102,117 @@ test('settings persist across reload and dialog is keyboard accessible', async (
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().settings)).toMatchObject({ quality: 'low', reducedMotion: true, masterVolume: 0.3 });
 });
 
+test('Shift precise movement responds immediately and clears when focus is lost', async ({ page }) => {
+  await play(page);
+  await page.keyboard.down('d'); await page.keyboard.down('Shift');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.vx)).toBe(180);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.focus)).toBe(true);
+  await page.keyboard.up('Shift');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.vx)).toBe(300);
+  await page.keyboard.down('Shift');
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('paused');
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.focus)).toBe(false);
+  await page.keyboard.up('Shift'); await page.keyboard.up('d');
+  await page.getByRole('button', { name: '继续游戏', exact: false }).click();
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.vx)).toBe(0);
+});
+
+test('Boss laser announces its locked sweep before activation and survives pause without consuming warning', async ({ page }) => {
+  await openGame(page);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-laser'));
+  await expect(page.getByLabel('首领行动')).toContainText('扫射方向已锁定');
+  const before = await page.evaluate(() => {
+    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
+    return { angle: boss.angle, timer: boss.timer };
+  });
+  expect(before.timer).toBeGreaterThan(1.7);
+  await page.keyboard.down('s'); await page.waitForTimeout(350); await page.keyboard.up('s');
+  await page.keyboard.press('Escape');
+  const paused = await page.evaluate(() => {
+    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
+    return { angle: boss.angle, timer: boss.timer };
+  });
+  expect(paused.angle).toBe(before.angle);
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!.timer)).toBe(paused.timer);
+  await page.getByRole('button', { name: '继续游戏', exact: false }).click();
+  await expect(page.getByLabel('首领行动')).toContainText('激光扫射');
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
+  await expect(page.getByLabel('首领行动')).toHaveCount(0);
+});
+
+test('Boss phase change clears old ground hazards and restart clears the whole encounter', async ({ page }) => {
+  await openGame(page);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-bombard'));
+  await expect(page.getByLabel('首领行动')).toContainText('地面连爆');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(3);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.every(h => !h.active && h.warning > 0))).toBe(true);
+  await page.evaluate(() => {
+    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
+    boss.hp = boss.maxHp * 0.64;
+  });
+  await expect(page.getByLabel('首领行动')).toContainText('阶段转换');
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().bossPhase)).toBe(2);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  expect(await page.evaluate(() => ({ hazards: window.__MAFUYU_DEBUG__.state().hazards.length, wave: window.__MAFUYU_DEBUG__.state().wave, focus: window.__MAFUYU_DEBUG__.state().player.focus }))).toEqual({ hazards: 0, wave: 1, focus: false });
+});
+
+test('difficulty persists, cannot change during a run, and keeps separate high scores through endless', async ({ page }) => {
+  await openGame(page);
+  await page.getByRole('button', { name: '困难', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '困难', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '开始游戏' }).click();
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
+  await page.evaluate(() => { const d = window.__MAFUYU_DEBUG__; d.state().score = 4242; d.difficulty('normal'); });
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '结束本局，返回主菜单' }).click();
+  expect(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:best:v3:hard'))).toBe('4242');
+  expect(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:best:v3'))).toBeNull();
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('complete'));
+  await page.getByRole('button', { name: /继续.*无尽|无尽.*继续|进入无尽/ }).click();
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
+});
+
+test('hard Boss uses a shorter committed warning and denser marked ground attack', async ({ page }) => {
+  await openGame(page);
+  await page.getByRole('button', { name: '困难', exact: true }).click();
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-laser'));
+  await expect(page.getByLabel('首领行动')).toContainText('扫射方向已锁定');
+  const boss = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!);
+  expect(boss.maxHp).toBe(2430); expect(boss.timer).toBeGreaterThan(0.8); expect(boss.timer).toBeLessThanOrEqual(1.25);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-bombard'));
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(5);
+  const hazards = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards);
+  expect(hazards.every(h => h.radius === 85 && h.warningDuration >= 0.85)).toBe(true);
+});
+
+test('third-wave miniboss coexists with spawning and exposes a locked laser without ending the wave', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await openGame(page);
+  await page.getByRole('button', { name: '困难', exact: true }).click();
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('miniboss-arrival'));
+  await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toBeVisible();
+  const before = await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.state(); const e = s.enemies.find(e => e.type === 'miniboss')!;
+    return { waveTime: s.waveTime, maxHp: e.maxHp, bossStage: s.bossStage };
+  });
+  expect(before).toMatchObject({ maxHp: 810, bossStage: false });
+  await expect(page.getByLabel('迷你首领行动')).toContainText('激光锁定');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.type !== 'miniboss').length)).toBeGreaterThan(1);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBeGreaterThan(before.waveTime);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossSpawned)).toBe(false);
+  await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('support craft fight while overheated, beam fires through the heat lock, restart clears both', async ({ page }) => {
   await openGame(page);
   await page.evaluate(() => {

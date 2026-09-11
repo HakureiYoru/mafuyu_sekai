@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ASSET_URLS, BALANCE } from './game/config';
-import type { GameSettings, HudSnapshot, RuntimeControls } from './game/types';
+import type { Difficulty, GameSettings, HudSnapshot, RuntimeControls } from './game/types';
 import changelog from 'virtual:changelog';
 
 type IconName = 'play' | 'pause' | 'settings' | 'arrow' | 'close' | 'sound' | 'spark' | 'restart';
@@ -61,24 +61,29 @@ function Dialog({ children, title, eyebrow, onClose, className = '' }: { childre
 
 function ControlsGuide({ compact = false }: { compact?: boolean }) {
   return <div className={`controls-guide ${compact ? 'compact' : ''}`}>
-    <div><span className="keycaps"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>自由移动</span></div>
+    <div><span className="keycaps"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>移动 · Shift 精准慢移</span></div>
     <div><span className="keycaps"><kbd>鼠标左键</kbd></span><span>瞄准 · 射击</span></div>
     <div><span className="keycaps"><kbd>R</kbd><span className="key-or">/</span><kbd>右键</kbd></span><span>冲刺后释放贯穿炮</span></div>
     <div><span className="keycaps"><kbd>空格</kbd></span><span>释放炸弹</span></div>
   </div>;
 }
 
-function Menu({ runtime, openSettings, openChangelog }: { runtime: RuntimeControls; openSettings: () => void; openChangelog: () => void }) {
+function Menu({ runtime, difficulty, openSettings, openChangelog }: { runtime: RuntimeControls; difficulty: Difficulty; openSettings: () => void; openChangelog: () => void }) {
   const latest = changelog[0];
   return <section className="menu-screen" aria-label="主菜单" style={{ '--scene-image': `url("${ASSET_URLS.bg}")` } as CSSProperties}>
     <div className="menu-simple">
       <h1 className="menu-title">MAFUYU SEKAI</h1>
+      <div className="difficulty-options" role="group" aria-label="游戏难度">
+        <button aria-pressed={difficulty === 'normal'} onClick={() => runtime.setDifficulty('normal')}>普通</button>
+        <button aria-pressed={difficulty === 'hard'} onClick={() => runtime.setDifficulty('hard')}>困难</button>
+      </div>
+      {difficulty === 'hard' && <p className="difficulty-note">更快敌人 · 密集攻势 · 受到伤害 ×2</p>}
       <button className="menu-start" onClick={() => runtime.start()}>开始游戏</button>
       <button className="menu-settings" onClick={openSettings}>体验设置</button>
       <div className="menu-instructions" aria-label="基本操作">
         <p>WASD 移动 · 鼠标左键 射击</p>
         <p>R 或右键 冲刺 · 空格 炸弹</p>
-        <p>Esc 暂停</p>
+        <p>Shift 精准慢移 · Esc 暂停</p>
       </div>
       <button className="menu-version" onClick={openChangelog}>{latest.version} · 更新日志</button>
     </div>
@@ -91,11 +96,12 @@ function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; ru
   const perfect = s.perfectWindow > 0;
   return <div className={`hud ${s.phase !== 'playing' ? 'hud-inactive' : ''}`} aria-label="战斗状态">
     <div className="hud-top">
-      <div className="wave-cluster"><div className="hud-eyebrow"><span className="status-dot" />{s.mode === 'story' ? '剧情挑战' : '无尽挑战'}</div><div className="wave-value"><span>WAVE</span><strong>{String(s.wave).padStart(2, '0')}</strong><span className="wave-divider">/</span><span>{s.bossStage ? '首领战' : s.mode === 'story' ? '05' : '∞'}</span></div><Meter value={s.waveProgress} label="当前波次进度" /></div>
+      <div className="wave-cluster"><div className="hud-eyebrow"><span className="status-dot" />{s.mode === 'story' ? '剧情挑战' : '无尽挑战'} · {s.difficulty === 'hard' ? '困难' : '普通'}</div><div className="wave-value"><span>WAVE</span><strong>{String(s.wave).padStart(2, '0')}</strong><span className="wave-divider">/</span><span>{s.bossStage ? '首领战' : s.mode === 'story' ? '05' : '∞'}</span></div><Meter value={s.waveProgress} label="当前波次进度" /></div>
       <div className="score-cluster"><span className="hud-eyebrow">SCORE</span><strong>{String(s.score).padStart(7, '0')}</strong><span className="run-time">{formatTime(s.elapsed)}</span></div>
       <div className="hud-actions"><div className="bomb-counter"><span className="bomb-icon" aria-hidden="true">✦</span><strong>{String(s.bombs).padStart(2, '0')}</strong><span>炸弹<kbd>空格</kbd></span></div><button className="icon-button hud-pause" onClick={() => runtime.pause()} aria-label="暂停游戏"><Icon name="pause" /><kbd>ESC</kbd></button></div>
     </div>
-    {s.bossStage && s.bossMaxHp > 0 && <div className="boss-hud"><div><span className="boss-label">深处的共鸣</span><strong>MAFUYU</strong><span>{Math.ceil(100 * s.bossHp / s.bossMaxHp)}%</span></div><Meter value={s.bossHp} max={s.bossMaxHp} className="meter-violet" label="真冬生命" /></div>}
+    {s.bossStage && s.bossMaxHp > 0 && <div className="boss-hud"><div><span className="boss-label">阶段 {s.bossPhase} / 3</span><strong>MAFUYU</strong><span>{Math.ceil(100 * s.bossHp / s.bossMaxHp)}%</span></div><Meter value={s.bossHp} max={s.bossMaxHp} className="meter-violet" label="真冬生命" /><p className="boss-action" aria-label="首领行动">{s.bossAction}</p></div>}
+    {!s.bossStage && s.minibossMaxHp > 0 && <div className="boss-hud miniboss-hud"><div><span className="boss-label">游猎回声</span><strong>ECHO</strong><span>{Math.ceil(100 * s.minibossHp / s.minibossMaxHp)}%</span></div><Meter value={s.minibossHp} max={s.minibossMaxHp} className="meter-heat" label="游猎回声生命" /><p className="boss-action" aria-label="迷你首领行动">{s.minibossAction}</p></div>}
     {s.announcement && <div className="wave-announcement" key={s.announcement} role="status"><span className="announcement-line" /><strong>{s.announcement}</strong><span className="announcement-line" /></div>}
     <div className="hud-bottom">
       <div className="player-status hud-surface"><div className="player-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><div><span className="hud-eyebrow">RESONANCE</span><strong>你的共鸣</strong></div><span className="level-badge">LV. {String(s.level).padStart(2, '0')}</span></div><div className="health-row"><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><span>{s.hp}<small> / {s.maxHp}</small></span></div><div className="growth-label"><span>武器成长</span><span>{s.level >= BALANCE.xp.cap ? 'MAX' : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= BALANCE.xp.cap ? 1 : s.xp} max={s.level >= BALANCE.xp.cap ? 1 : s.xpNeeded} className="meter-violet" label="武器成长" /><div className="support-status" aria-label="子机支援"><span>子机</span><span className="support-slots" aria-hidden="true">{Array.from({ length: BALANCE.companion.max }, (_, i) => <i key={i} className={i < s.companions ? "active" : ""} />)}</span><strong>{s.companions} / {BALANCE.companion.max}</strong></div></div>
@@ -149,7 +155,7 @@ export default function App({ runtime }: { runtime: RuntimeControls }) {
   }, [snapshot.phase]);
   return <div className={`app phase-${snapshot.phase} ${snapshot.settings.reducedMotion ? 'reduce-motion' : ''}`}>
     {inRun && <Hud snapshot={snapshot} runtime={runtime} openSettings={openSettings} />}
-    {snapshot.phase === 'menu' && <Menu runtime={runtime} openSettings={openSettings} openChangelog={() => setChangelogOpen(true)} />}
+    {snapshot.phase === 'menu' && <Menu runtime={runtime} difficulty={snapshot.difficulty} openSettings={openSettings} openChangelog={() => setChangelogOpen(true)} />}
     {snapshot.phase === 'loading' && <section className="screen-overlay loading-screen" aria-label="加载游戏"><span className="loading-mark" aria-hidden="true">✦</span><div className="eyebrow">MAFUYU SEKAI</div><h1>正在连接世界</h1><div className="loading-progress"><Meter value={snapshot.loading} label="资源加载进度" /><span>{Math.round(snapshot.loading * 100)}%</span></div><p>让共鸣，再次响起。</p></section>}
     {!settingsOpen && snapshot.phase === 'paused' && <Dialog title="稍作停留" eyebrow="TAKE A BREATH" onClose={() => runtime.resume()}><p className="dialog-description">世界正在等你。准备好后，继续共鸣。</p><RunResults snapshot={snapshot} /><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.resume()}><Icon name="play" />继续游戏 <kbd>ESC</kbd></button><button className="button button-secondary" onClick={openSettings}><Icon name="settings" />体验设置</button><button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button></div><ControlsGuide compact /></Dialog>}
     {!settingsOpen && snapshot.phase === 'failed' && <Dialog title="这次共鸣，暂时中断" eyebrow="RESONANCE LOST" className="result-dialog failure-dialog"><div className="result-emblem" aria-hidden="true">✧</div><p className="dialog-description">每一次靠近，都是下一次前进的起点。</p><RunResults snapshot={snapshot} /><div className="result-detail"><span>抵达第 {snapshot.wave} 波</span><span>最高纪录 {snapshot.bestScore.toLocaleString('en-US')}</span></div><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.restart()}><Icon name="restart" />再次挑战</button><button className="button button-secondary" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}

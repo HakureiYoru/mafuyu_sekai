@@ -1,0 +1,93 @@
+{
+  "version": "3.2.0",
+  "build": "Production preview",
+  "errors": [],
+  "checks": [
+    {
+      "skill": "laser",
+      "phase": 1,
+      "state": "laserWarmup",
+      "warning": 1.8166666666666682,
+      "hazards": 0,
+      "action": "扫射方向已锁定 · 离开紫色扇区"
+    },
+    {
+      "skill": "nova",
+      "phase": 3,
+      "state": "novaWarmup",
+      "warning": 0.6666666666666659,
+      "hazards": 0,
+      "action": "环弹 · 薄荷色扇区是弹幕缺口"
+    },
+    {
+      "skill": "bombard",
+      "phase": 1,
+      "state": "bombardWarmup",
+      "warning": 0.8666666666666671,
+      "hazards": 3,
+      "action": "地面连爆 · 离开标记圆圈"
+    },
+    {
+      "low": {
+        "settings": {
+          "quality": "low",
+          "masterVolume": 0.7,
+          "musicVolume": 0.45,
+          "sfxVolume": 0.65,
+          "screenShake": 0.45,
+          "reducedMotion": true
+        },
+        "boss": "laserWarmup"
+      }
+    },
+    {
+      "companions": [
+        {
+          "angle": 1.5316459555328494,
+          "x": 1965.9560148394457,
+          "y": 1914.5306658830903
+        },
+        {
+          "angle": -2.5707295076106833,
+          "x": 2091.040607170061,
+          "y": 2013.2517110633544
+        },
+        {
+          "angle": -0.8041720444537352,
+          "x": 1943.0033779904932,
+          "y": 2072.217623053555
+        }
+      ],
+      "enemies": [
+        {
+          "type": "dasher",
+          "state": "charge"
+        },
+        {
+          "type": "sniper",
+          "state": "chase"
+        },
+        {
+          "type": "sprayer",
+          "state": "chase"
+        },
+        {
+          "type": "minelayer",
+          "state": "chase"
+        },
+        {
+          "type": "basic",
+          "state": "chase"
+        },
+        {
+          "type": "basic",
+          "state": "chase"
+        },
+        {
+          "type": "basic",
+          "state": "chase"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem } from './effects';
+import { bossAttacks } from './boss-ai';
+import { miniBossAttacks } from './miniboss-ai';
+import { enemyAttacks } from './enemy-ai';
 import { beamGeometry, clamp, lerp, TAU } from './math';
 import type { CombatEvent, Enemy, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
 
@@ -62,11 +65,11 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     context.fillStyle = '#fff'; context.fillRect(764, 43, 8, 25); context.beginPath(); context.arc(768, 78, 4, 0, TAU); context.fill();
     context.beginPath(); context.moveTo(864, 13); context.lineTo(883, 32); context.lineTo(864, 51); context.lineTo(845, 32); context.closePath(); context.fill();
     context.lineWidth = 3; context.beginPath(); context.moveTo(928, 17); context.lineTo(928, 47); context.moveTo(913, 32); context.lineTo(943, 32); context.stroke();
-    const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss'];
+    const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'];
     types.forEach((type, index) => {
       context.save(); context.translate(index * 128 + 64, 192);
       context.strokeStyle = '#fff'; context.lineWidth = type === 'boss' ? 1 : 2;
-      const sides = type === 'dasher' ? 3 : type === 'sniper' ? 4 : type === 'minelayer' ? 4 : type === 'sprayer' ? 6 : type === 'boss' ? 8 : 0;
+      const sides = type === 'dasher' ? 3 : type === 'sniper' ? 4 : type === 'minelayer' ? 4 : type === 'sprayer' ? 6 : type === 'boss' ? 8 : type === 'miniboss' ? 5 : 0;
       if (sides) {
         context.beginPath();
         for (let i = 0; i <= sides; i++) {
@@ -107,7 +110,7 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     context.setLineDash([]); context.restore();
   });
   const frame = (x: number, y: number, width: number, height: number) => new Texture({ source: texture.source, frame: new Rectangle(x * 2, y * 2, width * 2, height * 2) });
-  const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss'];
+  const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'];
   return { texture, atlas: {
     glow: frame(0, 0, 128, 128), spark: frame(128, 0, 128, 64), ring: frame(256, 0, 128, 128),
     bolt: frame(384, 0, 128, 64), hostile: frame(512, 0, 64, 64), player: frame(576, 0, 128, 128),
@@ -379,6 +382,7 @@ export class GameRenderer {
       const motion = this.settings.reducedMotion ? 0 : clamp(enemy.vx / 150, -1, 1) * 0.07 + Math.sin(state.elapsed * 2 + enemy.id) * 0.022;
       visual.art.texture = isMine ? this.supportAssets.mine : this.assets.enemy;
       visual.art.tint = 0xffffff;
+      visual.art.alpha = isMine && enemy.state === 'arming' ? 0.55 : 1;
       visual.art.width = artSize * (1 + hit * 0.08); visual.art.height = artSize * (1 - hit * 0.05);
       visual.art.rotation = enemy.type === 'mine' ? 0 : motion;
       visual.hit.visible = enemy.type !== 'mine';
@@ -388,17 +392,18 @@ export class GameRenderer {
       visual.hazard.visible = isMine;
       if (isMine) {
         visual.hazard.position.set(x, y);
+        visual.hazard.alpha = enemy.state === 'arming' ? 0.3 : 1;
         // The atlas dashed circle has radius 35 in a 96-unit frame: this is the real contact radius.
         visual.hazard.width = enemy.radius * 96 / 35; visual.hazard.height = visual.hazard.width;
       }
       visual.badge.width = enemy.radius * 2.95; visual.badge.height = enemy.radius * 2.95;
       visual.badge.alpha = enemy.state === 'charge' || enemy.state === 'aim' ? 0.9 : 0.55;
-      visual.badge.rotation = enemy.type === 'dasher' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
+      visual.badge.rotation = enemy.type === 'dasher' || enemy.type === 'miniboss' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
       visual.halo.visible = isMine || this.settings.quality !== 'low';
       visual.halo.width = enemy.radius * (isMine ? 2.8 : 4.3); visual.halo.height = visual.halo.width;
       visual.halo.tint = isMine ? 0x030811 : color;
       visual.halo.alpha = isMine ? 0.85 : enemy.type === 'boss' ? 0.22 : 0.11 + hit * 0.17;
-      const showHealth = enemy.hp < enemy.maxHp && enemy.type !== 'mine' && enemy.type !== 'boss';
+      const showHealth = enemy.hp < enemy.maxHp && enemy.type !== 'mine' && enemy.type !== 'boss' && enemy.type !== 'miniboss';
       visual.health.visible = showHealth; visual.bar.visible = showHealth;
       if (showHealth) {
         const width = Math.max(36, enemy.radius * 1.5);
@@ -499,7 +504,8 @@ export class GameRenderer {
       let visual = this.companions[index];
       if (!visual) {
         const root = new Container(), glow = centered(this.atlas.glow, 78, 0x72dfff);
-        const ship = centered(this.supportAssets.drone, 37), barrel = centered(this.atlas.bolt, 12, 0xc5fff8);
+        const ship = centered(this.assets.player, 43), barrel = centered(this.atlas.bolt, 12, 0xc5fff8);
+        ship.rotation = Math.PI / 2;
         glow.alpha = 0.26; barrel.width = 20; barrel.height = 7; barrel.position.x = 20;
         root.addChild(glow, barrel, ship); this.companionLayer.addChild(root);
         visual = { root, glow, ship, barrel }; this.companions.push(visual);
@@ -570,7 +576,8 @@ export class GameRenderer {
     if (dashing && this.trailClock <= 0) { this.effects.trail(x, y, tilt); this.trailClock = 1 / 40; }
     const graph = this.playerMarks.clear();
     // The small ring is the actual hit circle; art and decorative rings never define damage.
-    graph.circle(x, y, player.radius).stroke({ color: WHITE, width: 1, alpha: player.invincible > 0 ? 0.9 : 0.25 });
+    if (player.focus) graph.circle(x, y, player.radius).stroke({ color: 0x07101e, width: 5, alpha: 0.95 });
+    graph.circle(x, y, player.radius).stroke({ color: WHITE, width: player.focus ? 2 : 1, alpha: player.focus || player.invincible > 0 ? 0.95 : 0.25 });
     graph.circle(x, y, 2.3).fill({ color: 0xf2fff8, alpha: 0.9 });
     const cos = Math.cos(player.angle), sin = Math.sin(player.angle), nx = -sin, ny = cos;
     const frontX = x + cos * 51, frontY = y + sin * 51;
@@ -587,8 +594,20 @@ export class GameRenderer {
     }
   }
 
+  private sector(graph: Graphics, x: number, y: number, start: number, sweep: number, radius: number, color: number, alpha: number) {
+    const points = [x, y];
+    for (let i = 0; i <= 32; i++) {
+      const angle = start + sweep * i / 32;
+      points.push(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
+    }
+    graph.poly(points).fill({ color, alpha });
+    graph.moveTo(x + Math.cos(start) * radius, y + Math.sin(start) * radius).lineTo(x, y)
+      .lineTo(x + Math.cos(start + sweep) * radius, y + Math.sin(start + sweep) * radius).stroke({ color, width: 1.5, alpha: Math.min(0.65, alpha * 7) });
+  }
+
   private renderWarnings(state: WorldState, alpha: number) {
     const graph = this.warnings.clear();
+    const attacks = bossAttacks(state.difficulty), enemyConfig = enemyAttacks(state.difficulty);
     for (const indicator of state.indicators) {
       if (!this.visible(indicator.x, indicator.y, 200)) continue;
       const progress = clamp(1 - indicator.time / indicator.duration, 0, 1);
@@ -602,16 +621,72 @@ export class GameRenderer {
     }
     for (const enemy of state.enemies) {
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha);
-      if (enemy.type === 'boss' && (enemy.state === 'laserWarmup' || enemy.state === 'laser')) {
-        this.renderLaser(graph, enemy, x, y);
-      } else if (enemy.type === 'sniper' && enemy.state === 'aim') {
-        const progress = clamp(1 - enemy.timer / 0.65, 0, 1), locked = enemy.timer <= 0.2;
+      if (enemy.type === 'miniboss' && enemy.miniboss) {
+        const cfg = miniBossAttacks(state.difficulty), brain = enemy.miniboss;
+        if (enemy.state === 'charge') {
+          const length = Math.hypot(brain.targetX - enemy.x, brain.targetY - enemy.y);
+          this.dashWarning(graph, x, y, enemy.angle, length, enemy.radius, 0xffae79, true);
+        } else if (enemy.state === 'laserWarmup' || enemy.state === 'laser') {
+          const beam = beamGeometry(x, y, enemy.angle, cfg.laser.length, cfg.laser.width), active = enemy.state === 'laser';
+          graph.poly(beam.corners).fill({ color: 0xff9c66, alpha: active ? 0.72 : 0.14 }).stroke({ color: 0xffc9a5, width: active ? 3 : 2, alpha: 0.95 });
+          graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff4dc, width: active ? cfg.laser.width * 0.24 : 1.5, alpha: 0.85 });
+          if (!active) {
+            const warning = brain.phase === 2 ? cfg.laser.phase2Warning : cfg.laser.warning;
+            graph.moveTo(x, y - enemy.radius - 14).arc(x, y, enemy.radius + 14, -Math.PI / 2, -Math.PI / 2 + clamp(1 - enemy.timer / warning, 0, 1) * TAU).stroke({ color: 0xffd6ab, width: 4, alpha: 0.9 });
+          }
+        } else if (enemy.state === 'phaseShift') {
+          graph.circle(x, y, enemy.radius + 20).stroke({ color: 0xffd0a4, width: 4, alpha: 0.8 });
+        }
+      } else if (enemy.type === 'boss' && (enemy.state === 'laserWarmup' || enemy.state === 'laser')) {
+        this.renderLaser(graph, enemy, x, y, attacks);
+      } else if (enemy.type === 'boss' && enemy.boss) {
+        const brain = enemy.boss, phase = brain.phase - 1;
+        if (enemy.state === 'novaWarmup' || enemy.state === 'nova') {
+          const gap = attacks.nova.gap[phase], angle = brain.lockedAngle;
+          this.sector(graph, x, y, angle + gap / 2, TAU - gap, 1150, 0xdd9bff, 0.045);
+          this.sector(graph, x, y, angle - gap / 2, gap, 900, 0x88f4d6, 0.07);
+          graph.circle(x, y, enemy.radius + 18).stroke({ color: 0xccafff, width: 3, alpha: 0.8 });
+          for (let distance = 240; distance < 850; distance += 120) {
+            const bx = x + Math.cos(angle) * distance, by = y + Math.sin(angle) * distance;
+            graph.circle(bx, by, 4).fill({ color: 0xb4ffe6, alpha: 0.8 });
+          }
+        } else if (enemy.state === 'aim' || enemy.state === 'volley') {
+          const spread = (attacks.volley.count[phase] - 1) * attacks.volley.angleStep;
+          this.sector(graph, x, y, brain.lockedAngle - spread / 2, spread, 1400, 0xf5a0c9, 0.06);
+          for (let i = 0; i < attacks.volley.count[phase]; i++) {
+            const angle = brain.lockedAngle + (i - (attacks.volley.count[phase] - 1) / 2) * attacks.volley.angleStep;
+            graph.moveTo(x, y).lineTo(x + Math.cos(angle) * 1400, y + Math.sin(angle) * 1400).stroke({ color: 0xffbad6, width: 1, alpha: 0.4 });
+          }
+        } else if (enemy.state === 'phaseShift') {
+          const progress = 1 - enemy.timer / attacks.phaseShift;
+          graph.circle(x, y, enemy.radius + 25 + progress * 20).stroke({ color: 0xe4d0ff, width: 3, alpha: 0.85 });
+        }
+      } else if (enemy.type === 'sniper' && (enemy.state === 'aim' || enemy.state === 'volley')) {
+        const progress = clamp(1 - enemy.timer / enemyConfig.sniper.warning, 0, 1), locked = enemy.tactics?.locked ?? false;
         const beam = beamGeometry(x, y, enemy.angle, 6000, 5);
         graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: locked ? 0xffb4db : 0xce99fc, width: locked ? 2.5 : 1.3, alpha: 0.25 + progress * 0.6 });
         graph.circle(x, y, enemy.radius + 10).stroke({ color: 0xf3b9ee, width: 2, alpha: 0.2 + progress * 0.65 });
       } else if (enemy.type === 'dasher' && enemy.state === 'charge') {
-        const beam = beamGeometry(x, y, enemy.angle, 280, enemy.radius * 1.5);
-        graph.poly(beam.corners).fill({ color: 0xffcc7c, alpha: 0.075 }).stroke({ color: 0xffcc7c, width: 1, alpha: 0.24 });
+        this.dashWarning(graph, x, y, enemy.angle, enemyConfig.dasher.speed * enemyConfig.dasher.duration, enemy.radius, 0xffcc7c, enemy.tactics?.locked ?? false);
+      } else if (enemy.type === 'sprayer' && (enemy.state === 'aim' || enemy.state === 'volley')) {
+        this.sector(graph, x, y, enemy.angle - enemyConfig.sprayer.sector / 2, enemyConfig.sprayer.sector, 1400, 0xffb873, 0.055);
+      } else if (enemy.type === 'minelayer' && (enemy.state === 'charge' || enemy.state === 'lay' || enemy.state === 'volley')) {
+        graph.circle(x, y, enemy.radius + 14).stroke({ color: 0xffca7f, width: 2, alpha: 0.8 });
+      } else if (enemy.type === 'mine' && enemy.state === 'arming') {
+        const progress = clamp(1 - enemy.timer / enemyConfig.mine.arming, 0, 1);
+        graph.moveTo(x, y - enemy.radius).arc(x, y, enemy.radius, -Math.PI / 2, -Math.PI / 2 + progress * TAU)
+          .stroke({ color: 0xffcb76, width: 3, alpha: 0.8 });
+      }
+    }
+    for (const hazard of state.hazards) {
+      const { x, y, radius } = hazard;
+      if (!this.visible(x, y, radius)) continue;
+      const progress = 1 - hazard.warning / hazard.warningDuration;
+      graph.circle(x, y, radius).fill({ color: 0xff725b, alpha: hazard.active ? 0.55 : 0.06 + progress * 0.09 });
+      graph.circle(x, y, radius).stroke({ color: hazard.active ? 0xffefe0 : 0xffa380, width: hazard.active ? 4 : 2, alpha: 0.95 });
+      if (!hazard.active) {
+        graph.moveTo(x, y - radius).arc(x, y, radius + 5, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffd2ad, width: 4, alpha: 0.9 });
+        graph.moveTo(x - 10, y - 10).lineTo(x + 10, y + 10).moveTo(x + 10, y - 10).lineTo(x - 10, y + 10).stroke({ color: 0xffd2ad, width: 3, alpha: 0.8 });
       }
     }
     if (state.blackHoleTime > 0) {
@@ -622,16 +697,41 @@ export class GameRenderer {
     }
   }
 
-  private renderLaser(graph: Graphics, enemy: Enemy, x: number, y: number) {
+  private dashWarning(graph: Graphics, x: number, y: number, angle: number, length: number, radius: number, color: number, locked: boolean) {
+    const beam = beamGeometry(x, y, angle, length, radius * 2);
+    const nx = -Math.sin(angle) * radius, ny = Math.cos(angle) * radius;
+    graph.moveTo(x - nx, y - ny).lineTo(beam.endX - nx, beam.endY - ny)
+      .arc(beam.endX, beam.endY, radius, angle - Math.PI / 2, angle + Math.PI / 2)
+      .lineTo(x + nx, y + ny).arc(x, y, radius, angle + Math.PI / 2, angle + Math.PI * 1.5).closePath()
+      .fill({ color, alpha: locked ? 0.16 : 0.07 }).stroke({ color, width: locked ? 2 : 1, alpha: locked ? 0.85 : 0.4 });
+  }
+
+  private renderLaser(graph: Graphics, enemy: Enemy, x: number, y: number, attacks: ReturnType<typeof bossAttacks>) {
     const active = enemy.state === 'laser';
-    const beam = beamGeometry(x, y, enemy.angle, BALANCE.boss.laserLength, BALANCE.boss.laserWidth);
-    const progress = clamp(1 - enemy.timer / BALANCE.boss.laserWarning, 0, 1);
-    const locked = enemy.timer <= BALANCE.boss.laserLock;
+    if (enemy.boss) {
+      const start = enemy.boss.lockedAngle;
+      const sweep = enemy.boss.sweepDirection * attacks.laser.angularSpeed * (attacks.laser.duration - attacks.laser.hold);
+      this.sector(graph, x, y, start, sweep, attacks.laser.length, 0xe49de5, active ? 0.025 : 0.075);
+      if (!active) {
+        const endBeam = beamGeometry(x, y, start + sweep, attacks.laser.length, attacks.laser.width);
+        graph.poly(endBeam.corners).fill({ color: 0xe49de5, alpha: 0.06 }).stroke({ color: 0xe49de5, width: 1, alpha: 0.4 });
+      }
+      const midpoint = start + sweep / 2, direction = enemy.boss.sweepDirection;
+      for (const radius of [300, 490, 680]) {
+        const bx = x + Math.cos(midpoint) * radius, by = y + Math.sin(midpoint) * radius;
+        const tangent = midpoint + direction * Math.PI / 2;
+        graph.moveTo(bx - Math.cos(tangent - 0.7) * 20, by - Math.sin(tangent - 0.7) * 20).lineTo(bx, by)
+          .lineTo(bx - Math.cos(tangent + 0.7) * 20, by - Math.sin(tangent + 0.7) * 20).stroke({ color: 0xffcfed, width: 3, alpha: 0.8 });
+      }
+    }
+    const beam = beamGeometry(x, y, enemy.angle, attacks.laser.length, attacks.laser.width);
+    const progress = clamp(1 - enemy.timer / attacks.laser.warning, 0, 1);
+    const locked = enemy.timer <= attacks.laser.warning;
     graph.poly(beam.corners).fill({ color: active ? 0xf695d9 : locked ? 0xfaacdc : 0xc49aff, alpha: active ? 0.66 : 0.07 + progress * 0.1 });
     graph.poly(beam.corners).stroke({ color: active ? 0xffd8f2 : 0xe2b5ff, width: active ? 3 : 2, alpha: active ? 1 : 0.5 + progress * 0.5 });
     if (active) {
       // White core stays inside the exact damage footprint. There is no wider decorative beam.
-      graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff5fd, width: BALANCE.boss.laserWidth * 0.27, alpha: 0.85 });
+      graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff5fd, width: attacks.laser.width * 0.27, alpha: 0.85 });
       graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xffffff, width: 5, alpha: 1 });
     } else {
       graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xe0b8ff, width: 1, alpha: 0.4 });
@@ -687,7 +787,8 @@ export class GameRenderer {
       if (event.type === 'dash') this.shake = Math.max(this.shake, 3);
       if (event.type === 'beam') this.shake = Math.max(this.shake, 9);
       if (event.type === 'kill') this.shake = Math.max(this.shake, event.enemyType === 'boss' ? 24 : 1.5);
-      if (event.type === 'boss' || event.type === 'attack') this.warning = 1;
+      if (event.type === 'boss' || (event.type === 'attack' && event.enemyType === 'boss' && event.text !== 'impact')) this.warning = 1;
+      if (event.type === 'attack' && event.text === 'impact') this.shake = Math.max(this.shake, 4);
     }
   }
 

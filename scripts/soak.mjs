@@ -4,14 +4,16 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const seconds = Number(process.env.MAFUYU_SOAK_SECONDS ?? 1800);
+const difficulty = process.env.MAFUYU_SOAK_DIFFICULTY ?? 'normal';
+if (!['normal', 'hard'].includes(difficulty)) throw new Error('MAFUYU_SOAK_DIFFICULTY must be normal or hard.');
 if (!Number.isFinite(seconds) || seconds < 5 || seconds > 1800) throw new Error('MAFUYU_SOAK_SECONDS must be between 5 and 1800 seconds.');
 const url = 'http://127.0.0.1:5183';
 const output = 'docs/validation';
 const args = process.platform === 'win32' ? ['--use-angle=d3d11'] : [];
-const limits = { enemies: 180, mines: 70, bullets: 4096, particles: 900, textures: 64, voices: 24, pickups: 20000, usedHeapBytes: 512 * 1024 * 1024 };
+const limits = { enemies: 180, mines: 70, hazards: 12, bullets: 4096, particles: 900, textures: 64, voices: 24, pickups: 20000, usedHeapBytes: 512 * 1024 * 1024 };
 const report = {
   version: JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version,
-  measuredAt: new Date().toISOString(), status: 'running', requestedWallSeconds: seconds,
+  measuredAt: new Date().toISOString(), status: 'running', requestedWallSeconds: seconds, difficulty,
   scenario: 'Production preview; 1920×1080; medium quality; three support craft seeded through the real pickup path; real-time endless combat driven by DOM keyboard/pointer input every 100 ms. No extra simulation steps or clock acceleration.',
   caveat: 'The player is invincible for this unattended stability run. Automated aim and movement do not validate human difficulty, fairness, or the 6–10 minute story balance.',
   launch: { channel: 'chromium', headless: true, args }, limits,
@@ -48,12 +50,12 @@ async function sample(wallSeconds, forceGc = false) {
   const [game, initialHeap, initialDom, initialMetrics] = await Promise.all([
     page.evaluate(() => {
       const debug = window.__MAFUYU_DEBUG__, state = debug.state(), snapshot = debug.snapshot();
-      const bodies = [state.player, ...state.enemies, ...state.bullets, ...state.pickups, ...state.companions, ...state.beams];
+      const bodies = [state.player, ...state.enemies, ...state.bullets, ...state.pickups, ...state.companions, ...state.beams, ...state.hazards];
       return { elapsed: state.elapsed, tick: state.tick, wave: state.wave, kills: state.kills, score: state.score,
-        phase: snapshot.phase, status: state.status, mode: state.mode, lifecycle: debug.lifecycle(),
+        phase: snapshot.phase, status: state.status, mode: state.mode, difficulty: state.difficulty, lifecycle: debug.lifecycle(),
         canvasCount: document.querySelectorAll('#game-host canvas').length,
         enemies: state.enemies.length, mines: state.enemies.filter(enemy => enemy.type === 'mine').length,
-        bullets: state.bullets.length, pickups: state.pickups.length, indicators: state.indicators.length,
+        hazards: state.hazards.length, bullets: state.bullets.length, pickups: state.pickups.length, indicators: state.indicators.length,
         companions: state.companions.length, beams: state.beams.length, droneBullets: state.bullets.filter(bullet => bullet.kind === 'drone').length,
         player: { hp: state.player.hp, level: state.player.level, ammo: state.player.ammo, heat: state.player.heat, bombs: state.player.bombs },
         stats: snapshot.stats, finite: bodies.every(body => Number.isFinite(body.x) && Number.isFinite(body.y)) && Number.isFinite(state.elapsed) && Number.isFinite(state.score),
@@ -78,10 +80,11 @@ async function sample(wallSeconds, forceGc = false) {
   firstSample ??= row;
   report.samples.push(row);
   check(game.phase === 'playing' && game.status === 'playing' && game.mode === 'endless', `Unexpected game phase/status at ${wallSeconds.toFixed(1)}s: ${game.phase}/${game.status}/${game.mode}`);
+  check(game.difficulty === difficulty, 'Difficulty changed during the stability run.');
   check(game.lifecycle.rafActive && game.canvasCount === 1, `Expected one active game RAF and one canvas at ${wallSeconds.toFixed(1)}s.`);
   check(game.finite, `Non-finite game state at ${wallSeconds.toFixed(1)}s.`);
   check(game.companions === 3 && game.beams <= 1, `Support craft or beam count invalid at ${wallSeconds.toFixed(1)}s.`);
-  for (const key of ['enemies', 'mines', 'bullets', 'pickups']) check(game[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
+  for (const key of ['enemies', 'mines', 'hazards', 'bullets', 'pickups']) check(game[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   for (const key of ['particles', 'textures', 'voices']) check(game.stats[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   if (typeof heap.usedSize === 'number') check(heap.usedSize <= limits.usedHeapBytes, 'Observed JS heap exceeded 512 MiB.');
   if (typeof dom.nodes === 'number') check(dom.nodes <= firstSample.dom.nodes + 500, 'DOM nodes grew by more than 500 from baseline.');
@@ -106,7 +109,7 @@ try {
   await resource('Performance.enable');
   await page.goto(`${url}/?debug=1`);
   await page.getByRole('button', { name: '开始游戏' }).waitFor();
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('complete'));
+  await page.evaluate(difficulty => { window.__MAFUYU_DEBUG__.difficulty(difficulty); window.__MAFUYU_DEBUG__.scenario('complete'); }, difficulty);
   await page.getByRole('button', { name: /继续.*无尽|无尽.*继续|进入无尽/ }).click();
   await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'playing' && window.__MAFUYU_DEBUG__.state().mode === 'endless');
   await page.evaluate(() => {
@@ -205,9 +208,9 @@ try {
   await page.screenshot({ path: `${output}/soak-end.png` });
   await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
   await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().tick >= 5);
-  const restart = await page.evaluate(() => ({ lifecycle: window.__MAFUYU_DEBUG__.lifecycle(), mode: window.__MAFUYU_DEBUG__.state().mode, wave: window.__MAFUYU_DEBUG__.state().wave, companions: window.__MAFUYU_DEBUG__.state().companions.length, beams: window.__MAFUYU_DEBUG__.state().beams.length, canvases: document.querySelectorAll('#game-host canvas').length }));
+  const restart = await page.evaluate(() => ({ lifecycle: window.__MAFUYU_DEBUG__.lifecycle(), mode: window.__MAFUYU_DEBUG__.state().mode, wave: window.__MAFUYU_DEBUG__.state().wave, companions: window.__MAFUYU_DEBUG__.state().companions.length, beams: window.__MAFUYU_DEBUG__.state().beams.length, hazards: window.__MAFUYU_DEBUG__.state().hazards.length, canvases: document.querySelectorAll('#game-host canvas').length }));
   check(restart.lifecycle.rafActive && restart.lifecycle.phase === 'playing' && restart.mode === 'story' && restart.wave === 1 && restart.canvases === 1, 'Restart did not recover one active story game.');
-  check(restart.companions === 0 && restart.beams === 0, 'Restart retained old support craft or beam state.');
+  check(restart.companions === 0 && restart.beams === 0 && restart.hazards === 0, 'Restart retained old support craft or beam state.');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '结束本局，返回主菜单' }).click();
   await page.getByRole('button', { name: '开始游戏' }).waitFor();

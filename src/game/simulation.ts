@@ -1,7 +1,11 @@
-import { BALANCE, ENEMIES, STEP, VIEW, WORLD, xpNeeded } from './config';
+import { BALANCE, ENEMIES, MINIBOSS_ENCOUNTER, STEP, VIEW, WORLD, xpNeeded } from './config';
+import { difficultyConfig } from './difficulty';
+import { createMiniBossBrain, updateMiniBossAi } from './miniboss-ai';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, SeededRandom, segmentCircleHit, SpatialGrid, TAU } from './math';
 import { ObjectPool } from './pool';
-import type { Bullet, CombatEvent, Companion, Enemy, EnemyType, InputAction, Pickup, PickupType, Player, WorldState } from './types';
+import { bossAttacks, createBossBrain, updateBossAi } from './boss-ai';
+import { enemyAttacks, updateEnemyAi } from './enemy-ai';
+import type { AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyType, InputAction, Pickup, PickupType, Player, WorldState } from './types';
 
 const EPSILON = 1e-8;
 const PICKUP_COLORS: Record<PickupType, number> = { xp: 0x73f7eb, hp: 0xa6f1aa, bomb: 0xffcb69, ammo: 0x69ffc0, coolant: 0x69caff, miniBomb: 0xffbb55, blackHole: 0xbb88ff, support: 0x9ceaff };
@@ -17,6 +21,8 @@ export class GameSimulation {
   private stepping = false;
   private previousDash = false;
   private previousBomb = false;
+  private dashBuffered = 0;
+  private nextEnemyCommit = 0;
   private bossAddTimer = BALANCE.boss.addInterval as number;
   private specialWindup = 0;
   private specialTarget: number | null = null;
@@ -32,9 +38,9 @@ export class GameSimulation {
   private readonly suppliedWaves = new Set<number>();
   private readonly bulletPool = new ObjectPool(emptyBullet, bullet => bullet.hitIds.clear(), BALANCE.limits.bullets);
 
-  constructor(seed = 12345) { this.seed = seed; this.reset(); }
+  constructor(seed = 12345, difficulty: Difficulty = 'normal') { this.seed = seed; this.reset('story', seed, difficulty); }
 
-  reset(mode: 'story' | 'endless' = 'story', seed = this.seed): void {
+  reset(mode: 'story' | 'endless' = 'story', seed = this.seed, difficulty: Difficulty = this.state?.difficulty ?? 'normal'): void {
     if (this.state) for (const bullet of this.state.bullets) this.bulletPool.release(bullet);
     this.seed = seed;
     this.random = new SeededRandom(seed);
@@ -47,6 +53,8 @@ export class GameSimulation {
     this.impacts.length = 0;
     this.suppliedWaves.clear();
     this.previousDash = this.previousBomb = false;
+    this.dashBuffered = 0;
+    this.nextEnemyCommit = 0;
     this.specialWindup = 0;
     this.specialTarget = null;
     this.bossAddTimer = BALANCE.boss.addInterval;
@@ -57,14 +65,14 @@ export class GameSimulation {
       hp: BALANCE.player.hp, maxHp: BALANCE.player.hp, bombs: BALANCE.player.bombs, level: 1, xp: 0,
       ammo: BALANCE.ammo.max, heat: 0, angle: -Math.PI / 2, invincible: 1, dashTime: 0, dashCooldown: 0,
       dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0, specialCooldown: 0, idleTime: 0,
-      heatLock: 0, overheated: false };
-    this.state = { status: 'playing', mode, elapsed: 0, tick: 0, score: 0, kills: 0, wave: mode === 'endless' ? 6 : 1,
+      heatLock: 0, overheated: false, focus: false };
+    this.state = { status: 'playing', mode, difficulty, minibossSpawned: false, elapsed: 0, tick: 0, score: 0, kills: 0, wave: mode === 'endless' ? 6 : 1,
       waveTime: 0, spawnTimer: 0.6, bossStage: false, bossPending: false, pendingWave: 0,
-      blackHoleTime: 0, player, camera: { x, y, prevX: x, prevY: y }, enemies: [], bullets: [], pickups: [], indicators: [], companions: [], beams: [] };
+      blackHoleTime: 0, player, camera: { x, y, prevX: x, prevY: y }, enemies: [], bullets: [], pickups: [], indicators: [], companions: [], beams: [], hazards: [] };
   }
 
   /** Edge history is reset on pause/blur so a new physical press resumes cleanly. */
-  clearInput(): void { this.previousDash = this.previousBomb = false; }
+  clearInput(): void { this.previousDash = this.previousBomb = false; this.dashBuffered = 0; this.state.player.focus = false; }
 
   continueEndless(): void {
     if (this.state.status !== 'complete') return;
@@ -101,6 +109,7 @@ export class GameSimulation {
     this.updateBeams(dt);
     this.rebuildGrid();
     this.updatePlayer(input, dt);
+    if (world.status === 'playing') this.updateHazards(dt);
     if (world.status === 'playing') {
       if (!this.stressMode) this.updateWaves(dt);
       this.updateEnemies(dt);
@@ -129,6 +138,8 @@ export class GameSimulation {
   private updatePlayer(input: InputAction, dt: number): void {
     const p = this.state.player;
     p.prevX = p.x; p.prevY = p.y;
+    p.focus = !!input.focus;
+    this.dashBuffered = Math.max(0, this.dashBuffered - dt);
     p.invincible = Math.max(0, p.invincible - dt);
     p.shotCooldown = Math.max(0, p.shotCooldown - dt);
     p.specialCooldown = Math.max(0, p.specialCooldown - dt);
@@ -138,7 +149,9 @@ export class GameSimulation {
     const aimX = input.aimX - p.x, aimY = input.aimY - p.y;
     if (Math.hypot(aimX, aimY) > EPSILON) p.angle = Math.atan2(aimY, aimX);
     const direction = normalize(input.moveX, input.moveY);
-    if (input.dash && !this.previousDash && p.dashCooldown <= EPSILON && p.dashTime <= EPSILON) {
+    if (input.dash && !this.previousDash && p.dashCooldown <= BALANCE.dash.inputBuffer + EPSILON) this.dashBuffered = BALANCE.dash.inputBuffer;
+    if (this.dashBuffered > 0 && p.dashCooldown <= EPSILON && p.dashTime <= EPSILON) {
+      this.dashBuffered = 0;
       const dash = direction.x || direction.y ? direction : { x: Math.cos(p.angle), y: Math.sin(p.angle) };
       p.dashVx = dash.x * BALANCE.dash.speed; p.dashVy = dash.y * BALANCE.dash.speed;
       p.dashTime = BALANCE.dash.duration;
@@ -154,10 +167,11 @@ export class GameSimulation {
       p.dashTime = Math.max(0, p.dashTime - dt);
       if (p.dashTime <= EPSILON) { p.dashTime = 0; p.perfectWindow = BALANCE.dash.window; }
     }
-    p.vx = dashDelta > 0 ? p.dashVx : direction.x * BALANCE.player.speed;
-    p.vy = dashDelta > 0 ? p.dashVy : direction.y * BALANCE.player.speed;
-    p.x = clamp(p.x + direction.x * BALANCE.player.speed * (dt - dashDelta), p.radius, WORLD.width - p.radius);
-    p.y = clamp(p.y + direction.y * BALANCE.player.speed * (dt - dashDelta), p.radius, WORLD.height - p.radius);
+    const moveSpeed = p.focus ? BALANCE.player.focusSpeed : BALANCE.player.speed;
+    p.vx = dashDelta > 0 ? p.dashVx : direction.x * moveSpeed;
+    p.vy = dashDelta > 0 ? p.dashVy : direction.y * moveSpeed;
+    p.x = clamp(p.x + direction.x * moveSpeed * (dt - dashDelta), p.radius, WORLD.width - p.radius);
+    p.y = clamp(p.y + direction.y * moveSpeed * (dt - dashDelta), p.radius, WORLD.height - p.radius);
     if (input.bomb && !this.previousBomb && p.bombs > 0) this.useBomb();
     this.previousBomb = input.bomb;
     if (this.state.status !== 'playing') return;
@@ -193,7 +207,7 @@ export class GameSimulation {
     p.shotCooldown = BALANCE.weapon.intervals[lv] * STEP;
     const color = p.level >= 10 ? 0xffcb69 : p.level >= 7 ? 0xc99dff : p.level >= 4 ? 0x69baff : 0x73f7eb;
     for (let i = 0; i < count; i++) {
-      const angle = p.angle + (i - (count - 1) / 2) * BALANCE.weapon.spreads[lv];
+      const angle = p.angle + (i - (count - 1) / 2) * BALANCE.weapon.spreads[lv] * (p.focus ? BALANCE.player.focusSpread : 1);
       this.addBullet(p.x, p.y, angle, BALANCE.weapon.speeds[lv], 'player', BALANCE.weapon.damage,
         p.level >= 10 ? 6 : 4, color, 'normal', p.level >= 10 ? 2 : 1, p.level >= 7, BALANCE.weapon.homingRange);
     }
@@ -325,10 +339,12 @@ export class GameSimulation {
 
   private updateWaves(dt: number): void {
     const w = this.state;
+    const difficulty = difficultyConfig(w.difficulty);
     if (!w.bossStage && !w.bossPending) {
       w.waveTime += dt;
       if (w.waveTime >= BALANCE.spawn.waveDuration - EPSILON) {
         w.waveTime = 0;
+        if (w.mode === 'story') this.gainXp(BALANCE.spawn.clearXp[Math.min(w.wave - 1, 4)]);
         const needsBoss = w.mode === 'story' ? w.wave === BALANCE.spawn.storyWaves : w.wave % BALANCE.spawn.endlessBossInterval === 0;
         if (needsBoss) {
           w.bossPending = true;
@@ -342,17 +358,25 @@ export class GameSimulation {
         }
       }
     }
-    if (w.bossStage) {
+    if (w.mode === 'story' && !w.minibossSpawned && w.wave === MINIBOSS_ENCOUNTER.wave && w.waveTime >= MINIBOSS_ENCOUNTER.time - EPSILON) {
+      w.minibossSpawned = true;
+      const p = w.player;
+      const side = p.x < WORLD.width / 2 ? 1 : -1;
+      const x = clamp(p.x + side * 600, 120, WORLD.width - 120), y = clamp(p.y - 170, 120, WORLD.height - 120);
+      w.indicators.push({ id: this.nextId++, type: 'miniboss', x, y, time: MINIBOSS_ENCOUNTER.warning, duration: MINIBOSS_ENCOUNTER.warning });
+      this.emit({ type: 'attack', enemyType: 'miniboss', x, y, text: 'arrival' });
+    }
+    if (w.bossStage && !this.bossExclusive()) {
       this.bossAddTimer -= dt;
       if (this.bossAddTimer <= EPSILON) {
-        this.bossAddTimer += BALANCE.boss.addInterval;
+        this.bossAddTimer += BALANCE.boss.addInterval * difficulty.spawnInterval;
         if (this.enemyCount - 1 + w.indicators.length < BALANCE.boss.maxAdds) this.queueSpawn();
       }
-    } else if (!w.bossPending) {
+    } else if (!w.bossStage && !w.bossPending) {
       w.spawnTimer -= dt;
       if (w.spawnTimer <= EPSILON) {
         const base = BALANCE.spawn.intervals[Math.min(w.wave - 1, 4)];
-        w.spawnTimer += w.mode === 'endless' ? Math.max(0.5, base - (w.wave - 5) * 0.015) : base;
+        w.spawnTimer += (w.mode === 'endless' ? Math.max(0.5, base - (w.wave - 5) * 0.015) : base) * difficulty.spawnInterval;
         this.queueSpawn();
       }
     }
@@ -361,14 +385,16 @@ export class GameSimulation {
       indicator.time -= dt;
       if (indicator.time <= EPSILON) {
         w.indicators.splice(i, 1);
-        this.spawnEnemy(indicator.type, indicator.x, indicator.y);
+        const spawned = this.spawnEnemy(indicator.type, indicator.x, indicator.y);
+        if (!spawned && indicator.type === 'miniboss') { indicator.time = 0.5; w.indicators.push(indicator); }
       }
     }
   }
 
   private queueSpawn(): void {
     const w = this.state;
-    if (this.enemyCount + w.indicators.length >= BALANCE.limits.enemies) return;
+    const reserved = w.mode === 'story' && !w.minibossSpawned ? 1 : 0;
+    if (this.enemyCount + w.indicators.length >= BALANCE.limits.enemies - reserved) return;
     const angle = this.random.next() * TAU;
     let x = clamp(w.player.x + Math.cos(angle) * 980, 70, WORLD.width - 70);
     let y = clamp(w.player.y + Math.sin(angle) * 980, 70, WORLD.height - 70);
@@ -377,18 +403,22 @@ export class GameSimulation {
       x = clamp(w.player.x + Math.cos(inward) * 850, 70, WORLD.width - 70);
       y = clamp(w.player.y + Math.sin(inward) * 850, 70, WORLD.height - 70);
     }
-    const roll = this.random.next();
+    const profile = difficultyConfig(w.difficulty);
+    const roll = 1 - (1 - this.random.next()) / profile.eliteChance;
+    const spawnWave = w.wave + (w.difficulty === 'hard' ? 1 : 0);
     let type: EnemyType = 'basic';
-    if (w.wave > 1 && roll > 0.6) type = 'dasher';
-    if (w.wave > 2 && roll > 0.75) type = 'minelayer';
-    if (w.wave > 3 && roll > 0.85) type = 'sniper';
-    if (w.wave > 4 && roll > 0.92) type = 'sprayer';
-    if ((type === 'minelayer' || type === 'sniper') && this.random.next() < 0.7) type = 'basic';
+    if (spawnWave > 1 && roll > 0.6) type = 'dasher';
+    if (spawnWave > 2 && roll > 0.75) type = 'minelayer';
+    if (spawnWave > 3 && roll > 0.85) type = 'sniper';
+    if (spawnWave > 4 && roll > 0.92) type = 'sprayer';
+    if ((type === 'minelayer' || type === 'sniper') && this.random.next() < (w.difficulty === 'hard' ? 0.35 : 0.7)) type = 'basic';
     w.indicators.push({ id: this.nextId++, x, y, type, time: BALANCE.spawn.warning, duration: BALANCE.spawn.warning });
   }
 
   spawnEnemy(type: EnemyType, x: number, y: number): Enemy | null {
     const w = this.state;
+    const difficulty = difficultyConfig(w.difficulty);
+    if (type === 'miniboss' && w.enemies.some(e => e.type === 'miniboss' && e.hp > 0)) return null;
     const atEnemyCap = this.stressMode
       ? this.enemyCount - this.mineCount >= BALANCE.limits.enemies && type !== 'mine'
       : this.enemyCount >= BALANCE.limits.enemies;
@@ -411,7 +441,8 @@ export class GameSimulation {
       this.specialWindup = 0; this.specialTarget = null;
     }
     const base = ENEMIES[type], waveBonus = Math.max(0, w.wave - 1);
-    let hp = type === 'basic' ? base.hp + waveBonus * 2 : type === 'mine' ? 1 : type === 'boss' ? BALANCE.boss.hp : base.hp * (1 + waveBonus * 0.18);
+    let hp = type === 'basic' ? base.hp + waveBonus * 2 : type === 'mine' ? 1 : type === 'boss' ? BALANCE.boss.hp : type === 'miniboss' ? base.hp : base.hp * (1 + waveBonus * 0.18);
+    if (type !== 'mine') hp *= type === 'boss' || type === 'miniboss' ? difficulty.bossHp : difficulty.enemyHp;
     let speed = base.speed as number, radius = base.radius as number;
     if (w.mode === 'endless') {
       const extra = Math.max(0, w.wave - 5);
@@ -419,11 +450,14 @@ export class GameSimulation {
       speed = Math.min(300, speed * (1 + extra * 0.02));
       radius *= Math.min(3, 1 + extra * 0.05);
     }
+    speed *= difficulty.enemySpeed;
     hp = Math.ceil(hp);
     const enemy: Enemy = { id: this.nextId++, type, x: clamp(x, radius, WORLD.width - radius), y: clamp(y, radius, WORLD.height - radius),
       prevX: x, prevY: y, vx: 0, vy: 0, radius, hp, maxHp: hp, speed, angle: this.random.next() * TAU,
-      state: 'chase', timer: type === 'boss' ? 5 : 0, cooldown: type === 'sniper' ? 0.6 + this.random.next() : type === 'minelayer' ? 2 : 0,
+      state: type === 'mine' ? 'arming' : 'chase', timer: type === 'boss' ? bossAttacks(w.difficulty).opening : type === 'mine' ? enemyAttacks(w.difficulty).mine.arming : 0, cooldown: type === 'sniper' ? 0.6 + this.random.next() : type === 'minelayer' ? 2 : 0,
       laserCooldown: BALANCE.boss.firstLaser, attackIndex: 0, hitTime: 0, lowHpSpoken: false, directionX: 0, directionY: 0 };
+    if (type === 'boss') enemy.boss = createBossBrain();
+    if (type === 'miniboss') { enemy.miniboss = createMiniBossBrain(); w.minibossSpawned = true; }
     enemy.prevX = enemy.x; enemy.prevY = enemy.y;
     this.state.enemies.push(enemy); this.byId.set(enemy.id, enemy);
     this.enemyCount++; if (type === 'mine') this.mineCount++;
@@ -431,156 +465,120 @@ export class GameSimulation {
     return enemy;
   }
 
+  private bossExclusive(): boolean {
+    const boss = this.state.enemies.find(e => e.type === 'boss' && e.hp > 0);
+    return !!boss && !['chase', 'recover'].includes(boss.state);
+  }
+
+  private clearHostileProjectiles(): void {
+    let keep = 0;
+    for (const bullet of this.state.bullets) {
+      if (bullet.owner === 'enemy') this.bulletPool.release(bullet);
+      else this.state.bullets[keep++] = bullet;
+    }
+    this.state.bullets.length = keep;
+    if (this.state.bossStage) this.state.indicators.length = 0;
+  }
+
+  private updateHazards(dt: number): void {
+    const w = this.state, p = w.player;
+    let keep = 0;
+    for (const hazard of w.hazards) {
+      if (!this.byId.has(hazard.sourceId)) continue;
+      if (!hazard.active) {
+        hazard.warning = Math.max(0, hazard.warning - dt);
+        if (hazard.warning <= EPSILON) {
+          hazard.active = true; hazard.life = hazard.duration;
+          this.emit({ type: 'attack', text: 'impact', x: hazard.x, y: hazard.y, color: 0xff886d, amount: hazard.radius, enemyType: 'boss' });
+        }
+      } else hazard.life -= dt;
+      if (hazard.life <= EPSILON) continue;
+      if (hazard.active && p.invincible <= EPSILON && segmentCircleHit(p.prevX, p.prevY, p.x, p.y, hazard.x, hazard.y, p.radius + hazard.radius) !== null) this.damagePlayer();
+      w.hazards[keep++] = hazard;
+      if (w.status !== 'playing') break;
+    }
+    w.hazards.length = keep;
+  }
+
   private updateEnemies(dt: number): void {
     const w = this.state, p = w.player;
-    // New mines start moving/attacking on the next simulation step.
-    const count = w.enemies.length;
-    for (let i = 0; i < count; i++) {
-      if (w.status !== 'playing') break;
-      const e = w.enemies[i];
-      if (e.hp <= 0) continue;
-      e.prevX = e.x; e.prevY = e.y;
-      e.hitTime = Math.max(0, e.hitTime - dt);
-      e.cooldown -= dt;
-      const dx = p.x - e.x, dy = p.y - e.y, distance = Math.hypot(dx, dy);
-      const toward = Math.atan2(dy, dx);
-      // Only steering decisions are throttled; all clocks, movement, firing, and collisions still run every step.
-      const decide = distance < 1250 || ((w.tick + e.id) & 1) === 0;
-      if (e.type === 'basic') {
-        if (decide) {
-          const angle = toward + Math.cos(w.elapsed * 0.6 + e.id) * 0.2;
-          this.steer(e, Math.cos(angle) * e.speed, Math.sin(angle) * e.speed, dt, 7);
-          e.angle = toward;
-        }
-      } else if (e.type === 'dasher') this.updateDasher(e, toward, distance, dt, decide);
-      else if (e.type === 'sniper') this.updateSniper(e, toward, distance, dt, decide);
-      else if (e.type === 'sprayer') {
-        if (decide) this.steer(e, Math.cos(toward + 0.5) * e.speed, Math.sin(toward + 0.5) * e.speed, dt, 5);
-        if (e.cooldown <= EPSILON) { e.cooldown += 10 * STEP; e.angle += 1; this.enemyShoot(e, e.angle, 240, 8, 0x69caff); }
-      } else if (e.type === 'minelayer') {
-        if (decide) {
-          if (e.x < 200 || e.x > WORLD.width - 200 || e.y < 200 || e.y > WORLD.height - 200) e.angle = Math.atan2(WORLD.height / 2 - e.y, WORLD.width / 2 - e.x);
-          else e.angle += (this.random.next() - 0.5) * 0.2;
-          this.steer(e, Math.cos(e.angle) * e.speed, Math.sin(e.angle) * e.speed, dt, 5);
-        }
-        if (e.cooldown <= EPSILON) {
-          e.cooldown += 2;
-          if (!w.bossStage || this.enemyCount - 1 < BALANCE.boss.maxAdds) this.spawnEnemy('mine', e.x, e.y);
-          this.emit({ type: 'attack', x: e.x, y: e.y, enemyType: e.type, targetId: e.id });
-        }
-      } else if (e.type === 'boss') this.updateBoss(e, toward, dt);
-      if (w.status !== 'playing') break;
+    const prepare = (e: Enemy) => {
+      e.prevX = e.x; e.prevY = e.y; e.hitTime = Math.max(0, e.hitTime - dt); e.cooldown -= dt;
+    };
+    const moveAndCollide = (e: Enemy) => {
       e.x = clamp(e.x + e.vx * dt, e.radius, WORLD.width - e.radius);
       e.y = clamp(e.y + e.vy * dt, e.radius, WORLD.height - e.radius);
-      if (w.status === 'playing' && p.invincible <= EPSILON) {
-        const impact = segmentCircleHit(p.prevX - e.prevX, p.prevY - e.prevY, p.x - e.x, p.y - e.y, 0, 0, p.radius + e.radius);
-        if (impact !== null) {
-          if (e.type === 'mine') this.damageEnemy(e, 99999);
-          this.damagePlayer();
-        }
+      if (w.status !== 'playing' || p.invincible > EPSILON || (e.type === 'mine' && e.state === 'arming')) return;
+      if (segmentCircleHit(p.prevX - e.prevX, p.prevY - e.prevY, p.x - e.x, p.y - e.y, 0, 0, p.radius + e.radius) !== null) {
+        if (e.type === 'mine') this.damageEnemy(e, 99999);
+        this.damagePlayer();
       }
+    };
+    // Resolve the Boss before its adds, so a newly committed major attack suppresses them in this same step.
+    const boss = w.enemies.find(e => e.type === 'boss' && e.hp > 0);
+    if (boss) {
+      prepare(boss);
+      updateBossAi(boss, dt, {
+        player: p, elapsed: w.elapsed, difficulty: w.difficulty,
+        shoot: (e, angle, speed, radius, color) => this.enemyShoot(e, angle, speed, radius, color),
+        emit: event => this.emit(event), damagePlayer: () => this.damagePlayer(),
+        clearHostileProjectiles: () => this.clearHostileProjectiles(),
+        clearBossHazards: () => { w.hazards.length = 0; },
+        spawnHazard: (hazard: Omit<AreaHazard, 'id'>) => {
+          if (w.status !== 'playing' || w.hazards.length >= BALANCE.ai.hazards) return;
+          w.hazards.push({ ...hazard, id: this.nextId++, x: clamp(hazard.x, hazard.radius, WORLD.width - hazard.radius), y: clamp(hazard.y, hazard.radius, WORLD.height - hazard.radius) });
+        },
+      });
+      if (w.status === 'playing') moveAndCollide(boss);
     }
-  }
-
-  private steer(e: Enemy, vx: number, vy: number, dt: number, response: number): void {
-    const alpha = 1 - Math.exp(-response * dt);
-    e.vx += (vx - e.vx) * alpha; e.vy += (vy - e.vy) * alpha;
-  }
-
-  private updateDasher(e: Enemy, toward: number, distance: number, dt: number, decide: boolean): void {
-    if (e.state === 'chase') {
-      if (decide) { this.steer(e, Math.cos(toward) * e.speed, Math.sin(toward) * e.speed, dt, 7); e.angle = toward; }
-      if (distance < 330 && e.cooldown <= EPSILON) { e.state = 'charge'; e.timer = 40 * STEP; }
-    } else if (e.state === 'charge') {
-      this.steer(e, 0, 0, dt, 12);
-      if (e.timer > 0.12) e.angle = toward;
-      e.timer -= dt;
-      if (e.timer <= EPSILON) {
-        e.state = 'dash'; e.timer = 1;
-        e.directionX = Math.cos(e.angle); e.directionY = Math.sin(e.angle);
-        this.emit({ type: 'attack', x: e.x, y: e.y, angle: e.angle, enemyType: e.type, targetId: e.id });
-      }
-    } else if (e.state === 'dash') {
-      e.vx = e.directionX * 420; e.vy = e.directionY * 420;
-      e.timer -= dt;
-      if (e.timer <= EPSILON) { e.state = 'recover'; e.timer = 0.5; }
-    } else {
-      this.steer(e, 0, 0, dt, 7);
-      e.timer -= dt;
-      if (e.timer <= EPSILON) { e.state = 'chase'; e.cooldown = 1; }
+    const exclusive = this.bossExclusive();
+    const difficulty = difficultyConfig(w.difficulty);
+    const committed = (e: Enemy) => e.type !== 'basic' && e.type !== 'mine' && e.type !== 'boss' && ['aim', 'charge', 'dash', 'volley', 'lay', 'laserWarmup', 'laser'].includes(e.state);
+    let commitments = w.enemies.reduce((count, e) => count + Number(e.hp > 0 && committed(e)), 0);
+    const canCommit = (e: Enemy) => {
+      const visible = Math.abs(e.x - w.camera.x) < VIEW.width / 2 - 45 && Math.abs(e.y - w.camera.y) < VIEW.height / 2 - 45;
+      if (!visible || exclusive || commitments >= difficulty.attackSlots || w.elapsed < this.nextEnemyCommit) return false;
+      commitments++; this.nextEnemyCommit = w.elapsed + difficulty.commitGap; return true;
+    };
+    const miniboss = w.enemies.find(e => e.type === 'miniboss' && e.hp > 0);
+    if (miniboss && w.status === 'playing') {
+      prepare(miniboss);
+      if (exclusive) { miniboss.state = 'recover'; miniboss.timer = 0.5; miniboss.vx = miniboss.vy = 0; }
+      else updateMiniBossAi(miniboss, dt, { player: p, elapsed: w.elapsed, difficulty: w.difficulty,
+        canCommit: () => canCommit(miniboss), emit: event => this.emit(event), damagePlayer: () => this.damagePlayer(),
+        shoot: (e, angle, speed, radius, color) => this.enemyShoot(e, angle, speed, radius, color) });
+      if (w.status === 'playing') moveAndCollide(miniboss);
     }
-  }
-
-  private updateSniper(e: Enemy, toward: number, distance: number, dt: number, decide: boolean): void {
-    if (e.state === 'aim') {
-      this.steer(e, 0, 0, dt, 10);
-      if (e.timer > 0.2 + EPSILON) e.angle = toward;
-      e.timer -= dt;
-      if (e.timer <= EPSILON) {
-        this.enemyShoot(e, e.angle, 600, 10, 0xc99dff);
-        this.emit({ type: 'attack', x: e.x, y: e.y, enemyType: e.type, targetId: e.id });
-        e.state = 'chase'; e.cooldown = 1.35;
-      }
-    } else {
-      if (decide) {
-        const forward = distance < 400 ? -e.speed * 1.2 : distance > 500 ? e.speed * 0.8 : 0;
-        const strafe = Math.sin(this.state.elapsed * 1.2 + e.id) * 45;
-        this.steer(e, Math.cos(toward) * forward - Math.sin(toward) * strafe, Math.sin(toward) * forward + Math.cos(toward) * strafe, dt, 6);
-        e.angle = toward;
-      }
-      if (e.cooldown <= EPSILON) { e.state = 'aim'; e.timer = 0.65; }
-    }
-  }
-
-  private updateBoss(e: Enemy, toward: number, dt: number): void {
-    const b = BALANCE.boss;
-    if (e.state === 'laserWarmup') {
-      e.vx = e.vy = 0;
-      if (e.timer > b.laserLock + EPSILON) e.angle = toward;
-      e.timer -= dt;
-      if (e.timer <= EPSILON) { e.state = 'laser'; e.timer = b.laserDuration; e.vx = e.vy = 0; }
-      return;
-    }
-    if (e.state === 'laser') {
-      e.angle += b.angularSpeed * dt;
-      e.timer -= dt;
-      const p = this.state.player;
-      if (p.invincible <= EPSILON && pointInBeam(p.x, p.y, p.radius, beamGeometry(e.x, e.y, e.angle, b.laserLength, b.laserWidth))) this.damagePlayer();
-      if (e.timer <= EPSILON) { e.state = 'recover'; e.timer = b.patternGap; e.laserCooldown = b.laserCooldown; }
-      return;
-    }
-    e.laserCooldown -= dt;
-    if (e.laserCooldown <= EPSILON) {
-      e.state = 'laserWarmup'; e.timer = b.laserWarning; e.angle = toward; e.vx = e.vy = 0;
-      this.emit({ type: 'attack', x: e.x, y: e.y, enemyType: 'boss', text: 'laser', targetId: e.id });
-      return;
-    }
-    this.steer(e, Math.cos(toward) * e.speed, Math.sin(toward) * e.speed, dt, 5);
-    e.timer -= dt;
-    if (e.state === 'recover') {
-      if (e.timer <= EPSILON) { e.state = 'chase'; e.timer = 5; e.cooldown = 0; }
-      return;
-    }
-    if (e.timer <= EPSILON) {
-      e.attackIndex = (e.attackIndex + 1) % 3; e.state = 'recover'; e.timer = b.patternGap;
-      this.emit({ type: 'attack', x: e.x, y: e.y, enemyType: 'boss', targetId: e.id });
-      return;
-    }
-    if (e.cooldown > EPSILON) return;
-    if (e.attackIndex === 0) {
-      e.cooldown = 10 * STEP; e.angle += 0.48;
-      for (let i = 0; i < 3; i++) this.enemyShoot(e, e.angle + i * TAU / 3, 300, 10, 0xffcb69);
-    } else if (e.attackIndex === 1) {
-      e.cooldown = 1;
-      for (let i = 0; i < 12; i++) this.enemyShoot(e, i * TAU / 12 + this.state.elapsed * 0.12, 360, 12, 0xff6584);
-    } else {
-      e.cooldown = 20 * STEP;
-      for (let i = -1; i <= 1; i++) this.enemyShoot(e, toward + i * 0.3, 360, 12, 0xf096ff);
+    // New mines are deliberately skipped until the next step; all movement and damage clocks stay at 60 Hz.
+    const count = w.enemies.length;
+    for (let i = 0; i < count && w.status === 'playing'; i++) {
+      const e = w.enemies[i];
+      if (e.hp <= 0 || e === boss || e === miniboss) continue;
+      prepare(e);
+      const distance = Math.hypot(p.x - e.x, p.y - e.y);
+      const decide = distance < 1250 || ((w.tick + e.id) & 1) === 0;
+      updateEnemyAi(e, dt, decide, {
+        player: p, elapsed: w.elapsed, wave: w.wave, difficulty: w.difficulty, allowAttack: !exclusive,
+        canCommit: () => canCommit(e),
+        shoot: (enemy, angle, speed, radius, color) => this.enemyShoot(enemy, angle, speed, radius, color),
+        emit: event => this.emit(event),
+        plantMine: (x, y) => {
+          if (exclusive || (w.bossStage && this.enemyCount - 1 >= BALANCE.boss.maxAdds)) return;
+          if (this.enemyCount >= BALANCE.limits.enemies - 1 && w.indicators.some(i => i.type === 'miniboss')) return;
+          const mineRadius = ENEMIES.mine.radius * (w.mode === 'endless' ? Math.min(3, 1 + Math.max(0, w.wave - 5) * 0.05) : 1);
+          x = clamp(x, mineRadius, WORLD.width - mineRadius); y = clamp(y, mineRadius, WORLD.height - mineRadius);
+          if (Math.hypot(x - p.x, y - p.y) < BALANCE.ai.mineSafeDistance) return;
+          if (w.enemies.some(other => other.hp > 0 && other.type === 'mine' && Math.hypot(x - other.x, y - other.y) < BALANCE.ai.mineSpacing)) return;
+          this.spawnEnemy('mine', x, y);
+        },
+      });
+      if (w.status === 'playing') moveAndCollide(e);
     }
   }
 
   private enemyShoot(e: Enemy, angle: number, speed: number, radius: number, color: number): void {
-    const bullet = this.addBullet(e.x, e.y, angle, speed, 'enemy', 1, radius, color);
+    const difficulty = difficultyConfig(this.state.difficulty);
+    const bullet = this.addBullet(e.x, e.y, angle, speed * difficulty.bulletSpeed, 'enemy', difficulty.damage, radius, color);
     if (bullet) this.emit({ type: 'enemyShot', x: e.x, y: e.y, color, angle, enemyType: e.type });
   }
 
@@ -627,11 +625,15 @@ export class GameSimulation {
       this.grid.query(e.x - range, e.y - range, e.x + range, e.y + range, this.candidates);
       for (const other of this.candidates) {
         if (other.id <= e.id || other.hp <= 0 || other.type === 'mine' || other.type === 'boss') continue;
+        const movable = e.state === 'chase' || e.state === 'recover';
+        const otherMovable = other.state === 'chase' || other.state === 'recover';
+        if (!movable && !otherMovable) continue;
         const dx = e.x - other.x, dy = e.y - other.y, distance = Math.hypot(dx, dy), overlap = e.radius + other.radius - distance;
         if (overlap <= 0) continue;
         const force = Math.min(overlap * 0.3, 50 * dt), nx = distance > EPSILON ? dx / distance : Math.cos(e.id), ny = distance > EPSILON ? dy / distance : Math.sin(e.id);
-        e.x = clamp(e.x + nx * force, e.radius, WORLD.width - e.radius); e.y = clamp(e.y + ny * force, e.radius, WORLD.height - e.radius);
-        other.x = clamp(other.x - nx * force, other.radius, WORLD.width - other.radius); other.y = clamp(other.y - ny * force, other.radius, WORLD.height - other.radius);
+        // Committed attacks keep the same origin as their warning. Neighbours yield around them.
+        if (movable) { e.x = clamp(e.x + nx * force, e.radius, WORLD.width - e.radius); e.y = clamp(e.y + ny * force, e.radius, WORLD.height - e.radius); }
+        if (otherMovable) { other.x = clamp(other.x - nx * force, other.radius, WORLD.width - other.radius); other.y = clamp(other.y - ny * force, other.radius, WORLD.height - other.radius); }
       }
     }
   }
@@ -677,7 +679,7 @@ export class GameSimulation {
         }
       } else if (!dead && b.owner === 'enemy' && this.state.status === 'playing' && p.invincible <= EPSILON) {
         if (segmentCircleHit(b.prevX - p.prevX, b.prevY - p.prevY, b.x - p.x, b.y - p.y, 0, 0, b.radius + p.radius) !== null) {
-          this.damagePlayer(); dead = true;
+          this.damagePlayer(b.damage); dead = true;
         }
       }
       dead ||= b.x < -b.radius || b.y < -b.radius || b.x > WORLD.width + b.radius || b.y > WORLD.height + b.radius;
@@ -698,7 +700,7 @@ export class GameSimulation {
     this.byId.delete(enemy.id); this.enemyCount--; if (enemy.type === 'mine') this.mineCount--;
     this.state.kills++;
     this.emit({ type: 'kill', x: enemy.x, y: enemy.y, enemyType: enemy.type, targetId: enemy.id, color: ENEMIES[enemy.type].color, amount: enemy.radius });
-    if (enemy.type !== 'mine') this.state.score += Math.round(enemy.maxHp * 10);
+    if (enemy.type !== 'mine') this.state.score += Math.round(enemy.maxHp * 10 * difficultyConfig(this.state.difficulty).score);
     if (enemy.type === 'boss') {
       this.state.bossStage = this.state.bossPending = false;
       if (this.state.mode === 'story') {
@@ -709,18 +711,24 @@ export class GameSimulation {
         this.state.pendingWave = 0; this.state.waveTime = 0; this.state.spawnTimer = 1;
         this.emit({ type: 'wave', x: enemy.x, y: enemy.y, amount: this.state.wave });
       }
+    } else if (enemy.type === 'miniboss') {
+      this.addPickup('xp', enemy.x, enemy.y, this.state.difficulty === 'hard' ? MINIBOSS_ENCOUNTER.hardXp : MINIBOSS_ENCOUNTER.xp);
+      this.addPickup('hp', enemy.x + 40, enemy.y, this.state.difficulty === 'hard' ? 2 : 1);
+      this.addPickup('ammo', enemy.x - 40, enemy.y, 1);
+      this.addPickup('coolant', enemy.x, enemy.y + 40, 1);
+      this.addPickup('support', enemy.x, enemy.y - 40, 1);
     } else if (enemy.type !== 'mine') this.dropLoot(enemy);
   }
 
-  private damagePlayer(): void {
+  private damagePlayer(damage: number = difficultyConfig(this.state.difficulty).damage): void {
     const p = this.state.player;
     if (p.invincible > EPSILON || this.state.status !== 'playing') return;
-    p.hp = Math.max(0, p.hp - 1); p.invincible = BALANCE.player.hitInvincible;
+    p.hp = Math.max(0, p.hp - damage); p.invincible = BALANCE.player.hitInvincible;
     let loss = Math.max(1, Math.floor(xpNeeded(p.level) * BALANCE.xp.loss));
     const before = p.level;
     while (loss > p.xp && p.level > 1) { loss -= p.xp; p.level--; p.xp = xpNeeded(p.level); }
     p.xp = Math.max(0, p.xp - loss);
-    this.emit({ type: 'damage', x: p.x, y: p.y, amount: 1, color: 0xff6584 });
+    this.emit({ type: 'damage', x: p.x, y: p.y, amount: damage, color: 0xff6584 });
     this.emit({ type: 'leveldown', x: p.x, y: p.y, amount: p.level, text: p.level < before ? 'LEVEL DOWN' : 'XP LOST' });
     if (p.hp <= 0) { this.state.status = 'failed'; this.emit({ type: 'failure', x: p.x, y: p.y, amount: this.state.score }); }
   }
@@ -823,6 +831,7 @@ export class GameSimulation {
     this.state.bullets.length = 0;
     this.state.indicators.length = 0;
     this.state.beams.length = 0;
+    this.state.hazards.length = 0;
     this.byId.clear(); this.grid.clear();
     this.enemyCount = this.mineCount = 0;
   }
@@ -838,7 +847,7 @@ export class GameSimulation {
 
   /** Stress-only cap override: 180 non-mine enemies + 70 mines; maintain 1,200 bullets. */
   debugStress(): void {
-    this.reset('endless', 20260911);
+    this.reset('endless', 20260911, 'normal');
     this.stressMode = true;
     const p = this.state.player;
     p.invincible = 1e9; p.level = 10;

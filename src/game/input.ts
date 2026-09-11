@@ -22,7 +22,7 @@ export class InputState {
       moveX: Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA')),
       moveY: Number(this.keys.has('KeyS')) - Number(this.keys.has('KeyW')),
       aimX: this.pointerX + cameraX, aimY: this.pointerY + cameraY,
-      shoot: this.shoot, dash: this.dash, bomb: this.bomb,
+      shoot: this.shoot, dash: this.dash, bomb: this.bomb, focus: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
     };
     this.dash = false;
     this.bomb = false;
@@ -36,7 +36,7 @@ export class InputController extends InputState {
   constructor(private host: HTMLElement, private active: () => boolean, pause: () => void, togglePause: () => void) {
     super();
     const options = { signal: this.abort.signal };
-    const gameKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'Space']);
+    const gameKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'Space', 'ShiftLeft', 'ShiftRight']);
     window.addEventListener('keydown', event => {
       const editing = event.target instanceof HTMLElement && !!event.target.closest('input,select,textarea,[contenteditable="true"]');
       if (event.code === 'Escape' && !event.repeat && !editing) { event.preventDefault(); togglePause(); return; }

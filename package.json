@@ -1,10 +1,12 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "3.1.1",
+  "version": "3.3.0",
   "private": true,
   "type": "module",
   "description": "Mafuyu Sekai — Neon Overdrive, a fixed-step WebGL arcade shooter",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

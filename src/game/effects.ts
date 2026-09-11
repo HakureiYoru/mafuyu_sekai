@@ -122,6 +122,12 @@ export class EffectSystem {
       case 'enemyShot':
         this.add(x, y, this.textures.glow, 0xff8959, 0.09, 45, 0, 0, 0, 0.4);
         break;
+      case 'attack':
+        if (event.text === 'impact') {
+          this.ring(x, y, 0xffc8a0, 18, (event.amount ?? 100) * 2, 0.35);
+          this.burst(x, y, 0xffa574, 16, 210, 5);
+        }
+        break;
       case 'hit':
         this.burst(x, y, color, 5, 200, 4, angle);
         if ((event.amount ?? 0) > 0) this.label(x, y, `${Math.round(event.amount!)}`, color, event.amount, event.targetId ?? null);
