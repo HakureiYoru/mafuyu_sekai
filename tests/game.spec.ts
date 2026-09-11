@@ -146,7 +146,7 @@ test('Boss laser announces its locked sweep before activation and survives pause
 test('Boss phase change clears old ground hazards and restart clears the whole encounter', async ({ page }) => {
   await openGame(page);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-bombard'));
-  await expect(page.getByLabel('首领行动')).toContainText('地面连爆');
+  await expect(page.getByLabel('首领行动')).toContainText('连爆星环');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(3);
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.every(h => !h.active && h.warning > 0))).toBe(true);
   await page.evaluate(() => {
@@ -203,7 +203,7 @@ test('third-wave miniboss coexists with spawning and exposes a locked laser with
     const s = window.__MAFUYU_DEBUG__.state(); const e = s.enemies.find(e => e.type === 'miniboss')!;
     return { waveTime: s.waveTime, maxHp: e.maxHp, bossStage: s.bossStage };
   });
-  expect(before).toMatchObject({ maxHp: 810, bossStage: false });
+  expect(before).toMatchObject({ maxHp: 1620, bossStage: false });
   await expect(page.getByLabel('迷你首领行动')).toContainText('激光锁定');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.type !== 'miniboss').length)).toBeGreaterThan(1);
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBeGreaterThan(before.waveTime);
@@ -212,6 +212,45 @@ test('third-wave miniboss coexists with spawning and exposes a locked laser with
   await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+for (const difficulty of ['普通', '困难']) {
+  test(`${difficulty} holds wave three until ECHO is defeated, then advances exactly once`, async ({ page }) => {
+    await openGame(page);
+    await page.getByRole('button', { name: difficulty, exact: true }).click();
+    await page.evaluate(() => {
+      const d = window.__MAFUYU_DEBUG__; d.scenario('miniboss');
+      d.state().waveTime = 40;
+    });
+    await expect(page.getByText('击败 ECHO 后进入第四波', { exact: true })).toBeVisible();
+    await page.waitForTimeout(800);
+    expect(await page.evaluate(() => ({ wave: window.__MAFUYU_DEBUG__.state().wave, time: window.__MAFUYU_DEBUG__.state().waveTime }))).toEqual({ wave: 3, time: 40 });
+    await page.evaluate(() => {
+      const s = window.__MAFUYU_DEBUG__.state(), e = s.enemies.find(e => e.type === 'miniboss')!;
+      e.x = e.prevX = s.player.x + 300; e.y = e.prevY = s.player.y;
+      e.hp = 1; e.state = 'recover'; e.timer = 20;
+      s.player.perfectWindow = 0.8;
+    });
+    const bounds = (await page.locator('#game-host').boundingBox())!;
+    await page.mouse.click(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2);
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
+    await expect(page.getByText('击败 ECHO 后进入第四波', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossDefeated)).toBe(true);
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
+  });
+  test(`${difficulty} Boss emits sustained curved layered danmaku`, async ({ page }) => {
+    await openGame(page);
+    await page.getByRole('button', { name: difficulty, exact: true }).click();
+    await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-nova'));
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').length)).toBeGreaterThan(120);
+    const shots = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').map(b => ({ shape: b.shape, age: b.motionAge, turn: b.turnRate, speed: b.speed })));
+    expect(new Set(shots.map(b => b.shape)).size).toBeGreaterThan(1);
+    expect(shots.some(b => (b.age ?? 0) > 0.6 && (b.turn ?? 0) > 0)).toBe(true);
+    expect(shots.some(b => (b.turn ?? 0) < 0)).toBe(true);
+    await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.length)).toBe(0);
+  });
+}
 
 test('support craft fight while overheated, beam fires through the heat lock, restart clears both', async ({ page }) => {
   await openGame(page);

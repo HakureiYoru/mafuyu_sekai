@@ -1,0 +1,1094 @@
+{
+  "version": "3.4.0",
+  "measuredAt": "2026-09-11T04:07:13.161Z",
+  "build": "Production preview, Chromium D3D11",
+  "caveat": "Invincible debug encounters; phase and next skill seeded, then actual simulation clocks, collision geometry and rendering. These checks do not establish human balance.",
+  "errors": [],
+  "checks": [
+    {
+      "encounter": "ECHO phase 1",
+      "phase": "playing",
+      "difficulty": "hard",
+      "waveTime": 25.716666666666512,
+      "bossStage": false,
+      "ordinary": 41,
+      "trace": [
+        {
+          "key": "undefined/undefined/undefined",
+          "elapsed": 0.09999999999999999,
+          "waveTime": 8.083333333333337,
+          "enemies": 0
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 1.5999999999999992,
+          "waveTime": 9.583333333333412,
+          "enemies": 2,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 2.0499999999999976,
+          "waveTime": 10.033333333333434,
+          "enemies": 3,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 2.499999999999996,
+          "waveTime": 10.483333333333457,
+          "enemies": 3,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 2.7333333333333285,
+          "waveTime": 10.716666666666802,
+          "enemies": 4,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 3.183333333333327,
+          "waveTime": 11.166666666666824,
+          "enemies": 4,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 3.6333333333333253,
+          "waveTime": 11.616666666666847,
+          "enemies": 5,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 3.866666666666658,
+          "waveTime": 11.850000000000191,
+          "enemies": 6,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 4.316666666666657,
+          "waveTime": 12.300000000000214,
+          "enemies": 6,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 4.766666666666655,
+          "waveTime": 12.750000000000236,
+          "enemies": 7,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laserWarmup/1/1",
+          "elapsed": 4.999999999999988,
+          "waveTime": 12.983333333333581,
+          "enemies": 7,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laser/1/1",
+          "elapsed": 5.549999999999986,
+          "waveTime": 13.533333333333609,
+          "enemies": 8,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 5.933333333333318,
+          "waveTime": 13.916666666666961,
+          "enemies": 9,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laserWarmup/1/1",
+          "elapsed": 6.06666666666665,
+          "waveTime": 14.050000000000301,
+          "enemies": 9,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laser/1/1",
+          "elapsed": 6.6166666666666485,
+          "waveTime": 14.600000000000328,
+          "enemies": 10,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "recover/1/1",
+          "elapsed": 6.9999999999999805,
+          "waveTime": 14.98333333333368,
+          "enemies": 11,
+          "state": "recover",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "chase/1/1",
+          "elapsed": 7.649999999999978,
+          "waveTime": 15.633333333333713,
+          "enemies": 12,
+          "state": "chase",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "charge/1/2",
+          "elapsed": 7.699999999999978,
+          "waveTime": 15.683333333333715,
+          "enemies": 12,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "dash/1/2",
+          "elapsed": 8.149999999999984,
+          "waveTime": 16.133333333333724,
+          "enemies": 13,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "aim/1/2",
+          "elapsed": 8.600000000000007,
+          "waveTime": 16.583333333333698,
+          "enemies": 13,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "charge/1/2",
+          "elapsed": 8.833333333333352,
+          "waveTime": 16.816666666667018,
+          "enemies": 14,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "dash/1/2",
+          "elapsed": 9.300000000000042,
+          "waveTime": 17.28333333333366,
+          "enemies": 14,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "aim/1/2",
+          "elapsed": 9.733333333333396,
+          "waveTime": 17.716666666666967,
+          "enemies": 17,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "charge/1/2",
+          "elapsed": 9.966666666666741,
+          "waveTime": 17.950000000000287,
+          "enemies": 20,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "dash/1/2",
+          "elapsed": 10.433333333333431,
+          "waveTime": 18.416666666666927,
+          "enemies": 22,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "aim/1/2",
+          "elapsed": 10.866666666666786,
+          "waveTime": 18.850000000000236,
+          "enemies": 25,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "laserWarmup/1/2",
+          "elapsed": 11.100000000000131,
+          "waveTime": 19.083333333333556,
+          "enemies": 25,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "laser/1/2",
+          "elapsed": 11.650000000000158,
+          "waveTime": 19.633333333333525,
+          "enemies": 26,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "aim/1/2",
+          "elapsed": 12.050000000000178,
+          "waveTime": 20.033333333333502,
+          "enemies": 27,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "laserWarmup/1/2",
+          "elapsed": 12.16666666666685,
+          "waveTime": 20.150000000000162,
+          "enemies": 27,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "laser/1/2",
+          "elapsed": 12.716666666666878,
+          "waveTime": 20.70000000000013,
+          "enemies": 28,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "recover/1/2",
+          "elapsed": 13.10000000000023,
+          "waveTime": 21.083333333333442,
+          "enemies": 29,
+          "state": "recover",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "chase/1/2",
+          "elapsed": 13.750000000000263,
+          "waveTime": 21.733333333333405,
+          "enemies": 36,
+          "state": "chase",
+          "phase": 1,
+          "cycle": 2
+        },
+        {
+          "key": "charge/1/3",
+          "elapsed": 13.8333333333336,
+          "waveTime": 21.816666666666734,
+          "enemies": 36,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "dash/1/3",
+          "elapsed": 14.283333333333623,
+          "waveTime": 22.26666666666671,
+          "enemies": 36,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "aim/1/3",
+          "elapsed": 14.733333333333645,
+          "waveTime": 22.716666666666683,
+          "enemies": 35,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "charge/1/3",
+          "elapsed": 14.96666666666699,
+          "waveTime": 22.950000000000003,
+          "enemies": 37,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "dash/1/3",
+          "elapsed": 15.416666666667012,
+          "waveTime": 23.399999999999977,
+          "enemies": 38,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "aim/1/3",
+          "elapsed": 15.866666666667035,
+          "waveTime": 23.84999999999995,
+          "enemies": 38,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "charge/1/3",
+          "elapsed": 16.100000000000367,
+          "waveTime": 24.08333333333327,
+          "enemies": 39,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "dash/1/3",
+          "elapsed": 16.55000000000034,
+          "waveTime": 24.533333333333246,
+          "enemies": 40,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "aim/1/3",
+          "elapsed": 17.000000000000316,
+          "waveTime": 24.98333333333322,
+          "enemies": 41,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 3
+        },
+        {
+          "key": "laserWarmup/1/3",
+          "elapsed": 17.250000000000302,
+          "waveTime": 25.233333333333206,
+          "enemies": 41,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 3
+        }
+      ]
+    },
+    {
+      "encounter": "ECHO phase 2",
+      "phase": "playing",
+      "difficulty": "hard",
+      "waveTime": 32.78333333333278,
+      "bossStage": false,
+      "ordinary": 63,
+      "trace": [
+        {
+          "key": "undefined/undefined/undefined",
+          "elapsed": 0,
+          "waveTime": 7.983333333333333,
+          "enemies": 0
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 1.5999999999999992,
+          "waveTime": 9.583333333333412,
+          "enemies": 2,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 2.0499999999999976,
+          "waveTime": 10.033333333333434,
+          "enemies": 3,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 2.499999999999996,
+          "waveTime": 10.483333333333457,
+          "enemies": 3,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 2.749999999999995,
+          "waveTime": 10.73333333333347,
+          "enemies": 4,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 3.183333333333327,
+          "waveTime": 11.166666666666824,
+          "enemies": 4,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 3.6333333333333253,
+          "waveTime": 11.616666666666847,
+          "enemies": 5,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "charge/1/1",
+          "elapsed": 3.866666666666658,
+          "waveTime": 11.850000000000191,
+          "enemies": 6,
+          "state": "charge",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "dash/1/1",
+          "elapsed": 4.316666666666657,
+          "waveTime": 12.300000000000214,
+          "enemies": 6,
+          "state": "dash",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 4.766666666666655,
+          "waveTime": 12.750000000000236,
+          "enemies": 7,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laserWarmup/1/1",
+          "elapsed": 4.999999999999988,
+          "waveTime": 12.983333333333581,
+          "enemies": 7,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laser/1/1",
+          "elapsed": 5.549999999999986,
+          "waveTime": 13.533333333333609,
+          "enemies": 8,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "aim/1/1",
+          "elapsed": 5.949999999999984,
+          "waveTime": 13.933333333333628,
+          "enemies": 9,
+          "state": "aim",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laserWarmup/1/1",
+          "elapsed": 6.06666666666665,
+          "waveTime": 14.050000000000301,
+          "enemies": 9,
+          "state": "laserWarmup",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "laser/1/1",
+          "elapsed": 6.6166666666666485,
+          "waveTime": 14.600000000000328,
+          "enemies": 10,
+          "state": "laser",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "recover/1/1",
+          "elapsed": 6.9999999999999805,
+          "waveTime": 14.98333333333368,
+          "enemies": 11,
+          "state": "recover",
+          "phase": 1,
+          "cycle": 1
+        },
+        {
+          "key": "phaseShift/2/1",
+          "elapsed": 7.016666666666647,
+          "waveTime": 15.000000000000348,
+          "enemies": 11,
+          "state": "phaseShift",
+          "phase": 2,
+          "cycle": 1
+        },
+        {
+          "key": "chase/2/1",
+          "elapsed": 7.716666666666645,
+          "waveTime": 15.700000000000383,
+          "enemies": 12,
+          "state": "chase",
+          "phase": 2,
+          "cycle": 1
+        },
+        {
+          "key": "charge/2/2",
+          "elapsed": 7.766666666666644,
+          "waveTime": 15.750000000000385,
+          "enemies": 12,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "dash/2/2",
+          "elapsed": 8.166666666666652,
+          "waveTime": 16.15000000000039,
+          "enemies": 13,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 8.616666666666674,
+          "waveTime": 16.600000000000364,
+          "enemies": 13,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "charge/2/2",
+          "elapsed": 8.85000000000002,
+          "waveTime": 16.833333333333684,
+          "enemies": 14,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "dash/2/2",
+          "elapsed": 9.250000000000039,
+          "waveTime": 17.23333333333366,
+          "enemies": 13,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 9.700000000000061,
+          "waveTime": 17.683333333333636,
+          "enemies": 17,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "charge/2/2",
+          "elapsed": 9.950000000000074,
+          "waveTime": 17.93333333333362,
+          "enemies": 20,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "dash/2/2",
+          "elapsed": 10.350000000000094,
+          "waveTime": 18.3333333333336,
+          "enemies": 22,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 10.783333333333449,
+          "waveTime": 18.766666666666907,
+          "enemies": 25,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "charge/2/2",
+          "elapsed": 11.016666666666794,
+          "waveTime": 19.000000000000227,
+          "enemies": 25,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "dash/2/2",
+          "elapsed": 11.416666666666814,
+          "waveTime": 19.400000000000205,
+          "enemies": 26,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 11.866666666666836,
+          "waveTime": 19.85000000000018,
+          "enemies": 27,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laserWarmup/2/2",
+          "elapsed": 12.10000000000018,
+          "waveTime": 20.0833333333335,
+          "enemies": 27,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laser/2/2",
+          "elapsed": 12.600000000000206,
+          "waveTime": 20.58333333333347,
+          "enemies": 28,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 12.983333333333558,
+          "waveTime": 20.966666666666782,
+          "enemies": 29,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laserWarmup/2/2",
+          "elapsed": 13.116666666666898,
+          "waveTime": 21.100000000000108,
+          "enemies": 30,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laser/2/2",
+          "elapsed": 13.616666666666923,
+          "waveTime": 21.60000000000008,
+          "enemies": 34,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "aim/2/2",
+          "elapsed": 14.000000000000275,
+          "waveTime": 21.98333333333339,
+          "enemies": 35,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laserWarmup/2/2",
+          "elapsed": 14.133333333333615,
+          "waveTime": 22.116666666666717,
+          "enemies": 35,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "laser/2/2",
+          "elapsed": 14.650000000000308,
+          "waveTime": 22.633333333333354,
+          "enemies": 36,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "recover/2/2",
+          "elapsed": 15.016666666666993,
+          "waveTime": 23,
+          "enemies": 38,
+          "state": "recover",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "chase/2/2",
+          "elapsed": 15.533333333333685,
+          "waveTime": 23.516666666666637,
+          "enemies": 39,
+          "state": "chase",
+          "phase": 2,
+          "cycle": 2
+        },
+        {
+          "key": "charge/2/3",
+          "elapsed": 15.866666666667035,
+          "waveTime": 23.84999999999995,
+          "enemies": 35,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "dash/2/3",
+          "elapsed": 16.25000000000036,
+          "waveTime": 24.233333333333263,
+          "enemies": 37,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 16.700000000000333,
+          "waveTime": 24.683333333333238,
+          "enemies": 39,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "charge/2/3",
+          "elapsed": 16.933333333333653,
+          "waveTime": 24.916666666666558,
+          "enemies": 39,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "dash/2/3",
+          "elapsed": 17.33333333333363,
+          "waveTime": 25.316666666666535,
+          "enemies": 40,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 17.783333333333605,
+          "waveTime": 25.76666666666651,
+          "enemies": 40,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "charge/2/3",
+          "elapsed": 18.016666666666925,
+          "waveTime": 25.99999999999983,
+          "enemies": 42,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "dash/2/3",
+          "elapsed": 18.416666666666902,
+          "waveTime": 26.399999999999807,
+          "enemies": 45,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 18.866666666666877,
+          "waveTime": 26.84999999999978,
+          "enemies": 46,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "charge/2/3",
+          "elapsed": 19.100000000000197,
+          "waveTime": 27.0833333333331,
+          "enemies": 47,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "dash/2/3",
+          "elapsed": 19.500000000000174,
+          "waveTime": 27.48333333333308,
+          "enemies": 49,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 19.95000000000015,
+          "waveTime": 27.933333333333053,
+          "enemies": 51,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laserWarmup/2/3",
+          "elapsed": 20.18333333333347,
+          "waveTime": 28.166666666666373,
+          "enemies": 51,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laser/2/3",
+          "elapsed": 20.68333333333344,
+          "waveTime": 28.666666666666345,
+          "enemies": 52,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 21.06666666666675,
+          "waveTime": 29.049999999999656,
+          "enemies": 53,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laserWarmup/2/3",
+          "elapsed": 21.200000000000077,
+          "waveTime": 29.183333333332982,
+          "enemies": 53,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laser/2/3",
+          "elapsed": 21.70000000000005,
+          "waveTime": 29.683333333332953,
+          "enemies": 53,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "aim/2/3",
+          "elapsed": 22.08333333333336,
+          "waveTime": 30.066666666666265,
+          "enemies": 54,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laserWarmup/2/3",
+          "elapsed": 22.216666666666686,
+          "waveTime": 30.19999999999959,
+          "enemies": 54,
+          "state": "laserWarmup",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "laser/2/3",
+          "elapsed": 22.716666666666658,
+          "waveTime": 30.699999999999562,
+          "enemies": 57,
+          "state": "laser",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "recover/2/3",
+          "elapsed": 23.116666666666635,
+          "waveTime": 31.09999999999954,
+          "enemies": 58,
+          "state": "recover",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "chase/2/3",
+          "elapsed": 23.59999999999994,
+          "waveTime": 31.583333333332845,
+          "enemies": 60,
+          "state": "chase",
+          "phase": 2,
+          "cycle": 3
+        },
+        {
+          "key": "charge/2/4",
+          "elapsed": 23.666666666666604,
+          "waveTime": 31.64999999999951,
+          "enemies": 61,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 4
+        },
+        {
+          "key": "dash/2/4",
+          "elapsed": 24.06666666666658,
+          "waveTime": 32.049999999999486,
+          "enemies": 63,
+          "state": "dash",
+          "phase": 2,
+          "cycle": 4
+        },
+        {
+          "key": "aim/2/4",
+          "elapsed": 24.516666666666556,
+          "waveTime": 32.49999999999946,
+          "enemies": 64,
+          "state": "aim",
+          "phase": 2,
+          "cycle": 4
+        },
+        {
+          "key": "charge/2/4",
+          "elapsed": 24.749999999999876,
+          "waveTime": 32.73333333333278,
+          "enemies": 64,
+          "state": "charge",
+          "phase": 2,
+          "cycle": 4
+        }
+      ]
+    },
+    {
+      "encounter": "Boss laser",
+      "difficulty": "hard",
+      "state": "laserWarmup",
+      "phase": 1,
+      "hp": 2430,
+      "warning": 1.25,
+      "hazards": []
+    },
+    {
+      "encounter": "Boss nova",
+      "difficulty": "hard",
+      "state": "novaWarmup",
+      "phase": 3,
+      "hp": 2430,
+      "warning": 0.85,
+      "hazards": [
+        {
+          "x": 2426.779728655761,
+          "y": 2342.285061328296,
+          "radius": 75,
+          "warning": 1.1,
+          "duration": 1.1
+        },
+        {
+          "x": 2546.5529679692913,
+          "y": 2024.0801412777978,
+          "radius": 75,
+          "warning": 1.6,
+          "duration": 1.6
+        }
+      ]
+    },
+    {
+      "encounter": "Boss bombard",
+      "difficulty": "hard",
+      "state": "bombardWarmup",
+      "phase": 1,
+      "hp": 2430,
+      "warning": 0.85,
+      "hazards": [
+        {
+          "x": 2520,
+          "y": 2000,
+          "radius": 85,
+          "warning": 0.85,
+          "duration": 0.85
+        },
+        {
+          "x": 2520,
+          "y": 2160,
+          "radius": 85,
+          "warning": 1.0899999999999999,
+          "duration": 1.0899999999999999
+        },
+        {
+          "x": 2520,
+          "y": 1840,
+          "radius": 85,
+          "warning": 1.33,
+          "duration": 1.33
+        },
+        {
+          "x": 2680,
+          "y": 2000,
+          "radius": 85,
+          "warning": 1.5699999999999998,
+          "duration": 1.5699999999999998
+        },
+        {
+          "x": 2360,
+          "y": 2000,
+          "radius": 85,
+          "warning": 1.81,
+          "duration": 1.81
+        }
+      ]
+    },
+    {
+      "encounter": "low quality reduced motion",
+      "settings": {
+        "quality": "low",
+        "masterVolume": 0.7,
+        "musicVolume": 0.45,
+        "sfxVolume": 0.65,
+        "screenShake": 0.45,
+        "reducedMotion": true
+      },
+      "mini": "laserWarmup"
+    }
+  ]
+}

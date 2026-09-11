@@ -2,7 +2,7 @@ import type { EnemyType, GameSettings } from './types';
 export const STEP = 1 / 60;
 export const VIEW = { width: 1600, height: 900 } as const;
 export const WORLD = { width: 4000, height: 4000 } as const;
-export const MINIBOSS_ENCOUNTER = { wave: 3, time: 8, warning: 1.6, xp: 180, hardXp: 240 } as const;
+export const MINIBOSS_ENCOUNTER = { wave: 3, time: 8, warning: 1.6, xp: 260, hardXp: 360, holdAdds: 24, hardHoldAdds: 32, holdSpawnInterval: 2.8, hardHoldSpawnInterval: 2 } as const;
 export const BALANCE = {
   player: { speed: 300, focusSpeed: 180, focusSpread: 0.5, radius: 18, hp: 5, bombs: 3, hitInvincible: 40 / 60 },
   dash: { speed: 1080, duration: 0.18, cooldown: 2.6, inputBuffer: 0.14, window: 0.85, damage: 40, targets: 180, beamLength: 2400, beamWidth: 88, beamDuration: 0.32 },
@@ -27,7 +27,7 @@ export const ENEMIES: Record<EnemyType, { hp: number; speed: number; radius: num
   minelayer: { hp: 36, speed: 100, radius: 55, color: 0x95e4ab, label: '布雷' },
   mine: { hp: 1, speed: 0, radius: 35, color: 0xff684f, label: '地雷' },
   boss: { hp: 1800, speed: 30, radius: 160, color: 0xc7adff, label: 'MAFUYU' },
-  miniboss: { hp: 600, speed: 155, radius: 64, color: 0xff956b, label: 'ECHO / 游猎回声' },
+  miniboss: { hp: 1200, speed: 240, radius: 64, color: 0xff956b, label: 'ECHO / 游猎回声' },
 };
 export const DEFAULT_SETTINGS: GameSettings = { quality: 'medium', masterVolume: 0.7, musicVolume: 0.45, sfxVolume: 0.65, screenShake: 0.45, reducedMotion: false };
 export const QUALITY = { low: { particles: 300, scale: 0.75, stars: 35 }, medium: { particles: 900, scale: 1, stars: 65 }, high: { particles: 1600, scale: 1.25, stars: 100 } } as const;

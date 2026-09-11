@@ -295,7 +295,11 @@ describe('progression, drops, and lifecycle', () => {
   });
   it('advances five configured waves, enters Boss safely, and continues at endless wave six', () => {
     const sim = quiet();
-    ticks(sim, BALANCE.spawn.storyWaves * BALANCE.spawn.waveDuration / STEP);
+    for (let i = 0; i < BALANCE.spawn.storyWaves * BALANCE.spawn.waveDuration / STEP; i++) {
+      sim.step(idle());
+      const mini = sim.state.enemies.find(e => e.type === 'miniboss');
+      if (mini) sim.damageEnemy(mini, mini.hp);
+    }
     expect(sim.state.wave).toBe(5); expect(sim.state.bossPending).toBe(true);
     ticks(sim, 120);
     const boss = sim.state.enemies.find(e => e.type === 'boss')!;
@@ -379,7 +383,9 @@ describe('progression, drops, and lifecycle', () => {
       sim.step(idle());
       const bullets = sim.state.bullets.filter(b => b.owner === 'enemy');
       expect(bullets.length).toBeGreaterThan(0);
-      expect(bullets.every(b => Math.abs(Math.hypot(b.vx, b.vy) - attack.speed[phase - 1]) < 1e-8)).toBe(true);
+      const speeds = Array.from({ length: attack.layers[phase - 1] }, (_, layer) => attack.speed[phase - 1] + layer * attack.speedStep + attack.acceleration * STEP);
+      expect(bullets.every(b => speeds.some(speed => Math.abs(Math.hypot(b.vx, b.vy) - speed) < 1e-8))).toBe(true);
+      expect(new Set(bullets.map(b => Math.round(b.speed * 1000))).size).toBe(attack.layers[phase - 1]);
     }
   });
   it('resets an in-flight boss telegraph and combat resources identically on twenty restarts', () => {
@@ -448,6 +454,7 @@ describe('support companions and instantaneous dash beam', () => {
     const sim = quiet(), p = sim.state.player;
     p.x = p.y = p.radius;
     for (const wave of [2, 3, 4]) {
+      if (wave === 4) sim.state.minibossDefeated = true;
       sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
       const events = sim.step(idle({ aimX: 3500, aimY: p.y }));
       expect(sim.state.wave).toBe(wave);

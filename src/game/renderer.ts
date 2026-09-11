@@ -1,11 +1,11 @@
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem } from './effects';
-import { bossAttacks } from './boss-ai';
-import { miniBossAttacks } from './miniboss-ai';
+import { bossAttacks, bossPatternLanes, bossVolleyArc } from './boss-ai';
+import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
 import { beamGeometry, clamp, lerp, TAU } from './math';
-import type { CombatEvent, Enemy, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
+import type { CombatEvent, Enemy, EnemyBulletShape, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
 
 type AssetKey = keyof typeof ASSET_URLS;
 const SUPPORT_ASSET_URLS = {
@@ -17,7 +17,7 @@ interface EnemyVisual { root: Container; halo: Sprite; badge: Sprite; hazard: Sp
 interface PickupVisual { root: Container; glow: Sprite; backing: Sprite; icon: Sprite; seen: number }
 interface BulletVisual { effect: Sprite; core: Sprite }
 interface CompanionVisual { root: Container; glow: Sprite; ship: Sprite; barrel: Sprite }
-interface Atlas { glow: Texture; spark: Texture; ring: Texture; bolt: Texture; hostile: Texture; hostileCore: Texture; player: Texture; mine: Texture; diamond: Texture; cross: Texture; pickupPlate: Texture; caution: Texture; badges: Record<EnemyType, Texture> }
+interface Atlas { glow: Texture; spark: Texture; ring: Texture; bolt: Texture; hostile: Texture; hostileCore: Texture; player: Texture; mine: Texture; diamond: Texture; cross: Texture; pickupPlate: Texture; caution: Texture; badges: Record<EnemyType, Texture>; danmaku: Record<EnemyBulletShape, Texture> }
 const WHITE = 0xf5f2ff;
 const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, ammo: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
 const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '生命恢复', ammo: '弹药补充', coolant: '冷却胶囊', bomb: '炸弹 +1', miniBomb: '范围爆破', blackHole: '引力黑洞', support: '支援子机' };
@@ -108,6 +108,25 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     context.beginPath(); context.arc(0, 0, 35, 0, TAU); context.strokeStyle = '#11161d'; context.lineWidth = 8; context.stroke();
     context.setLineDash([8, 5]); context.strokeStyle = '#ffd267'; context.lineWidth = 3; context.stroke();
     context.setLineDash([]); context.restore();
+    // Shared atlas silhouettes keep dense boss curtains batched and readable at every quality.
+    for (const [index, shape] of (['rice', 'orb', 'kunai'] as const).entries()) {
+      context.save(); context.translate(384 + index * 96 + 48, 304);
+      context.beginPath();
+      if (shape === 'orb') context.arc(0, 0, 31, 0, TAU);
+      else if (shape === 'rice') context.ellipse(0, 0, 40, 23, 0, 0, TAU);
+      else {
+        context.moveTo(42, 0); context.lineTo(-12, -24); context.lineTo(-34, -15);
+        context.lineTo(-24, 0); context.lineTo(-34, 15); context.lineTo(-12, 24); context.closePath();
+      }
+      context.strokeStyle = '#0a0917'; context.lineWidth = 9; context.lineJoin = 'round'; context.stroke();
+      context.fillStyle = '#fff'; context.fill();
+      context.strokeStyle = '#717184'; context.lineWidth = 3; context.stroke();
+      context.globalAlpha = 0.32; context.fillStyle = '#33303c';
+      context.beginPath(); context.ellipse(shape === 'kunai' ? -4 : 0, 5, shape === 'orb' ? 19 : 23, 9, 0, 0, TAU); context.fill();
+      context.globalAlpha = 1; context.fillStyle = '#fff';
+      context.beginPath(); context.ellipse(5, -8, shape === 'orb' ? 11 : 21, 6, 0, 0, TAU); context.fill();
+      context.restore();
+    }
   });
   const frame = (x: number, y: number, width: number, height: number) => new Texture({ source: texture.source, frame: new Rectangle(x * 2, y * 2, width * 2, height * 2) });
   const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'];
@@ -117,6 +136,7 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     mine: frame(704, 0, 128, 128), diamond: frame(832, 0, 64, 64), cross: frame(896, 0, 64, 64),
     badges: Object.fromEntries(types.map((type, index) => [type, frame(index * 128, 128, 128, 128)])) as Record<EnemyType, Texture>,
     hostileCore: frame(0, 256, 128, 64), pickupPlate: frame(128, 256, 96, 96), caution: frame(272, 256, 96, 96),
+    danmaku: { rice: frame(384, 256, 96, 96), orb: frame(480, 256, 96, 96), kunai: frame(576, 256, 96, 96) },
   } };
 }
 
@@ -482,15 +502,20 @@ export class GameRenderer {
       effect.rotation = angle;
       effect.width = hostile ? Math.max(30, bullet.radius * 5) : perfect ? 115 : bullet.kind === 'special' ? 40 : bullet.kind === 'drone' ? 25 : 31;
       effect.height = hostile ? effect.width : perfect ? 29 : bullet.kind === 'special' ? 20 : 12;
-      effect.tint = hostile ? 0xff713e : perfect ? 0xecffcc : bullet.color || 0x9ef8e4;
-      effect.alpha = hostile ? 0.22 : 0.85;
+      effect.tint = hostile ? bullet.shape ? bullet.color : 0xff713e : perfect ? 0xecffcc : bullet.color || 0x9ef8e4;
+      effect.alpha = hostile ? bullet.shape ? this.settings.quality === 'low' ? 0 : 0.12 : 0.22 : 0.85;
       const tailOffset = hostile ? 0 : perfect ? 28 : 8;
       effect.position.set(x - Math.cos(angle) * tailOffset, y - Math.sin(angle) * tailOffset);
       // Friendly shots retain the original crystal; enemies use opaque warm pointed shells.
-      core.texture = hostile ? this.atlas.hostileCore : this.assets.bullet;
+      core.texture = hostile ? bullet.shape ? this.atlas.danmaku[bullet.shape] : this.atlas.hostileCore : this.assets.bullet;
+      core.tint = hostile && bullet.shape ? bullet.color : 0xffffff;
       core.position.set(x, y); core.rotation = angle + (hostile ? 0 : Math.PI / 2);
       core.width = hostile ? Math.max(28, bullet.radius * 4.4) : perfect ? 28 : bullet.kind === 'special' ? 21 : bullet.kind === 'drone' ? 12 : 17;
       core.height = hostile ? Math.max(18, bullet.radius * 3) : core.width;
+      if (hostile && bullet.shape) {
+        const size = bullet.radius * (bullet.shape === 'orb' ? 3.25 : bullet.shape === 'rice' ? 4 : 4.5);
+        core.width = core.height = size;
+      }
     }
     for (let index = used; index < this.bullets.length; index++) {
       this.bullets[index].effect.visible = false; this.bullets[index].core.visible = false;
@@ -623,11 +648,18 @@ export class GameRenderer {
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha);
       if (enemy.type === 'miniboss' && enemy.miniboss) {
         const cfg = miniBossAttacks(state.difficulty), brain = enemy.miniboss;
+        if (['charge', 'dash', 'aim'].includes(enemy.state) && brain.laserIndex === 0) {
+          const landing = miniBossLandingTelegraph(enemy, state.difficulty);
+          const start = landing.pattern === 'ring' ? landing.angle + landing.gap / 2 : landing.angle - landing.spread / 2;
+          const sweep = landing.pattern === 'ring' ? TAU - landing.gap : landing.spread;
+          this.sector(graph, landing.x, landing.y, start, sweep, landing.range, 0xff9d65, 0.055);
+          graph.circle(landing.x, landing.y, enemy.radius + 12).stroke({ color: 0xffd194, width: 2, alpha: 0.55 });
+        }
         if (enemy.state === 'charge') {
-          const length = Math.hypot(brain.targetX - enemy.x, brain.targetY - enemy.y);
-          this.dashWarning(graph, x, y, enemy.angle, length, enemy.radius, 0xffae79, true);
+          const dash = miniBossDashGeometry(enemy, state.difficulty);
+          this.dashWarning(graph, enemy.x, enemy.y, enemy.angle, dash.length, enemy.radius, 0xffae79, true);
         } else if (enemy.state === 'laserWarmup' || enemy.state === 'laser') {
-          const beam = beamGeometry(x, y, enemy.angle, cfg.laser.length, cfg.laser.width), active = enemy.state === 'laser';
+          const beam = miniBossLaserGeometry(enemy, state.difficulty), active = enemy.state === 'laser';
           graph.poly(beam.corners).fill({ color: 0xff9c66, alpha: active ? 0.72 : 0.14 }).stroke({ color: 0xffc9a5, width: active ? 3 : 2, alpha: 0.95 });
           graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff4dc, width: active ? cfg.laser.width * 0.24 : 1.5, alpha: 0.85 });
           if (!active) {
@@ -640,22 +672,32 @@ export class GameRenderer {
       } else if (enemy.type === 'boss' && (enemy.state === 'laserWarmup' || enemy.state === 'laser')) {
         this.renderLaser(graph, enemy, x, y, attacks);
       } else if (enemy.type === 'boss' && enemy.boss) {
-        const brain = enemy.boss, phase = brain.phase - 1;
-        if (enemy.state === 'novaWarmup' || enemy.state === 'nova') {
-          const gap = attacks.nova.gap[phase], angle = brain.lockedAngle;
-          this.sector(graph, x, y, angle + gap / 2, TAU - gap, 1150, 0xdd9bff, 0.045);
-          this.sector(graph, x, y, angle - gap / 2, gap, 900, 0x88f4d6, 0.07);
-          graph.circle(x, y, enemy.radius + 18).stroke({ color: 0xccafff, width: 3, alpha: 0.8 });
-          for (let distance = 240; distance < 850; distance += 120) {
-            const bx = x + Math.cos(angle) * distance, by = y + Math.sin(angle) * distance;
-            graph.circle(bx, by, 4).fill({ color: 0xb4ffe6, alpha: 0.8 });
+        const brain = enemy.boss, lanes = bossPatternLanes(enemy, state.difficulty);
+        if (lanes.length) {
+          const color = brain.skill === 'volley' ? 0xff9fbd : brain.skill === 'nova' ? 0xc7a0ff : 0xffce8f;
+          if (brain.skill === 'volley') {
+            const arc = bossVolleyArc(enemy, state.difficulty);
+            this.sector(graph, x, y, arc.angle - arc.width / 2, arc.width, 1700, color, 0.035);
+          } else {
+            const lane = lanes[0];
+            this.sector(graph, x, y, lane.angle + lane.width / 2, TAU - lane.width, 1700, color, 0.025);
           }
-        } else if (enemy.state === 'aim' || enemy.state === 'volley') {
-          const spread = (attacks.volley.count[phase] - 1) * attacks.volley.angleStep;
-          this.sector(graph, x, y, brain.lockedAngle - spread / 2, spread, 1400, 0xf5a0c9, 0.06);
-          for (let i = 0; i < attacks.volley.count[phase]; i++) {
-            const angle = brain.lockedAngle + (i - (attacks.volley.count[phase] - 1) / 2) * attacks.volley.angleStep;
-            graph.moveTo(x, y).lineTo(x + Math.cos(angle) * 1400, y + Math.sin(angle) * 1400).stroke({ color: 0xffbad6, width: 1, alpha: 0.4 });
+          for (const lane of lanes) {
+            this.sector(graph, x, y, lane.angle - lane.width / 2, lane.width, 1300, 0x88f4d6, 0.065);
+            for (let distance = 260; distance < 1250; distance += 170) {
+              const bx = x + Math.cos(lane.angle) * distance, by = y + Math.sin(lane.angle) * distance;
+              graph.moveTo(bx - Math.cos(lane.angle - 0.65) * 13, by - Math.sin(lane.angle - 0.65) * 13).lineTo(bx, by)
+                .lineTo(bx - Math.cos(lane.angle + 0.65) * 13, by - Math.sin(lane.angle + 0.65) * 13).stroke({ color: 0xbaffeb, width: 2, alpha: 0.65 });
+            }
+          }
+          graph.circle(x, y, enemy.radius + 18).stroke({ color, width: 3, alpha: 0.7 });
+          if (this.settings.quality !== 'low') {
+            const spin = this.settings.reducedMotion ? 0 : state.elapsed * 0.3;
+            for (let i = 0; i < 12; i++) {
+              const angle = spin + i * TAU / 12, radius = enemy.radius + 32;
+              graph.moveTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius)
+                .lineTo(x + Math.cos(angle + 0.025) * (radius + 18), y + Math.sin(angle + 0.025) * (radius + 18)).stroke({ color, width: 3, alpha: 0.4 });
+            }
           }
         } else if (enemy.state === 'phaseShift') {
           const progress = 1 - enemy.timer / attacks.phaseShift;

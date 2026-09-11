@@ -67,8 +67,8 @@ describe('difficulty through the simulation boundary', () => {
     const boss = quiet(difficulty).spawnEnemy('boss', 1000, 1000)!;
     const mini = quiet(difficulty).spawnEnemy('miniboss', 2500, 2000)!;
     expect(boss.maxHp).toBe(difficulty === 'hard' ? 2430 : 1800);
-    expect(mini.maxHp).toBe(difficulty === 'hard' ? 810 : 600);
-    expect(mini.speed).toBeCloseTo(difficulty === 'hard' ? 201.5 : 155);
+    expect(mini.maxHp).toBe(difficulty === 'hard' ? 1620 : 1200);
+    expect(mini.speed).toBeCloseTo(difficulty === 'hard' ? 312 : 240);
     expect(mini.radius).toBe(64);
   });
 
@@ -152,7 +152,9 @@ describe('mid-wave miniboss integration', () => {
     expect(events.filter(e => e.type === 'spawn' && e.enemyType !== 'miniboss').length).toBeGreaterThan(3);
     const mini = sim.state.enemies.find(e => e.type === 'miniboss')!;
     sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-    sim.step(idle()); expect(sim.state.wave).toBe(4); expect(sim.state.enemies).toContain(mini);
+    sim.step(idle()); expect(sim.state.wave).toBe(3); expect(sim.state.enemies).toContain(mini);
+    expect(sim.isWaveBlocked()).toBe(true);
+    sim.damageEnemy(mini, mini.hp); sim.step(idle()); expect(sim.state.wave).toBe(4);
     expect(sim.state.bossStage).toBe(false);
     events.push(...ticks(sim, 60));
     expect(events.filter(e => e.type === 'attack' && e.enemyType === 'miniboss' && e.text === 'arrival')).toHaveLength(1);
@@ -169,7 +171,7 @@ describe('mid-wave miniboss integration', () => {
     expect(sim.state.enemies).toContain(ordinary); expect(sim.state.enemies).toContain(shooter);
     expect(sim.state.bullets).toContain(bullet);
     const rewards = Object.fromEntries(sim.state.pickups.map(p => [p.type, p.value]));
-    expect(rewards).toEqual({ xp: difficulty === 'hard' ? 240 : 180, hp: difficulty === 'hard' ? 2 : 1, ammo: 1, coolant: 1, support: 1 });
+    expect(rewards).toEqual({ xp: difficulty === 'hard' ? 360 : 260, hp: difficulty === 'hard' ? 2 : 1, ammo: 1, coolant: 1, support: 1 });
     const before = structuredClone(sim.state.pickups);
     sim.damageEnemy(mini, 9999); expect(sim.state.pickups).toEqual(before); expect(sim.state.kills).toBe(1);
     const events = sim.step(idle());

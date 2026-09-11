@@ -93,22 +93,26 @@ function startBombard(placement?: Placement) {
   return scene;
 }
 
-function playBombard(escape: boolean, placement?: Placement, route: Route = { moveX: 1, moveY: 0, ticks: 36 }) {
+function playBombard(escape: boolean, placement?: Placement, route: Route = { moveX: 1, moveY: 0, ticks: 36 }, wholePattern = false) {
   const scene = startBombard(placement);
   const { sim, player } = scene;
   const hp = player.hp, startX = player.x, startY = player.y;
   const marked = sim.state.hazards.map(hazard => ({ id: hazard.id, x: hazard.x, y: hazard.y }));
   const activated = new Set<number>();
-  let damageEvents = 0, maxStep = 0, rescueEvents = 0;
+  let damageEvents = 0, maxStep = 0, rescueEvents = 0, ringBursts = 0, maxLiveBullets = 0;
+  let finishedPattern = false;
 
-  for (let tick = 0; tick < 240; tick++) {
-    // Notice the markers after 350 ms; follow one straight route, then stop.
+  for (let tick = 0; tick < (wholePattern ? 480 : 240); tick++) {
+    // Notice the markers after 350 ms. The complete combination requires keeping clear of later rings.
     const moving = escape && tick >= 21 && tick < 21 + route.ticks;
     const beforeX = player.x, beforeY = player.y;
     const events = sim.step(walk(moving ? route.moveX : 0, moving ? route.moveY : 0));
     maxStep = Math.max(maxStep, Math.hypot(player.x - beforeX, player.y - beforeY));
     damageEvents += events.filter(event => event.type === 'damage').length;
     rescueEvents += events.filter(event => event.type === 'dash' || event.type === 'bomb').length;
+    ringBursts += events.filter(event => event.type === 'enemyShot' && event.enemyType === 'boss').length;
+    maxLiveBullets = Math.max(maxLiveBullets, sim.state.bullets.filter(bullet => bullet.owner === 'enemy').length);
+    finishedPattern ||= scene.boss.state === 'recover';
     for (const hazard of sim.state.hazards) {
       const original = marked.find(mark => mark.id === hazard.id)!;
       expect(original).toBeDefined();
@@ -116,7 +120,7 @@ function playBombard(escape: boolean, placement?: Placement, route: Route = { mo
       expect(hazard.y).toBe(original.y);
       if (hazard.active) activated.add(hazard.id);
     }
-    if (sim.state.hazards.length === 0) break;
+    if (!wholePattern && sim.state.hazards.length === 0) break;
   }
 
   expect(activated.size).toBe(3);
@@ -126,6 +130,11 @@ function playBombard(escape: boolean, placement?: Placement, route: Route = { mo
   expect(player.bombs).toBe(0);
   expect(player.x).toBeCloseTo(startX + (escape ? route.moveX * route.ticks * 300 * STEP : 0), 8);
   expect(player.y).toBeCloseTo(startY + (escape ? route.moveY * route.ticks * 300 * STEP : 0), 8);
+  if (wholePattern) {
+    expect(finishedPattern).toBe(true);
+    expect(ringBursts).toBeGreaterThanOrEqual(6);
+    expect(maxLiveBullets).toBeGreaterThan(50);
+  }
   return { ...scene, hp, startX, damageEvents };
 }
 
@@ -204,8 +213,8 @@ describe('unassisted routes through real Boss attacks', () => {
     },
   );
 
-  it.each(corners)('escapes overlapping, wall-clamped bombard markers at $name with a short walk', corner => {
-    const { sim, player, hp, damageEvents } = playBombard(true, corner, { moveX: 0, moveY: corner.inwardY, ticks: 48 });
+  it.each(corners)('escapes wall-clamped bombard and all accompanying rings at $name by continuing along the wall', corner => {
+    const { sim, player, hp, damageEvents } = playBombard(true, corner, { moveX: 0, moveY: corner.inwardY, ticks: 459 }, true);
     expect(sim.state.status).toBe('playing');
     expect(player.hp).toBe(hp);
     expect(player.invincible).toBe(0);

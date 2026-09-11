@@ -1,0 +1,267 @@
+{
+  "version": "3.4.0",
+  "measuredAt": "2026-09-11T04:04:20.893Z",
+  "scenario": "Production preview; 1080p medium; normal and hard phase-three patterns, 5 seconds each. Skill/phase seeded, invincible stationary player; no extra simulation steps. Frame intervals include encounter startup and are not an input-latency measurement.",
+  "errors": [],
+  "patterns": [
+    {
+      "skill": "volley",
+      "difficulty": "normal",
+      "simulated": 5.066666666666654,
+      "peak": 205,
+      "visiblePeak": 137,
+      "shapes": [
+        "rice",
+        "kunai"
+      ],
+      "sectors": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "curved": true,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.699999999999818,
+        "p99": 5.700000000000273,
+        "max": 127.80000000000007
+      },
+      "stats": {
+        "fps": 179.99640007199858,
+        "frameP95": 5.699999999999818,
+        "frameP99": 5.700000000000273,
+        "updateMs": 0,
+        "renderMs": 0.7000000029802322,
+        "enemies": 1,
+        "bullets": 207,
+        "particles": 15,
+        "pickups": 0,
+        "voices": 2,
+        "textures": 23
+      }
+    },
+    {
+      "skill": "nova",
+      "difficulty": "normal",
+      "simulated": 4.999999999999988,
+      "peak": 468,
+      "visiblePeak": 225,
+      "shapes": [
+        "kunai",
+        "orb"
+      ],
+      "sectors": [
+        5,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "curved": true,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.699999999999818,
+        "p99": 5.700000000000728,
+        "max": 5.700000000000728
+      },
+      "stats": {
+        "fps": 179.99100044997752,
+        "frameP95": 5.699999999999818,
+        "frameP99": 5.700000000000728,
+        "updateMs": 0,
+        "renderMs": 1.2999999970197678,
+        "enemies": 1,
+        "bullets": 469,
+        "particles": 14,
+        "pickups": 0,
+        "voices": 1,
+        "textures": 23
+      }
+    },
+    {
+      "skill": "bombard",
+      "difficulty": "normal",
+      "simulated": 4.999999999999988,
+      "peak": 190,
+      "visiblePeak": 115,
+      "shapes": [
+        "orb",
+        "rice"
+      ],
+      "sectors": [
+        4,
+        5,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3
+      ],
+      "curved": false,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.699999999998909,
+        "p99": 5.700000000000728,
+        "max": 5.799999999999272
+      },
+      "stats": {
+        "fps": 180.00720028801157,
+        "frameP95": 5.699999999998909,
+        "frameP99": 5.700000000000728,
+        "updateMs": 0,
+        "renderMs": 0.7000000029802322,
+        "enemies": 1,
+        "bullets": 191,
+        "particles": 13,
+        "pickups": 0,
+        "voices": 1,
+        "textures": 23
+      }
+    },
+    {
+      "skill": "volley",
+      "difficulty": "hard",
+      "simulated": 5.033333333333321,
+      "peak": 438,
+      "visiblePeak": 247,
+      "shapes": [
+        "rice",
+        "kunai"
+      ],
+      "sectors": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        0,
+        7
+      ],
+      "curved": true,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.699999999999818,
+        "p99": 5.700000000000728,
+        "max": 11.199999999999989
+      },
+      "stats": {
+        "fps": 180.00180001800018,
+        "frameP95": 5.699999999999818,
+        "frameP99": 5.700000000000728,
+        "updateMs": 0,
+        "renderMs": 1.199999988079071,
+        "enemies": 1,
+        "bullets": 439,
+        "particles": 13,
+        "pickups": 0,
+        "voices": 1,
+        "textures": 23
+      }
+    },
+    {
+      "skill": "nova",
+      "difficulty": "hard",
+      "simulated": 4.999999999999988,
+      "peak": 702,
+      "visiblePeak": 272,
+      "shapes": [
+        "kunai",
+        "orb"
+      ],
+      "sectors": [
+        5,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3
+      ],
+      "curved": true,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.699999999999818,
+        "p99": 5.700000000000728,
+        "max": 11.099999999999454
+      },
+      "stats": {
+        "fps": 179.99640007199855,
+        "frameP95": 5.699999999999818,
+        "frameP99": 5.700000000000728,
+        "updateMs": 0,
+        "renderMs": 1.2999999970197678,
+        "enemies": 1,
+        "bullets": 703,
+        "particles": 16,
+        "pickups": 0,
+        "voices": 2,
+        "textures": 23
+      }
+    },
+    {
+      "skill": "bombard",
+      "difficulty": "hard",
+      "simulated": 4.999999999999988,
+      "peak": 302,
+      "visiblePeak": 155,
+      "shapes": [
+        "orb",
+        "rice"
+      ],
+      "sectors": [
+        4,
+        5,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3
+      ],
+      "curved": false,
+      "finite": true,
+      "frameMs": {
+        "p95": 5.700000000000728,
+        "p99": 5.700000000000728,
+        "max": 5.800000000001091
+      },
+      "stats": {
+        "fps": 180.00180001800024,
+        "frameP95": 5.700000000000728,
+        "frameP99": 5.700000000000728,
+        "updateMs": 0,
+        "renderMs": 1,
+        "enemies": 1,
+        "bullets": 303,
+        "particles": 11,
+        "pickups": 0,
+        "voices": 1,
+        "textures": 23
+      }
+    }
+  ],
+  "gates": [
+    {
+      "difficulty": "normal",
+      "wave": 3,
+      "waveTime": 40,
+      "hp": 1200,
+      "blocked": true
+    },
+    {
+      "difficulty": "hard",
+      "wave": 3,
+      "waveTime": 40,
+      "hp": 1620,
+      "blocked": true
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { BALANCE, VIEW, WORLD } from './config';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, TAU } from './math';
-import type { AreaHazard, BossBrain, CombatEvent, Difficulty, Enemy, Player } from './types';
+import type { AreaHazard, BossBrain, CombatEvent, Difficulty, Enemy, EnemyShotOptions, Player } from './types';
 
 const EPSILON = 1e-8;
 
@@ -13,10 +13,17 @@ export const BOSS_ATTACKS = {
   recovery: BALANCE.boss.patternGap,
   breathing: [1.6, 1.3, 1],
   positioning: { maxDistance: 900, edgeMargin: 260, edgeBodyPadding: 60, viewPadding: 80, speed: 110, horizontalOffset: 520 },
-  volley: { warning: [1.15, 1.05, 0.95], count: [3, 5, 5], bursts: [1, 2, 3], interval: 0.35, angleStep: 0.16, speed: [260, 280, 300], radius: 9, tail: 0.3 },
-  nova: { warning: [1.3, 1.15, 1.05], count: [24, 28, 32], rings: [1, 2, 3], interval: 0.45, gap: [1.3, 1.25, 1.2], speed: [210, 235, 255], radius: 9, tail: 0.3, interleave: 0 },
+  volley: { warning: [1.15, 1.05, 0.95], count: [11, 13, 15], bursts: [9, 10, 11], layers: [2, 2, 2], interval: 0.46,
+    angleStep: 0.18, speed: [230, 245, 260], speedStep: 18, radius: 6, tail: 0.5,
+    lobeOffset: 0.6, sway: 0.3, swayStep: 0.72, gap: 0.58, laneOffset: 0.9,
+    turnRate: 0.22, turnDelay: 0.55, turnDuration: 0.8, acceleration: 30, maxSpeed: 330 },
+  nova: { warning: [1.3, 1.15, 1.05], count: [22, 24, 26], rings: [7, 8, 9], layers: [2, 2, 3], interval: 0.62,
+    gap: [0.6, 0.56, 0.52], laneOffset: 0.36, speed: [190, 205, 220], speedStep: 22, radius: 7, tail: 0.5,
+    interleave: 0.5, rotation: 0.17, turnRate: 0.25, turnDelay: 0.4, turnDuration: 0.65, acceleration: 24, maxSpeed: 310 },
   novaFlanks: { enabled: false, warning: 0.85, radius: 75, offset: 170, duration: 0.36 },
-  bombard: { warning: 1.25, count: 3, delay: 0.5, radius: 100, duration: 0.38, offset: 145 },
+  bombard: { warning: 1.25, count: 3, delay: 0.5, radius: 100, duration: 0.38, offset: 145,
+    ringCount: [22, 26, 30], rings: [6, 7, 8], ringInterval: 0.6, ringSpeed: [190, 210, 230], ringRadius: 8,
+    ringGap: 0.58, laneOffset: 0.62, rotation: 0.13, tail: 1.4 },
   laser: {
     warning: BALANCE.boss.laserWarning, duration: BALANCE.boss.laserDuration,
     angularSpeed: BALANCE.boss.angularSpeed, width: BALANCE.boss.laserWidth, length: BALANCE.boss.laserLength,
@@ -31,10 +38,13 @@ const HARD_BOSS_ATTACKS = {
   recovery: 0.65,
   breathing: [0.8, 0.65, 0.5],
   positioning: { ...BOSS_ATTACKS.positioning, speed: 150 },
-  volley: { ...BOSS_ATTACKS.volley, warning: [0.95, 0.9, 0.85], count: [5, 7, 9], bursts: [2, 3, 3], interval: 0.27, angleStep: 0.12, tail: 0.25 },
-  nova: { ...BOSS_ATTACKS.nova, warning: [1.05, 0.95, 0.85], count: [30, 34, 38], rings: [2, 3, 4], interval: 0.38, gap: [1.05, 0.95, 0.9], tail: 0.25, interleave: 0.5 },
+  volley: { ...BOSS_ATTACKS.volley, warning: [0.95, 0.9, 0.85], count: [13, 15, 17], bursts: [12, 14, 15], layers: [2, 3, 3],
+    interval: 0.38, angleStep: 0.17, gap: 0.42, tail: 0.5 },
+  nova: { ...BOSS_ATTACKS.nova, warning: [1.05, 0.95, 0.85], count: [26, 28, 30], rings: [9, 10, 11], layers: [2, 3, 3],
+    interval: 0.5, gap: [0.46, 0.43, 0.4], rotation: 0.21, tail: 0.5 },
   novaFlanks: { ...BOSS_ATTACKS.novaFlanks, enabled: true },
-  bombard: { ...BOSS_ATTACKS.bombard, warning: 0.85, count: 5, delay: 0.24, radius: 85, duration: 0.34, offset: 160 },
+  bombard: { ...BOSS_ATTACKS.bombard, warning: 0.85, count: 5, delay: 0.24, radius: 85, duration: 0.34, offset: 160,
+    ringCount: [28, 32, 36], rings: [9, 10, 11], ringInterval: 0.46, ringGap: 0.42, tail: 1.2 },
   laser: { ...BOSS_ATTACKS.laser, warning: 1.25, duration: 2.6, hold: 0.15, angularSpeed: 0.42, sideAngle: 0.58, cooldown: 9 },
 } as const;
 
@@ -47,7 +57,7 @@ export interface BossAiContext {
   difficulty?: Difficulty;
   player: Player;
   elapsed: number;
-  shoot(enemy: Enemy, angle: number, speed: number, radius: number, color: number): void;
+  shoot(enemy: Enemy, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void;
   emit(event: CombatEvent): void;
   damagePlayer(): void;
   clearHostileProjectiles(): void;
@@ -57,6 +67,28 @@ export interface BossAiContext {
 
 export function createBossBrain(): BossBrain {
   return { phase: 1, skill: 'idle', cycle: 0, lockedAngle: 0, sweepDirection: -1, targetX: 0, targetY: 0, shotCount: 0, auxTimer: 0 };
+}
+
+/** The same committed escape lane drives every layer, curved trajectory and visible telegraph. */
+export function bossPatternLanes(e: Enemy, difficulty: Difficulty = 'normal'): { angle: number; width: number }[] {
+  const brain = e.boss;
+  if (!brain || !['volley', 'nova', 'bombard'].includes(brain.skill)) return [];
+  const cfg = bossAttacks(difficulty), direction = brain.cycle % 2 === 1 ? 1 : -1;
+  const offset = brain.skill === 'volley' ? cfg.volley.laneOffset : brain.skill === 'nova' ? -cfg.nova.laneOffset : cfg.bombard.laneOffset;
+  const width = brain.skill === 'volley' ? cfg.volley.gap : brain.skill === 'nova' ? cfg.nova.gap[brain.phase - 1] : cfg.bombard.ringGap;
+  return [{ angle: brain.lockedAngle + direction * offset, width }];
+}
+
+/** Encloses every future fan axis plus its finite post-launch curvature, not only the first burst. */
+export function bossVolleyArc(e: Enemy, difficulty: Difficulty = 'normal'): { angle: number; width: number } {
+  const cfg = bossAttacks(difficulty).volley, phase = (e.boss?.phase ?? 1) - 1;
+  return { angle: e.boss?.lockedAngle ?? e.angle,
+    width: Math.min(TAU, (cfg.count[phase] - 0.5) * cfg.angleStep + 2 * (cfg.lobeOffset + cfg.sway + cfg.turnRate * cfg.turnDuration)) };
+}
+
+function clearsLane(angle: number, lane: { angle: number; width: number }, turn = 0): boolean {
+  // Every heading on the finite curve remains outside the lane, so the entire position path does too.
+  return Math.abs(angleDelta(lane.angle, angle)) > lane.width / 2 + Math.abs(turn) + 0.015;
 }
 
 function announce(e: Enemy, ctx: BossAiContext, text: string, amount?: number): void {
@@ -133,13 +165,16 @@ function beginSkill(e: Enemy, brain: BossBrain, ctx: BossAiContext): void {
     e.state = 'novaWarmup'; e.timer = attacks.nova.warning[phase];
     if (attacks.novaFlanks.enabled && brain.phase >= 2) {
       const flank = attacks.novaFlanks;
-      const tangentX = -Math.sin(brain.lockedAngle), tangentY = Math.cos(brain.lockedAngle);
+      const lane = bossPatternLanes(e, ctx.difficulty)[0];
+      const distance = Math.hypot(brain.targetX - e.x, brain.targetY - e.y);
+      const centerX = e.x + Math.cos(lane.angle) * distance, centerY = e.y + Math.sin(lane.angle) * distance;
+      const tangentX = -Math.sin(lane.angle), tangentY = Math.cos(lane.angle);
       for (let i = 0; i < 2; i++) {
         const offset = (i === 0 ? 1 : -1) * flank.offset;
         const warning = Math.max(flank.warning, attacks.nova.warning[phase] + (i + 0.5) * attacks.nova.interval);
         ctx.spawnHazard({
-          x: clamp(brain.targetX + tangentX * offset, flank.radius, WORLD.width - flank.radius),
-          y: clamp(brain.targetY + tangentY * offset, flank.radius, WORLD.height - flank.radius),
+          x: clamp(centerX + tangentX * offset, flank.radius, WORLD.width - flank.radius),
+          y: clamp(centerY + tangentY * offset, flank.radius, WORLD.height - flank.radius),
           radius: flank.radius, warning, warningDuration: warning, life: flank.duration, duration: flank.duration,
           sourceId: e.id, kind: 'bombard', active: false,
         });
@@ -168,21 +203,52 @@ function beginSkill(e: Enemy, brain: BossBrain, ctx: BossAiContext): void {
 
 function fireVolley(e: Enemy, brain: BossBrain, ctx: BossAiContext): void {
   const phase = brain.phase - 1, config = bossAttacks(ctx.difficulty).volley, count = config.count[phase];
-  for (let i = 0; i < count; i++) {
-    ctx.shoot(e, brain.lockedAngle + (i - (count - 1) / 2) * config.angleStep, config.speed[phase], config.radius, 0xf09fcd);
+  const lane = bossPatternLanes(e, ctx.difficulty)[0];
+  for (let layer = 0; layer < config.layers[phase]; layer++) {
+    const wing = layer === 0 ? -1 : layer === 1 ? 1 : 0;
+    const turn = (wing || (brain.shotCount % 2 === 0 ? 1 : -1)) * config.turnRate;
+    const center = brain.lockedAngle + wing * (config.lobeOffset + Math.sin(brain.shotCount * config.swayStep) * config.sway);
+    const interleave = (brain.shotCount % 2 === 0 ? -1 : 1) * config.angleStep / 4;
+    for (let i = 0; i < count; i++) {
+      const angle = center + (i - (count - 1) / 2) * config.angleStep + interleave;
+      if (!clearsLane(angle, lane, turn * config.turnDuration)) continue;
+      ctx.shoot(e, angle, config.speed[phase] + layer * config.speedStep, config.radius, layer === 0 ? 0xf5a3d4 : layer === 1 ? 0xb3a0ff : 0xffd58a,
+        { shape: layer === 0 ? 'rice' : 'kunai', turnRate: turn, turnDelay: config.turnDelay, turnDuration: config.turnDuration,
+          acceleration: config.acceleration, maxSpeed: config.maxSpeed });
+    }
   }
   brain.shotCount++; e.cooldown = config.interval;
 }
 
 function fireNova(e: Enemy, brain: BossBrain, ctx: BossAiContext): void {
   const phase = brain.phase - 1, config = bossAttacks(ctx.difficulty).nova, count = config.count[phase];
-  const interleave = (brain.shotCount % 2) * config.interleave * TAU / count;
-  for (let i = 0; i < count; i++) {
-    const angle = brain.lockedAngle + i * TAU / count + interleave;
-    if (Math.abs(angleDelta(brain.lockedAngle, angle)) <= config.gap[phase] / 2) continue;
-    ctx.shoot(e, angle, config.speed[phase], config.radius, 0xa9bdff);
+  const lane = bossPatternLanes(e, ctx.difficulty)[0];
+  for (let layer = 0; layer < config.layers[phase]; layer++) {
+    const direction = layer % 2 === 0 ? 1 : -1;
+    const rotation = direction * brain.shotCount * config.rotation + layer * config.interleave * TAU / count;
+    const turn = direction * config.turnRate;
+    for (let i = 0; i < count; i++) {
+      const angle = brain.lockedAngle + i * TAU / count + rotation;
+      if (!clearsLane(angle, lane, turn * config.turnDuration)) continue;
+      ctx.shoot(e, angle, config.speed[phase] + layer * config.speedStep, config.radius, layer === 0 ? 0xb8b1ff : layer === 1 ? 0xffcf73 : 0xffb5de,
+        { shape: layer % 2 === 0 ? 'kunai' : 'orb', turnRate: turn, turnDelay: config.turnDelay, turnDuration: config.turnDuration,
+          acceleration: config.acceleration, maxSpeed: config.maxSpeed });
+    }
   }
   brain.shotCount++; e.cooldown = config.interval;
+}
+
+function fireBombardRing(e: Enemy, brain: BossBrain, ctx: BossAiContext): void {
+  const phase = brain.phase - 1, config = bossAttacks(ctx.difficulty).bombard;
+  const lane = bossPatternLanes(e, ctx.difficulty)[0], count = config.ringCount[phase];
+  const rotation = brain.shotCount * config.rotation * (brain.cycle % 2 === 0 ? -1 : 1);
+  for (let i = 0; i < count; i++) {
+    const angle = brain.lockedAngle + i * TAU / count + rotation;
+    if (!clearsLane(angle, lane)) continue;
+    ctx.shoot(e, angle, config.ringSpeed[phase], config.ringRadius, brain.shotCount % 2 === 0 ? 0xffcb89 : 0xfc95bd,
+      { shape: brain.shotCount % 2 === 0 ? 'orb' : 'rice' });
+  }
+  brain.shotCount++; e.cooldown = config.ringInterval;
 }
 
 /** Fixed-step, deterministic Boss decisions. The simulation owns position integration and e.cooldown. */
@@ -249,7 +315,9 @@ export function updateBossAi(e: Enemy, dt: number, ctx: BossAiContext): void {
       fireNova(e, brain, ctx);
     } else {
       e.state = 'bombard';
-      e.timer = (attacks.bombard.count - 1) * attacks.bombard.delay + attacks.bombard.duration;
+      e.timer = Math.max((attacks.bombard.count - 1) * attacks.bombard.delay + attacks.bombard.duration,
+        (attacks.bombard.rings[phaseIndex] - 1) * attacks.bombard.ringInterval + attacks.bombard.tail);
+      fireBombardRing(e, brain, ctx);
     }
     return;
   }
@@ -258,6 +326,7 @@ export function updateBossAi(e: Enemy, dt: number, ctx: BossAiContext): void {
     const phaseIndex = brain.phase - 1;
     if (e.state === 'volley' && brain.shotCount < attacks.volley.bursts[phaseIndex] && e.cooldown <= EPSILON) fireVolley(e, brain, ctx);
     if (e.state === 'nova' && brain.shotCount < attacks.nova.rings[phaseIndex] && e.cooldown <= EPSILON) fireNova(e, brain, ctx);
+    if (e.state === 'bombard' && brain.shotCount < attacks.bombard.rings[phaseIndex] && e.cooldown <= EPSILON) fireBombardRing(e, brain, ctx);
     if (e.timer <= EPSILON) beginRecovery(e, brain, ctx);
     return;
   }

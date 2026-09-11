@@ -5,7 +5,8 @@ import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, SeededRandom, 
 import { ObjectPool } from './pool';
 import { bossAttacks, createBossBrain, updateBossAi } from './boss-ai';
 import { enemyAttacks, updateEnemyAi } from './enemy-ai';
-import type { AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyType, InputAction, Pickup, PickupType, Player, WorldState } from './types';
+import { advanceProjectileMotion } from './projectile-motion';
+import type { AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyShotOptions, EnemyType, InputAction, Pickup, PickupType, Player, WorldState } from './types';
 
 const EPSILON = 1e-8;
 const PICKUP_COLORS: Record<PickupType, number> = { xp: 0x73f7eb, hp: 0xa6f1aa, bomb: 0xffcb69, ammo: 0x69ffc0, coolant: 0x69caff, miniBomb: 0xffbb55, blackHole: 0xbb88ff, support: 0x9ceaff };
@@ -36,6 +37,7 @@ export class GameSimulation {
   private readonly candidates: Enemy[] = [];
   private readonly impacts: { enemy: Enemy; time: number }[] = [];
   private readonly suppliedWaves = new Set<number>();
+  private readonly shotFeedback = new Set<number>();
   private readonly bulletPool = new ObjectPool(emptyBullet, bullet => bullet.hitIds.clear(), BALANCE.limits.bullets);
 
   constructor(seed = 12345, difficulty: Difficulty = 'normal') { this.seed = seed; this.reset('story', seed, difficulty); }
@@ -52,6 +54,7 @@ export class GameSimulation {
     this.candidates.length = 0;
     this.impacts.length = 0;
     this.suppliedWaves.clear();
+    this.shotFeedback.clear();
     this.previousDash = this.previousBomb = false;
     this.dashBuffered = 0;
     this.nextEnemyCommit = 0;
@@ -66,7 +69,7 @@ export class GameSimulation {
       ammo: BALANCE.ammo.max, heat: 0, angle: -Math.PI / 2, invincible: 1, dashTime: 0, dashCooldown: 0,
       dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0, specialCooldown: 0, idleTime: 0,
       heatLock: 0, overheated: false, focus: false };
-    this.state = { status: 'playing', mode, difficulty, minibossSpawned: false, elapsed: 0, tick: 0, score: 0, kills: 0, wave: mode === 'endless' ? 6 : 1,
+    this.state = { status: 'playing', mode, difficulty, minibossSpawned: false, minibossDefeated: false, elapsed: 0, tick: 0, score: 0, kills: 0, wave: mode === 'endless' ? 6 : 1,
       waveTime: 0, spawnTimer: 0.6, bossStage: false, bossPending: false, pendingWave: 0,
       blackHoleTime: 0, player, camera: { x, y, prevX: x, prevY: y }, enemies: [], bullets: [], pickups: [], indicators: [], companions: [], beams: [], hazards: [] };
   }
@@ -102,6 +105,7 @@ export class GameSimulation {
     this.queuedEvents = [];
     if (this.state.status !== 'playing' || dt <= 0 || !Number.isFinite(dt)) return this.events;
     this.stepping = true;
+    this.shotFeedback.clear();
     const world = this.state;
     world.tick++;
     world.elapsed += dt;
@@ -342,7 +346,8 @@ export class GameSimulation {
     const difficulty = difficultyConfig(w.difficulty);
     if (!w.bossStage && !w.bossPending) {
       w.waveTime += dt;
-      if (w.waveTime >= BALANCE.spawn.waveDuration - EPSILON) {
+      if (this.isWaveBlocked()) w.waveTime = BALANCE.spawn.waveDuration;
+      else if (w.waveTime >= BALANCE.spawn.waveDuration - EPSILON) {
         w.waveTime = 0;
         if (w.mode === 'story') this.gainXp(BALANCE.spawn.clearXp[Math.min(w.wave - 1, 4)]);
         const needsBoss = w.mode === 'story' ? w.wave === BALANCE.spawn.storyWaves : w.wave % BALANCE.spawn.endlessBossInterval === 0;
@@ -376,8 +381,13 @@ export class GameSimulation {
       w.spawnTimer -= dt;
       if (w.spawnTimer <= EPSILON) {
         const base = BALANCE.spawn.intervals[Math.min(w.wave - 1, 4)];
-        w.spawnTimer += (w.mode === 'endless' ? Math.max(0.5, base - (w.wave - 5) * 0.015) : base) * difficulty.spawnInterval;
-        this.queueSpawn();
+        if (this.isWaveBlocked()) {
+          w.spawnTimer += w.difficulty === 'hard' ? MINIBOSS_ENCOUNTER.hardHoldSpawnInterval : MINIBOSS_ENCOUNTER.holdSpawnInterval;
+          if (this.enemyCount - 1 + w.indicators.length < this.holdAddLimit()) this.queueSpawn();
+        } else {
+          w.spawnTimer += (w.mode === 'endless' ? Math.max(0.5, base - (w.wave - 5) * 0.015) : base) * difficulty.spawnInterval;
+          this.queueSpawn();
+        }
       }
     }
     for (let i = w.indicators.length - 1; i >= 0; i--) {
@@ -390,6 +400,12 @@ export class GameSimulation {
       }
     }
   }
+
+  isWaveBlocked(): boolean {
+    const w = this.state;
+    return w.mode === 'story' && w.wave === MINIBOSS_ENCOUNTER.wave && !w.minibossDefeated && w.waveTime >= BALANCE.spawn.waveDuration - EPSILON;
+  }
+  private holdAddLimit(): number { return this.state.difficulty === 'hard' ? MINIBOSS_ENCOUNTER.hardHoldAdds : MINIBOSS_ENCOUNTER.holdAdds; }
 
   private queueSpawn(): void {
     const w = this.state;
@@ -457,7 +473,7 @@ export class GameSimulation {
       state: type === 'mine' ? 'arming' : 'chase', timer: type === 'boss' ? bossAttacks(w.difficulty).opening : type === 'mine' ? enemyAttacks(w.difficulty).mine.arming : 0, cooldown: type === 'sniper' ? 0.6 + this.random.next() : type === 'minelayer' ? 2 : 0,
       laserCooldown: BALANCE.boss.firstLaser, attackIndex: 0, hitTime: 0, lowHpSpoken: false, directionX: 0, directionY: 0 };
     if (type === 'boss') enemy.boss = createBossBrain();
-    if (type === 'miniboss') { enemy.miniboss = createMiniBossBrain(); w.minibossSpawned = true; }
+    if (type === 'miniboss') { enemy.miniboss = createMiniBossBrain(); w.minibossSpawned = true; w.minibossDefeated = false; }
     enemy.prevX = enemy.x; enemy.prevY = enemy.y;
     this.state.enemies.push(enemy); this.byId.set(enemy.id, enemy);
     this.enemyCount++; if (type === 'mine') this.mineCount++;
@@ -520,7 +536,7 @@ export class GameSimulation {
       prepare(boss);
       updateBossAi(boss, dt, {
         player: p, elapsed: w.elapsed, difficulty: w.difficulty,
-        shoot: (e, angle, speed, radius, color) => this.enemyShoot(e, angle, speed, radius, color),
+        shoot: (e, angle, speed, radius, color, options) => this.enemyShoot(e, angle, speed, radius, color, options),
         emit: event => this.emit(event), damagePlayer: () => this.damagePlayer(),
         clearHostileProjectiles: () => this.clearHostileProjectiles(),
         clearBossHazards: () => { w.hazards.length = 0; },
@@ -546,7 +562,7 @@ export class GameSimulation {
       if (exclusive) { miniboss.state = 'recover'; miniboss.timer = 0.5; miniboss.vx = miniboss.vy = 0; }
       else updateMiniBossAi(miniboss, dt, { player: p, elapsed: w.elapsed, difficulty: w.difficulty,
         canCommit: () => canCommit(miniboss), emit: event => this.emit(event), damagePlayer: () => this.damagePlayer(),
-        shoot: (e, angle, speed, radius, color) => this.enemyShoot(e, angle, speed, radius, color) });
+        shoot: (e, angle, speed, radius, color, options) => this.enemyShoot(e, angle, speed, radius, color, options) });
       if (w.status === 'playing') moveAndCollide(miniboss);
     }
     // New mines are deliberately skipped until the next step; all movement and damage clocks stay at 60 Hz.
@@ -564,6 +580,7 @@ export class GameSimulation {
         emit: event => this.emit(event),
         plantMine: (x, y) => {
           if (exclusive || (w.bossStage && this.enemyCount - 1 >= BALANCE.boss.maxAdds)) return;
+          if (this.isWaveBlocked() && this.enemyCount - 1 + w.indicators.length >= this.holdAddLimit()) return;
           if (this.enemyCount >= BALANCE.limits.enemies - 1 && w.indicators.some(i => i.type === 'miniboss')) return;
           const mineRadius = ENEMIES.mine.radius * (w.mode === 'endless' ? Math.min(3, 1 + Math.max(0, w.wave - 5) * 0.05) : 1);
           x = clamp(x, mineRadius, WORLD.width - mineRadius); y = clamp(y, mineRadius, WORLD.height - mineRadius);
@@ -576,10 +593,21 @@ export class GameSimulation {
     }
   }
 
-  private enemyShoot(e: Enemy, angle: number, speed: number, radius: number, color: number): void {
+  private enemyShoot(e: Enemy, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void {
     const difficulty = difficultyConfig(this.state.difficulty);
     const bullet = this.addBullet(e.x, e.y, angle, speed * difficulty.bulletSpeed, 'enemy', difficulty.damage, radius, color);
-    if (bullet) this.emit({ type: 'enemyShot', x: e.x, y: e.y, color, angle, enemyType: e.type });
+    if (bullet) {
+      bullet.shape = options?.shape;
+      bullet.turnRate = options?.turnRate ?? 0; bullet.turnDelay = Math.max(0, options?.turnDelay ?? 0);
+      bullet.turnDuration = Math.max(0, options?.turnDuration ?? 0);
+      bullet.acceleration = (options?.acceleration ?? 0) * difficulty.bulletSpeed;
+      bullet.maxSpeed = Math.max(bullet.speed, (options?.maxSpeed ?? speed) * difficulty.bulletSpeed);
+      // One muzzle flash / sound per emitter per tick, even for a dense flower burst.
+      if (!this.shotFeedback.has(e.id)) {
+        this.shotFeedback.add(e.id);
+        this.emit({ type: 'enemyShot', x: e.x, y: e.y, color, angle, enemyType: e.type });
+      }
+    }
   }
 
   private addBullet(x: number, y: number, angle: number, speed: number, owner: Bullet['owner'], damage: number, radius: number, color: number,
@@ -594,6 +622,7 @@ export class GameSimulation {
     b.life = homing ? (kind === 'burst' ? 5 : 3) : Infinity;
     b.homing = homing; b.lockRange = lockRange; b.targetId = null; b.remainingHits = remainingHits; b.kind = kind;
     b.hitIds.clear();
+    b.shape = undefined; b.motionAge = 0; b.turnRate = 0; b.turnDelay = 0; b.turnDuration = 0; b.acceleration = 0; b.maxSpeed = speed;
     this.state.bullets.push(b);
     return b;
   }
@@ -646,6 +675,7 @@ export class GameSimulation {
       // Preserve unprocessed objects for terminal cleanup without moving or resolving them.
       if (this.state.status !== 'playing') { bullets[keep++] = b; continue; }
       b.prevX = b.x; b.prevY = b.y;
+      advanceProjectileMotion(b, dt);
       if (b.homing) {
         let target = b.targetId === null ? null : this.byId.get(b.targetId) ?? null;
         if (target && (target.hp <= 0 || b.hitIds.has(target.id) || Math.hypot(target.x - b.x, target.y - b.y) > b.lockRange + target.radius)) target = null;
@@ -712,6 +742,7 @@ export class GameSimulation {
         this.emit({ type: 'wave', x: enemy.x, y: enemy.y, amount: this.state.wave });
       }
     } else if (enemy.type === 'miniboss') {
+      this.state.minibossDefeated = true;
       this.addPickup('xp', enemy.x, enemy.y, this.state.difficulty === 'hard' ? MINIBOSS_ENCOUNTER.hardXp : MINIBOSS_ENCOUNTER.xp);
       this.addPickup('hp', enemy.x + 40, enemy.y, this.state.difficulty === 'hard' ? 2 : 1);
       this.addPickup('ammo', enemy.x - 40, enemy.y, 1);

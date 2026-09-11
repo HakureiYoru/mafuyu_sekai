@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_ATTACKS, bossAttacks, createBossBrain, updateBossAi } from './boss-ai';
+import { BOSS_ATTACKS, bossAttacks, bossPatternLanes, bossVolleyArc, createBossBrain, updateBossAi } from './boss-ai';
 import type { BossAiContext } from './boss-ai';
 import { BALANCE, STEP, WORLD } from './config';
 import { FixedClock } from './clock';
 import { angleDelta, clamp, segmentCircleHit } from './math';
-import type { AreaHazard, CombatEvent, Difficulty, Enemy, Player } from './types';
+import { GameSimulation } from './simulation';
+import type { AreaHazard, CombatEvent, Difficulty, Enemy, EnemyShotOptions, InputAction, Player } from './types';
 
 function harness(difficulty?: Difficulty) {
   const player: Player = { x: 2500, y: 2000, prevX: 2500, prevY: 2000, vx: 0, vy: 0, radius: 18,
@@ -15,14 +16,14 @@ function harness(difficulty?: Difficulty) {
     radius: 160, hp: 1800, maxHp: 1800, speed: 50, angle: 0, state: 'chase', timer: 0,
     cooldown: 0, laserCooldown: 999, attackIndex: 0, hitTime: 0, lowHpSpoken: false,
     directionX: 0, directionY: 0, boss: createBossBrain() };
-  const shots: { angle: number; speed: number; radius: number; color: number; time: number }[] = [];
+  const shots: { angle: number; speed: number; radius: number; color: number; time: number; options?: EnemyShotOptions }[] = [];
   const events: CombatEvent[] = [];
   const hazards: Omit<AreaHazard, 'id'>[] = [];
   const spawned: Omit<AreaHazard, 'id'>[] = [];
   const counts = { clearBullets: 0, clearHazards: 0, damage: 0, maxHazards: 0 };
   const ctx: BossAiContext = {
     player, elapsed: 0, difficulty,
-    shoot: (_enemy, angle, speed, radius, color) => shots.push({ angle, speed, radius, color, time: ctx.elapsed }),
+    shoot: (_enemy, angle, speed, radius, color, options) => shots.push({ angle, speed, radius, color, time: ctx.elapsed, options }),
     emit: event => events.push(event),
     damagePlayer: () => { counts.damage++; player.hp--; player.invincible = BALANCE.player.hitInvincible; },
     clearHostileProjectiles: () => { counts.clearBullets++; },
@@ -45,6 +46,11 @@ function harness(difficulty?: Difficulty) {
   };
   const run = (ticks: number) => { for (let i = 0; i < ticks; i++) tick(); };
   return { player, enemy, shots, events, hazards, spawned, counts, ctx, tick, run };
+}
+
+function finishAttack(h: ReturnType<typeof harness>): void {
+  for (let tick = 0; tick < 600 && h.enemy.state !== 'recover'; tick++) h.tick();
+  expect(h.enemy.state).toBe('recover');
 }
 
 describe('Boss phases and commitment', () => {
@@ -142,20 +148,20 @@ describe('fully committed laser sweep', () => {
 });
 
 describe('bounded patterns with visible escape routes', () => {
-  it('keeps a fixed gap in all three phase-three nova rings even when the player moves', () => {
+  it('keeps a committed gap through every rotating phase-three nova layer even when the player moves', () => {
     const h = harness(); h.enemy.hp = 500; h.enemy.boss!.phase = 3; h.enemy.boss!.cycle = 2;
     h.tick(); expect(h.enemy.state).toBe('novaWarmup');
-    const locked = h.enemy.boss!.lockedAngle;
+    const locked = h.enemy.boss!.lockedAngle, lane = bossPatternLanes(h.enemy)[0];
     h.player.y += 500; h.run(62);
     expect(h.shots).toHaveLength(0); expect(h.enemy.angle).toBe(locked);
     h.tick(); expect(h.enemy.state).toBe('nova');
     const firstRing = h.shots.map(shot => shot.angle);
-    h.run(72);
-    expect(h.enemy.state).toBe('recover');
-    expect(h.shots).toHaveLength(firstRing.length * 3);
-    expect(h.shots.every(shot => Math.abs(angleDelta(locked, shot.angle)) > BOSS_ATTACKS.nova.gap[2] / 2)).toBe(true);
-    expect(h.shots.slice(firstRing.length, firstRing.length * 2).map(shot => shot.angle)).toEqual(firstRing);
-    expect(h.shots.length).toBeLessThan(32 * 3);
+    finishAttack(h);
+    expect(new Set(h.shots.map(shot => shot.time)).size).toBe(BOSS_ATTACKS.nova.rings[2]);
+    expect(h.shots.length).toBeGreaterThan(450);
+    expect(h.shots.every(shot => Math.abs(angleDelta(lane.angle, shot.angle)) > lane.width / 2)).toBe(true);
+    expect(h.shots.slice(firstRing.length, firstRing.length * 2).map(shot => shot.angle)).not.toEqual(firstRing);
+    expect(h.shots.length).toBeLessThan(BOSS_ATTACKS.nova.count[2] * BOSS_ATTACKS.nova.layers[2] * BOSS_ATTACKS.nova.rings[2]);
   });
   it('locks fan direction throughout warning and all subsequent bursts', () => {
     const h = harness(); h.enemy.hp = 500; h.enemy.boss!.phase = 3; h.enemy.boss!.cycle = 1;
@@ -163,11 +169,14 @@ describe('bounded patterns with visible escape routes', () => {
     h.player.x = 1000; h.player.y = 3000;
     h.run(56); expect(h.shots).toHaveLength(0); expect(h.enemy.angle).toBe(locked);
     h.tick(); expect(h.enemy.state).toBe('volley');
-    h.run(60);
-    expect(h.shots).toHaveLength(15);
-    expect(h.shots.every(shot => Math.abs(angleDelta(locked, shot.angle)) <= 0.320000001)).toBe(true);
-    expect(h.shots.slice(0, 5).map(shot => shot.angle)).toEqual(h.shots.slice(10, 15).map(shot => shot.angle));
-    expect(h.enemy.state).toBe('recover');
+    const envelope = bossVolleyArc(h.enemy), lane = bossPatternLanes(h.enemy)[0];
+    finishAttack(h);
+    expect(new Set(h.shots.map(shot => shot.time)).size).toBe(BOSS_ATTACKS.volley.bursts[2]);
+    expect(h.shots.length).toBeGreaterThan(200);
+    expect(h.shots.some(shot => Math.abs(angleDelta(locked, shot.angle)) > 1.5)).toBe(true);
+    expect(h.shots.every(shot => Math.abs(angleDelta(envelope.angle, shot.angle)) <= envelope.width / 2)).toBe(true);
+    expect(h.shots.every(shot => Math.abs(angleDelta(lane.angle, shot.angle)) > lane.width / 2)).toBe(true);
+    expect(h.enemy.angle).toBe(locked);
   });
   it('reveals all three bombard circles at once, locks their positions, and never creates a zero-warning impact', () => {
     const h = harness(); h.enemy.boss!.cycle = 2;
@@ -177,12 +186,12 @@ describe('bounded patterns with visible escape routes', () => {
     expect(h.spawned.map(hazard => hazard.warningDuration)).toEqual([1.25, 1.75, 2.25]);
     expect(h.spawned.every(hazard => hazard.warning > 0 && !hazard.active && hazard.radius === 100 && hazard.duration === 0.38)).toBe(true);
     const original = structuredClone(h.spawned);
-    h.player.x = 1000; h.player.y = 1000; h.run(160);
+    h.player.x = 1000; h.player.y = 1000; finishAttack(h);
     expect(h.spawned).toEqual(original); expect(h.enemy.state).toBe('recover');
-    expect(h.hazards).toHaveLength(0); expect(h.counts.maxHazards).toBe(3); expect(h.shots).toHaveLength(0);
+    expect(h.hazards).toHaveLength(0); expect(h.counts.maxHazards).toBe(3); expect(h.shots.length).toBeGreaterThan(100);
   });
   it('keeps a complete recovery and attackable breathing interval between skills', () => {
-    const h = harness(); h.tick(); h.run(69 + 18);
+    const h = harness(); h.tick(); finishAttack(h);
     expect(h.enemy.state).toBe('recover'); const shots = h.shots.length;
     h.run(68); expect(h.enemy.state).toBe('recover'); expect(h.shots.length).toBe(shots);
     h.tick(); expect(h.enemy.state).toBe('chase');
@@ -207,7 +216,7 @@ describe('bounded patterns with visible escape routes', () => {
         h.tick(dt);
       });
       expect(h.counts.maxHazards).toBeLessThanOrEqual(3);
-      expect(h.shots.length).toBeLessThan(600);
+      expect(h.shots.length).toBeGreaterThan(1000); expect(h.shots.length).toBeLessThan(8000);
       expect(h.events.some(event => event.text === 'laser')).toBe(true);
       expect(h.events.some(event => event.text === 'bombard')).toBe(true);
       expect(h.events.some(event => event.text === 'nova')).toBe(true);
@@ -253,8 +262,9 @@ describe('hard Boss tactics with readable combinations', () => {
       expect(hard.enemy.timer).toBeLessThan(normal.enemy.timer);
       finishSkill(normal); finishSkill(hard);
       expect(hard.shots.length).toBeGreaterThan(normal.shots.length);
-      expect(hard.shots.every(shot => shot.speed === BOSS_ATTACKS[skill].speed[phase - 1])).toBe(true);
-      if (skill === 'volley') expect(hard.shots.length).toBe(bossAttacks('hard').volley.count[phase - 1] * bossAttacks('hard').volley.bursts[phase - 1]);
+      const config = BOSS_ATTACKS[skill];
+      expect(hard.shots.every(shot => Array.from({ length: bossAttacks('hard')[skill].layers[phase - 1] }, (_, layer) => config.speed[phase - 1] + layer * config.speedStep).includes(shot.speed))).toBe(true);
+      expect(hard.shots.every(shot => shot.options?.maxSpeed === config.maxSpeed && shot.options.acceleration === config.acceleration)).toBe(true);
       expect(hard.enemy.timer).toBe(0.65);
     }
   });
@@ -317,18 +327,20 @@ describe('hard Boss tactics with readable combinations', () => {
     const h = prepare('hard', phase, 'nova'), config = bossAttacks('hard');
     expect(h.spawned).toHaveLength(2);
     expect(h.spawned.every(hazard => hazard.warning >= 0.85 && !hazard.active)).toBe(true);
-    expect(h.spawned.map(hazard => [hazard.x, hazard.y])).toEqual([[2300, 2170], [2300, 1830]]);
-    const initialHazards = structuredClone(h.spawned), gap = config.nova.gap[phase - 1], locked = h.enemy.angle;
+    const lane = bossPatternLanes(h.enemy, 'hard')[0];
+    const lanePoint = { x: h.enemy.x + Math.cos(lane.angle) * 300, y: h.enemy.y + Math.sin(lane.angle) * 300 };
+    for (const hazard of h.spawned) expect(Math.hypot(hazard.x - lanePoint.x, hazard.y - lanePoint.y)).toBeCloseTo(config.novaFlanks.offset);
+    const initialHazards = structuredClone(h.spawned), gap = config.nova.gap[phase - 1];
     finishSkill(h);
     const rings = new Map<number, number[]>();
     for (const shot of h.shots) rings.set(shot.time, [...(rings.get(shot.time) ?? []), shot.angle]);
     expect(rings.size).toBe(config.nova.rings[phase - 1]);
     const patterns = [...rings.values()]; expect(patterns[0]).not.toEqual(patterns[1]);
-    expect(h.shots.every(shot => Math.abs(angleDelta(locked, shot.angle)) > gap / 2)).toBe(true);
+    expect(h.shots.every(shot => Math.abs(angleDelta(lane.angle, shot.angle)) > gap / 2)).toBe(true);
     // A ray through every bullet trajectory misses the announced central opening, including projectile radius.
     expect(h.shots.every(shot => segmentCircleHit(h.enemy.x, h.enemy.y, h.enemy.x + Math.cos(shot.angle) * 6000,
-      h.enemy.y + Math.sin(shot.angle) * 6000, h.player.x, h.player.y, h.player.radius + shot.radius) === null)).toBe(true);
-    expect(h.spawned.every(hazard => Math.hypot(hazard.x - h.player.x, hazard.y - h.player.y) > hazard.radius + h.player.radius)).toBe(true);
+      h.enemy.y + Math.sin(shot.angle) * 6000, lanePoint.x, lanePoint.y, h.player.radius + shot.radius) === null)).toBe(true);
+    expect(h.spawned.every(hazard => Math.hypot(hazard.x - lanePoint.x, hazard.y - lanePoint.y) > hazard.radius + h.player.radius)).toBe(true);
     expect(h.spawned).toEqual(initialHazards); expect(h.counts.maxHazards).toBe(2);
   });
 
@@ -342,7 +354,7 @@ describe('hard Boss tactics with readable combinations', () => {
     expect(h.spawned.every(hazard => Math.hypot(hazard.x - h.player.x, hazard.y - h.player.y) > hazard.radius + h.player.radius)).toBe(true);
     finishSkill(h);
     expect(h.spawned).toEqual(initial); expect(h.counts.maxHazards).toBe(5); expect(h.hazards).toHaveLength(0);
-    expect(h.shots).toHaveLength(0);
+    expect(h.shots.length).toBeGreaterThan(180);
   });
 
   it('clears a hard nova combination on a phase transition and still grants the full transition pause', () => {
@@ -366,12 +378,127 @@ describe('hard Boss tactics with readable combinations', () => {
         const previous = h.shots.length; h.tick(dt); maxShotsPerTick = Math.max(maxShotsPerTick, h.shots.length - previous);
       });
       expect(h.counts.maxHazards).toBeLessThanOrEqual(5);
-      expect(h.shots.length).toBeGreaterThan(250); expect(h.shots.length).toBeLessThan(1800);
-      expect(maxShotsPerTick).toBeLessThanOrEqual(38);
+      expect(h.shots.length).toBeGreaterThan(1800); expect(h.shots.length).toBeLessThan(12000);
+      expect(maxShotsPerTick).toBeLessThanOrEqual(90);
       expect(h.events.some(event => event.text === 'nova')).toBe(true);
       expect(h.events.some(event => event.text === 'bombard')).toBe(true);
       return { enemy: h.enemy, shots: h.shots, events: h.events, spawned: h.spawned, counts: h.counts };
     });
     for (const output of outputs.slice(1)) expect(output).toEqual(outputs[0]);
+  });
+});
+
+describe('v3.4 live projectile patterns', () => {
+  type Skill = 'volley' | 'nova' | 'bombard';
+  const idle = (): InputAction => ({ moveX: 0, moveY: 0, aimX: 2000, aimY: 2000, shoot: false, dash: false, bomb: false });
+  function setup(difficulty: Difficulty, phase: 1 | 2 | 3, skill: Skill, distance = 500) {
+    const sim = new GameSimulation(3401, difficulty), boss = sim.spawnEnemy('boss', 2000, 2000)!;
+    const player = sim.state.player;
+    player.x = player.prevX = 2000 + distance; player.y = player.prevY = 2000; player.invincible = 1e9;
+    boss.hp = boss.maxHp * (phase === 1 ? 1 : phase === 2 ? 0.6 : 0.25);
+    boss.boss!.phase = phase; boss.timer = 0; boss.laserCooldown = 999;
+    // Odd cycles retain the explicit sequence in either difficulty, independent of tactical selection.
+    const index = skill === 'volley' ? [0, 2, 1][phase - 1] : skill === 'nova' ? [1, 0, 2][phase - 1] : [2, 1, 0][phase - 1];
+    boss.boss!.cycle = index % 2 === 1 ? index : index + 3;
+    sim.step(idle());
+    expect(boss.boss!.skill).toBe(skill);
+    return { sim, boss, lane: bossPatternLanes(boss, difficulty)[0] };
+  }
+
+  for (const difficulty of ['normal', 'hard'] as const) for (const phase of [1, 2, 3] as const) for (const skill of ['volley', 'nova', 'bombard'] as const) {
+    it(`${difficulty} phase ${phase} ${skill} emits bounded moving projectiles and preserves the full curved escape route at every render rate`, () => {
+      const results = [30, 60, 120, 144].map(hz => {
+        const { sim, boss, lane } = setup(difficulty, phase, skill), clock = new FixedClock();
+        const shapes = new Set<string>(), ids = new Set<number>(), launches = new Map<number, { angle: number; speed: number }>();
+        const safePoints = [300, 500, 800].map(distance => ({ x: boss.x + Math.cos(lane.angle) * distance, y: boss.y + Math.sin(lane.angle) * distance }));
+        const envelope = bossVolleyArc(boss, difficulty);
+        let firstEmission = 0, endOfPattern = 0, maxLive = 0, maxBatch = 0, curved = false, accelerated = false;
+        let safe = true, finite = true, boundedEnvelope = true;
+        const start = sim.state.elapsed;
+        for (let frame = 0; frame <= hz * 8; frame++) clock.advance(frame * 1000 / hz, dt => {
+          const events = sim.step(idle(), dt);
+          const burst = events.filter(event => event.type === 'enemyShot' && event.enemyType === 'boss').length;
+          if (burst && !firstEmission) firstEmission = sim.state.elapsed;
+          if (boss.state === 'recover' && !endOfPattern) endOfPattern = sim.state.elapsed;
+          if (endOfPattern) { boss.timer = 1000; boss.laserCooldown = 1000; }
+          const bullets = sim.state.bullets.filter(bullet => bullet.owner === 'enemy' && bullet.shape);
+          maxBatch = Math.max(maxBatch, bullets.filter(bullet => !ids.has(bullet.id)).length);
+          maxLive = Math.max(maxLive, bullets.length);
+          for (const bullet of bullets) {
+            ids.add(bullet.id); shapes.add(bullet.shape!);
+            const angle = Math.atan2(bullet.vy, bullet.vx);
+            if (!launches.has(bullet.id)) launches.set(bullet.id, { angle, speed: bullet.speed });
+            const initial = launches.get(bullet.id)!;
+            curved ||= Math.abs(angleDelta(initial.angle, angle)) > 0.1;
+            accelerated ||= bullet.speed > initial.speed + 15;
+            finite &&= [bullet.x, bullet.y, bullet.vx, bullet.vy, bullet.speed, bullet.motionAge].every(Number.isFinite);
+            // Check the swept circle along every real update, including the finite post-launch turn.
+            safe &&= safePoints.every(point => segmentCircleHit(bullet.prevX, bullet.prevY, bullet.x, bullet.y,
+              point.x, point.y, sim.state.player.radius + bullet.radius + 8) === null);
+            if (skill === 'volley') boundedEnvelope &&= Math.abs(angleDelta(envelope.angle, Math.atan2(bullet.y - 2000, bullet.x - 2000))) <= envelope.width / 2 + 1e-8;
+          }
+        });
+        expect(firstEmission - start).toBeGreaterThanOrEqual(0.8);
+        expect(endOfPattern - firstEmission).toBeGreaterThanOrEqual(4);
+        expect(endOfPattern - firstEmission).toBeLessThan(7);
+        expect(ids.size).toBeGreaterThan(100); expect(ids.size).toBeLessThan(1000);
+        expect(maxLive).toBeGreaterThan(100); expect(maxLive).toBeLessThan(1000); expect(maxBatch).toBeLessThanOrEqual(90);
+        expect(shapes.size).toBeGreaterThanOrEqual(2); expect(safe).toBe(true); expect(finite).toBe(true); expect(boundedEnvelope).toBe(true);
+        if (skill !== 'bombard') { expect(curved).toBe(true); expect(accelerated).toBe(true); }
+        expect(sim.state.player.hp).toBe(5);
+        return { firstEmission, endOfPattern, maxLive, maxBatch, count: ids.size, shapes: [...shapes],
+          bullets: sim.state.bullets.filter(b => b.shape).map(b => [b.id, b.x, b.y, b.vx, b.vy, b.speed, b.motionAge]) };
+      });
+      for (const result of results.slice(1)) expect(result).toEqual(results[0]);
+    });
+  }
+
+  for (const difficulty of ['normal', 'hard'] as const) for (const skill of ['volley', 'nova', 'bombard'] as const) for (const distance of [350, 700]) {
+    it(`${difficulty} ${skill} leaves a normal-speed escape after 0.2s reaction from radius ${distance}, with the full player hitbox`, () => {
+      const { sim, boss, lane } = setup(difficulty, 3, skill, distance), player = sim.state.player;
+      // Bombard still requires leaving its separately marked ground circles while taking the ring opening.
+      const escapeRadius = skill === 'bombard' ? Math.max(500, distance) : distance;
+      const target = { x: boss.x + Math.cos(lane.angle) * escapeRadius, y: boss.y + Math.sin(lane.angle) * escapeRadius };
+      player.invincible = 0;
+      let damage = 0, ended = false;
+      for (let tick = 0; tick < 480; tick++) {
+        const input = idle(), dx = target.x - player.x, dy = target.y - player.y;
+        if (tick >= 12 && Math.hypot(dx, dy) > BALANCE.player.speed * STEP) { input.moveX = dx; input.moveY = dy; }
+        damage += sim.step(input).filter(event => event.type === 'damage').length;
+        ended ||= boss.state === 'recover';
+        if (ended) boss.timer = 1000;
+      }
+      expect(ended).toBe(true); expect(Math.hypot(player.x - target.x, player.y - target.y)).toBeLessThanOrEqual(5);
+      expect(damage).toBe(0); expect(player.hp).toBe(5); expect(player.invincible).toBe(0);
+      expect(player.bombs).toBe(BALANCE.player.bombs); expect(player.dashCooldown).toBe(0);
+    });
+  }
+
+  it.each(['normal', 'hard'] as const)('%s commits different escape lanes and never uses later player motion to alter any layer', difficulty => {
+    const offsets: number[] = [];
+    for (const skill of ['volley', 'nova', 'bombard'] as const) {
+      const a = setup(difficulty, 3, skill), b = setup(difficulty, 3, skill);
+      offsets.push(angleDelta(a.boss.boss!.lockedAngle, a.lane.angle));
+      const shotsA: CombatEvent[] = [], shotsB: CombatEvent[] = [];
+      const birthsA: number[][] = [], birthsB: number[][] = [], seenA = new Set<number>(), seenB = new Set<number>();
+      const capture = (sim: GameSimulation, seen: Set<number>, births: number[][]) => {
+        for (const bullet of sim.state.bullets) if (bullet.shape && !seen.has(bullet.id)) {
+          seen.add(bullet.id); births.push([sim.state.tick, bullet.id, bullet.x, bullet.y, bullet.vx, bullet.vy, bullet.speed, bullet.turnRate ?? 0]);
+        }
+      };
+      for (let tick = 0; tick < 430 && a.boss.state !== 'recover'; tick++) {
+        b.sim.state.player.x = 2000 + Math.cos(tick * 0.05) * 600;
+        b.sim.state.player.y = 2000 + Math.sin(tick * 0.05) * 600;
+        shotsA.push(...a.sim.step(idle()).filter(e => e.type === 'enemyShot' && e.enemyType === 'boss'));
+        shotsB.push(...b.sim.step(idle()).filter(e => e.type === 'enemyShot' && e.enemyType === 'boss'));
+        capture(a.sim, seenA, birthsA); capture(b.sim, seenB, birthsB);
+        if (a.boss.boss!.skill !== 'idle') expect(bossPatternLanes(b.boss, difficulty)).toEqual([b.lane]);
+      }
+      expect(shotsA.length).toBeGreaterThanOrEqual(6); expect(shotsB).toEqual(shotsA);
+      expect(birthsA.length).toBeGreaterThan(200); expect(birthsB).toEqual(birthsA);
+      expect(a.boss.state).toBe('recover'); expect(b.boss.state).toBe('recover');
+    }
+    expect(new Set(offsets).size).toBe(3);
+    expect(offsets.every(offset => Math.abs(offset) >= 0.35)).toBe(true);
   });
 });

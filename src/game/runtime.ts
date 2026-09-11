@@ -226,6 +226,7 @@ export class GameRuntime implements RuntimeControls {
       phase: this.phase, loading: this.progress, error: this.error, mode: state.mode,
       score: state.score, bestScore: this.bestScores[state.difficulty], difficulty: state.difficulty, wave: state.wave, waveProgress: state.waveTime / BALANCE.spawn.waveDuration,
       minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? miniBossAction(miniboss.state) : '',
+      waveBlocked: this.simulation.isWaveBlocked(),
       elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, bombs: player.bombs,
       level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level), ammo: player.ammo, maxAmmo: BALANCE.ammo.max,
       heat: player.heat, overheated: player.overheated, dashCooldown: player.dashCooldown, perfectWindow: player.perfectWindow,
@@ -321,16 +322,16 @@ function bossAction(state: string, skill?: string): string {
   if (state === 'phaseShift') return '阶段转换 · 准备下一轮';
   if (state === 'recover' || state === 'chase') return '攻击间隙 · 可以反击';
   if (skill === 'laser') return state === 'laserWarmup' ? '扫射方向已锁定 · 离开紫色扇区' : '激光扫射 · 留在扇区外';
-  if (skill === 'nova') return '环弹 · 薄荷色扇区是弹幕缺口';
-  if (skill === 'bombard') return '地面连爆 · 离开标记圆圈';
-  if (skill === 'volley') return '锁定扇射 · 向两侧移动';
+  if (skill === 'nova') return '旋花弹幕 · 沿薄荷色缺口换位';
+  if (skill === 'bombard') return '连爆星环 · 避开圆圈与扩散弹幕';
+  if (skill === 'volley') return '双翼扇幕 · 移向标出的侧向缺口';
   return '观察预告 · 保持走位';
 }
 function miniBossAction(state: string): string {
-  if (state === 'charge') return '突进锁向 · 横向避开';
-  if (state === 'dash') return '高速突进';
+  if (state === 'charge') return '连续突进锁向 · 横向避开';
+  if (state === 'dash') return '追猎突进 · 留意落点弹幕';
   if (state === 'laserWarmup') return '激光锁定 · 离开橙色走廊';
-  if (state === 'laser') return '远程激光';
+  if (state === 'laser') return '连锁激光 · 继续换位';
   if (state === 'phaseShift') return '回声加速 · 准备连招';
   if (state === 'recover') return '出招间隙 · 集火反击';
   return '游猎回声 · 注意侧翼';

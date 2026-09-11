@@ -283,6 +283,7 @@ kbd {
 .difficulty-options button:last-child[aria-pressed="true"] { background: #d9896626; color: #ffc29d; }
 .difficulty-note { margin: 0; color: #e4b49d; font-size: 12px; line-height: 1.5; }
 .miniboss-hud .boss-label, .miniboss-hud .boss-action { color: #ffd1ae; }
+.wave-blocked { position: absolute; top: 8.3em; left: 3em; margin: 0; font-size: max(10px, .7em); color: #ffcb9d; letter-spacing: .03em; }
 .menu-settings,
 .menu-version {
   display: block;

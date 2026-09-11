@@ -17,6 +17,12 @@ export interface BossBrain {
 }
 export interface MiniBossBrain {
   phase: 1 | 2; cycle: number; lockedAngle: number; targetX: number; targetY: number; dashesLeft: number;
+  combo: 'pursuit' | 'crossfire'; lasersLeft: number; laserIndex: number; chainIndex: number; burstAngle: number;
+}
+export type EnemyBulletShape = 'rice' | 'orb' | 'kunai';
+export interface EnemyShotOptions {
+  shape?: EnemyBulletShape; turnRate?: number; turnDelay?: number; turnDuration?: number;
+  acceleration?: number; maxSpeed?: number;
 }
 export interface EnemyTactics { shotsLeft: number; shotTimer: number; sweepStart: number; sweepIndex: number; locked: boolean }
 export interface AreaHazard extends Vec2 {
@@ -36,6 +42,8 @@ export interface Bullet extends MovingBody {
   id: number; owner: 'player' | 'enemy'; damage: number; life: number; color: number;
   homing: boolean; speed: number; lockRange: number; targetId: number | null; remainingHits: number;
   hitIds: Set<number>; kind: 'normal' | 'perfect' | 'special' | 'burst' | 'drone';
+  shape?: EnemyBulletShape; motionAge?: number; turnRate?: number; turnDelay?: number; turnDuration?: number;
+  acceleration?: number; maxSpeed?: number;
 }
 export interface Companion extends MovingBody { id: number; angle: number; shotCooldown: number; targetId: number | null }
 export interface PlayerBeam extends Vec2 { id: number; angle: number; length: number; width: number; life: number; duration: number }
@@ -45,7 +53,7 @@ export interface WorldState {
   status: 'playing' | 'failed' | 'complete'; mode: 'story' | 'endless'; difficulty: Difficulty; elapsed: number; tick: number;
   score: number; kills: number; wave: number; waveTime: number; spawnTimer: number;
   bossStage: boolean; bossPending: boolean; pendingWave: number; blackHoleTime: number;
-  minibossSpawned: boolean;
+  minibossSpawned: boolean; minibossDefeated: boolean;
   player: Player; camera: { x: number; y: number; prevX: number; prevY: number };
   enemies: Enemy[]; bullets: Bullet[]; pickups: Pickup[]; indicators: SpawnIndicator[];
   companions: Companion[]; beams: PlayerBeam[]; hazards: AreaHazard[];
@@ -64,7 +72,7 @@ export interface HudSnapshot {
   bombs: number; level: number; xp: number; xpNeeded: number; ammo: number; maxAmmo: number; heat: number;
   overheated: boolean; dashCooldown: number; perfectWindow: number; bossHp: number; bossMaxHp: number;
   bossStage: boolean; bossPhase: number; bossAction: string; focus: boolean; companions: number; comms: CommsMessage | null; announcement: string; settings: GameSettings; stats: PerformanceStats;
-  difficulty: Difficulty; minibossHp: number; minibossMaxHp: number; minibossAction: string;
+  difficulty: Difficulty; minibossHp: number; minibossMaxHp: number; minibossAction: string; waveBlocked: boolean;
 }
 export interface RuntimeControls {
   start(): void; pause(): void; resume(): void; restart(): void; continueEndless(): void; returnToMenu(): void;
