@@ -1,0 +1,97 @@
+{
+  "version": "4.0.0",
+  "sha": "4eb8d9047b52bb4a62cd7a8f1d59891e4f596c6a",
+  "url": "https://mafuyu-sekai.vercel.app",
+  "checkedAt": "2026-09-12T07:08:23.029Z",
+  "fixture": "Fresh browser profile. Stage timers accelerated with debug.advanceStage; ECHO and all six cards individually defeated through the real damage/completion path. This validates deployment, persistence and menus, not human play balance.",
+  "errors": [],
+  "cards": [
+    {
+      "name": "零响针雨",
+      "hp": 700,
+      "card": 0
+    },
+    {
+      "name": "交错织幕",
+      "hp": 747,
+      "card": 1
+    },
+    {
+      "name": "逆相花庭",
+      "hp": 797,
+      "card": 2
+    },
+    {
+      "name": "镜面折光",
+      "hp": 847,
+      "card": 3
+    },
+    {
+      "name": "无声刻印",
+      "hp": 897,
+      "card": 4
+    },
+    {
+      "name": "空白终曲",
+      "hp": 1000,
+      "card": 5
+    }
+  ],
+  "saved": {
+    "version": 1,
+    "revision": 1,
+    "clears": {
+      "s1:3580fd10-9080-4af7-abe1-e05fbe260bc5": {
+        "runId": "3580fd10-9080-4af7-abe1-e05fbe260bc5",
+        "season": "s1",
+        "difficulty": "normal",
+        "encounterId": "s1:mafuyu",
+        "score": 62000,
+        "source": "gameplay",
+        "completedAt": 1789196917295,
+        "carryover": {
+          "level": 3,
+          "xp": 40,
+          "companions": 3
+        }
+      }
+    },
+    "carryover": {
+      "level": 3,
+      "xp": 40,
+      "companions": 3
+    },
+    "bestScores": {
+      "s1": {
+        "normal": 62000,
+        "hard": 0
+      },
+      "s2": {
+        "normal": 0,
+        "hard": 0
+      }
+    }
+  },
+  "entry": {
+    "season": "s2",
+    "difficulty": "hard",
+    "level": 3,
+    "xp": 40,
+    "companions": 3,
+    "bombs": 3,
+    "phase": "upgrade",
+    "choices": 3,
+    "raf": false
+  },
+  "movement": {
+    "from": {
+      "x": 2000,
+      "y": 2000
+    },
+    "to": {
+      "x": 2055,
+      "y": 2000
+    }
+  },
+  "result": "passed"
+}
