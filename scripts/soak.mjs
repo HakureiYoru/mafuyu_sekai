@@ -5,6 +5,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const seconds = Number(process.env.MAFUYU_SOAK_SECONDS ?? 1800);
 const difficulty = process.env.MAFUYU_SOAK_DIFFICULTY ?? 'normal';
+const season = process.env.MAFUYU_SOAK_SEASON ?? 's2';
+if (!['s1', 's2'].includes(season)) throw new Error('MAFUYU_SOAK_SEASON must be s1 or s2.');
 if (!['normal', 'hard'].includes(difficulty)) throw new Error('MAFUYU_SOAK_DIFFICULTY must be normal or hard.');
 if (!Number.isFinite(seconds) || seconds < 5 || seconds > 1800) throw new Error('MAFUYU_SOAK_SECONDS must be between 5 and 1800 seconds.');
 const url = 'http://127.0.0.1:5183';
@@ -13,8 +15,8 @@ const args = process.platform === 'win32' ? ['--use-angle=d3d11'] : [];
 const limits = { enemies: 180, mines: 70, hazards: 12, bullets: 4096, particles: 900, textures: 64, voices: 24, pickups: 20000, usedHeapBytes: 512 * 1024 * 1024 };
 const report = {
   version: JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version,
-  measuredAt: new Date().toISOString(), status: 'running', requestedWallSeconds: seconds, difficulty,
-  scenario: 'Production preview; 1920×1080; medium quality; three support craft seeded through the real pickup path; real-time endless combat driven by DOM keyboard/pointer input every 100 ms. No extra simulation steps or clock acceleration.',
+  measuredAt: new Date().toISOString(), status: 'running', requestedWallSeconds: seconds, difficulty, season,
+  scenario: 'Production preview; 1920×1080; medium quality; second-season endless practice with Lv8, three support craft and seven modules; real-time combat driven by DOM keyboard/pointer input every 100 ms. No extra simulation steps or clock acceleration. Practice never grants a persistent clear.',
   caveat: 'The player is invincible for this unattended stability run. Automated aim and movement do not validate human difficulty, fairness, or the 6–10 minute story balance.',
   launch: { channel: 'chromium', headless: true, args }, limits,
   measurement: { resourceIntervalSeconds: 30, progressIntervalSeconds: 60, forcedGcIntervalSeconds: 300,
@@ -52,7 +54,7 @@ async function sample(wallSeconds, forceGc = false) {
       const debug = window.__MAFUYU_DEBUG__, state = debug.state(), snapshot = debug.snapshot();
       const bodies = [state.player, ...state.enemies, ...state.bullets, ...state.pickups, ...state.companions, ...state.beams, ...state.hazards];
       return { elapsed: state.elapsed, tick: state.tick, wave: state.wave, kills: state.kills, score: state.score,
-        phase: snapshot.phase, status: state.status, mode: state.mode, difficulty: state.difficulty, lifecycle: debug.lifecycle(),
+        phase: snapshot.phase, status: state.status, mode: state.mode, season: state.seasonId, modules: state.build.modules, difficulty: state.difficulty, lifecycle: debug.lifecycle(),
         canvasCount: document.querySelectorAll('#game-host canvas').length,
         enemies: state.enemies.length, mines: state.enemies.filter(enemy => enemy.type === 'mine').length,
         hazards: state.hazards.length, bullets: state.bullets.length, pickups: state.pickups.length, indicators: state.indicators.length,
@@ -81,9 +83,10 @@ async function sample(wallSeconds, forceGc = false) {
   report.samples.push(row);
   check(game.phase === 'playing' && game.status === 'playing' && game.mode === 'endless', `Unexpected game phase/status at ${wallSeconds.toFixed(1)}s: ${game.phase}/${game.status}/${game.mode}`);
   check(game.difficulty === difficulty, 'Difficulty changed during the stability run.');
+  check(game.season === season, 'Season changed during the stability run.');
   check(game.lifecycle.rafActive && game.canvasCount === 1, `Expected one active game RAF and one canvas at ${wallSeconds.toFixed(1)}s.`);
   check(game.finite, `Non-finite game state at ${wallSeconds.toFixed(1)}s.`);
-  check(game.companions === 3 && game.beams <= 1, `Support craft or beam count invalid at ${wallSeconds.toFixed(1)}s.`);
+  check(game.companions === 3 && game.beams <= 3, `Support craft or beam count invalid at ${wallSeconds.toFixed(1)}s.`);
   for (const key of ['enemies', 'mines', 'hazards', 'bullets', 'pickups']) check(game[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   for (const key of ['particles', 'textures', 'voices']) check(game.stats[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   if (typeof heap.usedSize === 'number') check(heap.usedSize <= limits.usedHeapBytes, 'Observed JS heap exceeded 512 MiB.');
@@ -109,13 +112,13 @@ try {
   await resource('Performance.enable');
   await page.goto(`${url}/?debug=1`);
   await page.getByRole('button', { name: '开始游戏' }).waitFor();
-  await page.evaluate(difficulty => { window.__MAFUYU_DEBUG__.difficulty(difficulty); window.__MAFUYU_DEBUG__.scenario('complete'); }, difficulty);
-  await page.getByRole('button', { name: /继续.*无尽|无尽.*继续|进入无尽/ }).click();
-  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'playing' && window.__MAFUYU_DEBUG__.state().mode === 'endless');
-  await page.evaluate(() => {
+  await page.evaluate(({ difficulty, season }) => {
+    window.__MAFUYU_DEBUG__.difficulty(difficulty);
+    window.__MAFUYU_DEBUG__.practice({ season, mode: 'endless', modules: ['prism', 'shatter', 'chain', 'droneHoming', 'droneBurst', 'doubleDash', 'intercept'] });
     const state = window.__MAFUYU_DEBUG__.state();
-    state.pickups.push({ id: 900001, type: 'support', value: 3, x: state.player.x, y: state.player.y, age: 0 });
-  });
+    if (!state.companions.length) state.pickups.push({ id: 900001, type: 'support', value: 3, x: state.player.x, y: state.player.y, age: 0 });
+  }, { difficulty, season });
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'playing' && window.__MAFUYU_DEBUG__.state().mode === 'endless');
   await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().companions.length === 3);
   await page.evaluate(() => {
     const debug = window.__MAFUYU_DEBUG__, canvas = document.querySelector('#game-host canvas');
@@ -206,7 +209,7 @@ try {
   report.retainedHeapSamples = retained.map(row => ({ wallSeconds: row.wallSeconds, usedBytes: row.heap.usedSize, gcDurationMs: row.gc.durationMs }));
   if (retained.length >= 2) check(retained.at(-1).heap.usedSize <= retained[0].heap.usedSize * 3 + 64 * 1048576, 'Retained JS heap exceeded three times baseline plus 64 MiB after GC.');
   await page.screenshot({ path: `${output}/soak-end.png` });
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.start({ season: 's1' }));
   await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().tick >= 5);
   const restart = await page.evaluate(() => ({ lifecycle: window.__MAFUYU_DEBUG__.lifecycle(), mode: window.__MAFUYU_DEBUG__.state().mode, wave: window.__MAFUYU_DEBUG__.state().wave, companions: window.__MAFUYU_DEBUG__.state().companions.length, beams: window.__MAFUYU_DEBUG__.state().beams.length, hazards: window.__MAFUYU_DEBUG__.state().hazards.length, canvases: document.querySelectorAll('#game-host canvas').length }));
   check(restart.lifecycle.rafActive && restart.lifecycle.phase === 'playing' && restart.mode === 'story' && restart.wave === 1 && restart.canvases === 1, 'Restart did not recover one active story game.');

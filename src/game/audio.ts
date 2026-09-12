@@ -112,8 +112,9 @@ export class GameAudio {
       else if (event.type === 'damage') this.sound('damage', 0.8, 5, 0.1);
       else if (event.type === 'pickup') this.sound('pickup', 0.4, 1, 0.12);
       else if (event.type === 'levelup' || event.type === 'complete') this.sound('levelup', 0.65, 4, 0.1);
-      else if (event.type === 'boss') this.sound('warning', 0.7, 5, 0.2);
-      else if (event.type === 'attack' && event.enemyType === 'miniboss' && event.text !== 'release') this.sound('warning', event.text === 'laser' ? 0.6 : 0.35, 4, 0.35);
+      else if (event.type === 'boss' || event.type === 'card') this.sound('warning', 0.7, 5, 0.2);
+      else if (event.type === 'attack' && ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '') && event.text !== 'release') this.sound('warning', event.text === 'laser' ? 0.6 : 0.35, 4, 0.35);
+      else if (event.type === 'attack' && ['weaver', 'sampler', 'core'].includes(event.enemyType ?? '') && event.text === 'windup') this.sound('warning', 0.25, 3, 0.55);
       else if (event.type === 'attack' && event.enemyType === 'boss') {
         if (event.text === 'impact') this.sound('bomb', 0.45, 4, 0.2);
         else this.sound('warning', event.text === 'laser' ? 0.8 : 0.5, 5, 0.35);

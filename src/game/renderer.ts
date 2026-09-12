@@ -1,9 +1,11 @@
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem } from './effects';
-import { bossAttacks, bossPatternLanes, bossVolleyArc } from './boss-ai';
 import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
+import { season2Telegraph } from './season2-ai';
+import { spellCardDefinition, spellReturnPreview, spellTelegraphs } from './spellcards';
+import type { SpellReturnPath } from './spellcards';
 import { beamGeometry, clamp, lerp, TAU } from './math';
 import type { CombatEvent, Enemy, EnemyBulletShape, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
 
@@ -19,6 +21,9 @@ interface BulletVisual { effect: Sprite; core: Sprite }
 interface CompanionVisual { root: Container; glow: Sprite; ship: Sprite; barrel: Sprite }
 interface Atlas { glow: Texture; spark: Texture; ring: Texture; bolt: Texture; hostile: Texture; hostileCore: Texture; player: Texture; mine: Texture; diamond: Texture; cross: Texture; pickupPlate: Texture; caution: Texture; badges: Record<EnemyType, Texture>; danmaku: Record<EnemyBulletShape, Texture> }
 const WHITE = 0xf5f2ff;
+const BADGE_TYPES: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss',
+  'shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier', 'palisade', 'reprise', 'arm', 'node', 'core'];
+const badgeCell = (index: number) => ({ x: index % 8 * 128, y: index < 8 ? 128 : 384 + Math.floor((index - 8) / 8) * 128 });
 const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, ammo: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
 const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '生命恢复', ammo: '弹药补充', coolant: '冷却胶囊', bomb: '炸弹 +1', miniBomb: '范围爆破', blackHole: '引力黑洞', support: '支援子机' };
 
@@ -31,8 +36,50 @@ function canvasTexture(width: number, height: number, paint: (context: CanvasRen
   return Texture.from(canvas);
 }
 
+function drawMachineBadge(ctx: CanvasRenderingContext2D, type: EnemyType): void {
+  ctx.fillStyle = '#15131f'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  const box = (x: number, y: number, width: number, height: number) => { ctx.beginPath(); ctx.roundRect(x, y, width, height, 4); ctx.fill(); ctx.stroke(); };
+  const polygon = (sides: number, radius: number, offset = -Math.PI / 2) => {
+    ctx.beginPath();
+    for (let i = 0; i <= sides; i++) { const angle = offset + i * TAU / sides; if (i === 0) ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius); else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius); }
+    ctx.fill(); ctx.stroke();
+  };
+  if (type === 'shield') {
+    ctx.beginPath(); ctx.moveTo(34, -46); ctx.lineTo(54, -28); ctx.lineTo(59, 0); ctx.lineTo(54, 28); ctx.lineTo(34, 46); ctx.lineTo(30, 26); ctx.lineTo(38, 0); ctx.lineTo(30, -26); ctx.closePath(); ctx.fill(); ctx.stroke();
+    box(-54, -20, 12, 40);
+  } else if (type === 'weaver') {
+    for (const side of [-1, 1]) { box(side * 46 - 7, -46, 14, 92); for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(side * 40, i * 18); ctx.lineTo(side * 28, i * 18); ctx.stroke(); } }
+    box(-23, -54, 46, 10); box(-23, 44, 46, 10);
+  } else if (type === 'returner') {
+    for (const side of [-1, 1]) { ctx.save(); ctx.rotate(side < 0 ? Math.PI : 0); ctx.beginPath(); ctx.moveTo(8, -51); ctx.lineTo(44, -38); ctx.lineTo(59, -3); ctx.lineTo(33, -18); ctx.lineTo(20, -32); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  } else if (type === 'sampler') {
+    for (const angle of [-Math.PI / 2, Math.PI / 6, Math.PI * 5 / 6]) { const x = Math.cos(angle) * 47, y = Math.sin(angle) * 47; box(x - 11, y - 11, 22, 22); ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6); ctx.stroke(); }
+  } else if (type === 'repairer') {
+    for (const side of [-1, 1]) { box(side * 47 - 9, -29, 18, 58); ctx.beginPath(); ctx.moveTo(side * 44, -38); ctx.lineTo(side * 30, -49); ctx.lineTo(side * 19, -49); ctx.stroke(); }
+    box(-15, 40, 30, 18); ctx.beginPath(); ctx.moveTo(0, 42); ctx.lineTo(0, 56); ctx.moveTo(-7, 49); ctx.lineTo(7, 49); ctx.stroke();
+  } else if (type === 'carrier') {
+    polygon(6, 56); ctx.lineWidth = 5;
+    for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * TAU / 3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 38, Math.sin(a) * 38); ctx.lineTo(Math.cos(a + 0.1) * 49, Math.sin(a + 0.1) * 49); ctx.lineTo(Math.cos(a) * 59, Math.sin(a) * 59); ctx.stroke(); }
+  } else if (type === 'palisade') {
+    for (const side of [-1, 1]) { box(side * 46 - 12, -52, 24, 104); box(side * 26 - 10, -40, 20, 12); box(side * 26 - 10, 28, 20, 12); }
+    box(-25, -58, 50, 13); box(-25, 45, 50, 13);
+  } else if (type === 'reprise') {
+    for (const side of [-1, 1]) { ctx.save(); ctx.rotate(side < 0 ? Math.PI : 0); ctx.beginPath(); ctx.arc(0, 0, 53, -1.9, 0.45); ctx.lineTo(39, 17); ctx.moveTo(49, 22); ctx.lineTo(55, 7); ctx.stroke(); ctx.restore(); }
+    ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.arc(0, 0, 42, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+  } else if (type === 'arm') {
+    box(-36, -24, 60, 48); box(5, -15, 51, 30); box(42, -20, 16, 40);
+    ctx.fillStyle = '#fff'; ctx.fillRect(-24, -10, 16, 20); ctx.fillRect(48, -10, 5, 20);
+  } else if (type === 'node') {
+    polygon(6, 45, 0); ctx.lineWidth = 2; polygon(3, 25, 0);
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 45, Math.sin(a) * 45); ctx.lineTo(Math.cos(a) * 60, Math.sin(a) * 60); ctx.stroke(); }
+  } else if (type === 'core') {
+    polygon(3, 51); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+    for (let i = 0; i < 3; i++) { const a = i * TAU / 3 - Math.PI / 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26); ctx.lineTo(Math.cos(a) * 58, Math.sin(a) * 58); ctx.stroke(); }
+  }
+}
+
 function makeAtlas(): { atlas: Atlas; texture: Texture } {
-  const texture = canvasTexture(2048, 768, context => {
+  const texture = canvasTexture(2048, 1280, context => {
     context.scale(2, 2);
     const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 62);
     gradient.addColorStop(0, 'rgba(255,255,255,.85)'); gradient.addColorStop(0.2, 'rgba(255,255,255,.55)');
@@ -65,9 +112,10 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     context.fillStyle = '#fff'; context.fillRect(764, 43, 8, 25); context.beginPath(); context.arc(768, 78, 4, 0, TAU); context.fill();
     context.beginPath(); context.moveTo(864, 13); context.lineTo(883, 32); context.lineTo(864, 51); context.lineTo(845, 32); context.closePath(); context.fill();
     context.lineWidth = 3; context.beginPath(); context.moveTo(928, 17); context.lineTo(928, 47); context.moveTo(913, 32); context.lineTo(943, 32); context.stroke();
-    const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'];
-    types.forEach((type, index) => {
-      context.save(); context.translate(index * 128 + 64, 192);
+    BADGE_TYPES.forEach((type, index) => {
+      const cell = badgeCell(index);
+      context.save(); context.translate(cell.x + 64, cell.y + 64);
+      if (index >= 8) { drawMachineBadge(context, type); context.restore(); return; }
       context.strokeStyle = '#fff'; context.lineWidth = type === 'boss' ? 1 : 2;
       const sides = type === 'dasher' ? 3 : type === 'sniper' ? 4 : type === 'minelayer' ? 4 : type === 'sprayer' ? 6 : type === 'boss' ? 8 : type === 'miniboss' ? 5 : 0;
       if (sides) {
@@ -129,12 +177,11 @@ function makeAtlas(): { atlas: Atlas; texture: Texture } {
     }
   });
   const frame = (x: number, y: number, width: number, height: number) => new Texture({ source: texture.source, frame: new Rectangle(x * 2, y * 2, width * 2, height * 2) });
-  const types: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'];
   return { texture, atlas: {
     glow: frame(0, 0, 128, 128), spark: frame(128, 0, 128, 64), ring: frame(256, 0, 128, 128),
     bolt: frame(384, 0, 128, 64), hostile: frame(512, 0, 64, 64), player: frame(576, 0, 128, 128),
     mine: frame(704, 0, 128, 128), diamond: frame(832, 0, 64, 64), cross: frame(896, 0, 64, 64),
-    badges: Object.fromEntries(types.map((type, index) => [type, frame(index * 128, 128, 128, 128)])) as Record<EnemyType, Texture>,
+    badges: Object.fromEntries(BADGE_TYPES.map((type, index) => { const cell = badgeCell(index); return [type, frame(cell.x, cell.y, 128, 128)]; })) as Record<EnemyType, Texture>,
     hostileCore: frame(0, 256, 128, 64), pickupPlate: frame(128, 256, 96, 96), caution: frame(272, 256, 96, 96),
     danmaku: { rice: frame(384, 256, 96, 96), orb: frame(480, 256, 96, 96), kunai: frame(576, 256, 96, 96) },
   } };
@@ -152,6 +199,8 @@ export class GameRenderer {
   private readonly scene = new Container();
   private readonly world = new Container();
   private readonly backdrop = new Container();
+  private readonly arenaMarks = new Graphics();
+  private readonly machineLinks = new Graphics();
   private readonly warnings = new Graphics();
   private readonly playerBeams = new Graphics();
   private readonly mineHazards = new Container();
@@ -240,7 +289,7 @@ export class GameRenderer {
     this.app.stage.addChild(this.scene);
     this.scene.addChild(this.world, this.ambient, this.edgeFeedback, this.overlay);
     // Warnings stay above enemy art. Hostile projectiles and the player stay above every beam.
-    this.world.addChild(this.backdrop, this.pickupLayer, this.effects.particles, this.enemyLayer,
+    this.world.addChild(this.backdrop, this.arenaMarks, this.pickupLayer, this.effects.particles, this.machineLinks, this.enemyLayer,
       this.playerBeams, this.mineHazards, this.warnings, this.companionLayer, this.bulletLayer,
       this.bulletCoreLayer, this.playerLayer, this.playerMarks, this.effects.labels, this.pickupHintLayer);
     this.pickupHint = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 17,
@@ -355,6 +404,8 @@ export class GameRenderer {
     this.world.position.set(VIEW.width / 2 - this.cameraX + Math.sin(this.clock * 83) * shake,
       VIEW.height / 2 - this.cameraY + Math.cos(this.clock * 107) * shake * 0.7);
     this.renderWarnings(state, alpha);
+    this.renderArena(state);
+    this.renderMachines(state, alpha);
     this.renderPickups(state);
     this.renderEnemies(state, alpha);
     this.renderPlayerBeams(state);
@@ -368,6 +419,34 @@ export class GameRenderer {
 
   private visible(x: number, y: number, margin = 130) {
     return Math.abs(x - this.cameraX) < VIEW.width / 2 + margin && Math.abs(y - this.cameraY) < VIEW.height / 2 + margin;
+  }
+
+  private renderArena(state: WorldState) {
+    const graph = this.arenaMarks.clear(), arena = state.arena;
+    if (!arena) return;
+    const color = state.seasonId === 's2' ? 0xb8a9da : 0x948bc1;
+    graph.rect(arena.x, arena.y, arena.width, arena.height).fill({ color: 0x191326, alpha: 0.15 }).stroke({ color, width: 4, alpha: 0.75 });
+    graph.rect(arena.x + 14, arena.y + 14, arena.width - 28, arena.height - 28).stroke({ color, width: 1, alpha: 0.22 });
+    for (const sideX of [0, 1]) for (const sideY of [0, 1]) {
+      const x = arena.x + (sideX ? arena.width - 24 : 24), y = arena.y + (sideY ? arena.height - 24 : 24);
+      const dx = sideX ? -1 : 1, dy = sideY ? -1 : 1;
+      graph.moveTo(x + dx * 50, y).lineTo(x, y).lineTo(x, y + dy * 50).stroke({ color: 0xe8dced, width: 3, alpha: 0.65 });
+    }
+  }
+
+  private renderMachines(state: WorldState, alpha: number) {
+    const graph = this.machineLinks.clear();
+    for (const part of state.enemies) {
+      if ((part.type !== 'arm' && part.type !== 'node') || part.hp <= 0) continue;
+      const parent = state.enemies.find(enemy => enemy.id === part.parentId && enemy.hp > 0);
+      if (!parent) continue;
+      const x = lerp(part.prevX, part.x, alpha), y = lerp(part.prevY, part.y, alpha);
+      const px = lerp(parent.prevX, parent.x, alpha), py = lerp(parent.prevY, parent.y, alpha);
+      const disabled = (part.disabledUntil ?? 0) > state.elapsed;
+      graph.moveTo(px, py).lineTo(x, y).stroke({ color: 0x0c101d, width: 8, alpha: 0.85 });
+      graph.moveTo(px, py).lineTo(x, y).stroke({ color: disabled ? 0x626474 : 0xa895bc, width: 2, alpha: disabled ? 0.2 : 0.45 });
+      graph.circle(x, y, part.radius + 5).stroke({ color: disabled ? 0x777786 : ENEMIES[part.type].color, width: 2, alpha: disabled ? 0.25 : 0.65 });
+    }
   }
 
   private createEnemy(): EnemyVisual {
@@ -397,18 +476,21 @@ export class GameRenderer {
       visual.root.position.set(x, y);
       const color = ENEMIES[enemy.type].color;
       const isMine = enemy.type === 'mine';
+      const part = enemy.type === 'arm' || enemy.type === 'node' || enemy.type === 'core';
+      const machine = !!enemy.season2 && !part;
+      const disabled = (enemy.disabledUntil ?? 0) > state.elapsed;
       const hit = clamp(enemy.hitTime / 0.12, 0, 1);
-      const artSize = enemy.radius * (isMine ? 1.8 : enemy.type === 'boss' ? 2.3 : 2.35);
+      const artSize = enemy.radius * (part ? 3 : isMine ? 1.8 : machine ? 1.95 : enemy.type === 'boss' ? 2.3 : 2.35);
       const motion = this.settings.reducedMotion ? 0 : clamp(enemy.vx / 150, -1, 1) * 0.07 + Math.sin(state.elapsed * 2 + enemy.id) * 0.022;
-      visual.art.texture = isMine ? this.supportAssets.mine : this.assets.enemy;
-      visual.art.tint = 0xffffff;
-      visual.art.alpha = isMine && enemy.state === 'arming' ? 0.55 : 1;
+      visual.art.texture = isMine ? this.supportAssets.mine : part ? this.atlas.badges[enemy.type] : this.assets.enemy;
+      visual.art.tint = part ? disabled ? 0x757782 : color : 0xffffff;
+      visual.art.alpha = disabled ? 0.45 : isMine && enemy.state === 'arming' ? 0.55 : 1;
       visual.art.width = artSize * (1 + hit * 0.08); visual.art.height = artSize * (1 - hit * 0.05);
-      visual.art.rotation = enemy.type === 'mine' ? 0 : motion;
-      visual.hit.visible = enemy.type !== 'mine';
+      visual.art.rotation = isMine ? 0 : part ? enemy.angle : motion;
+      visual.hit.visible = !isMine && !part;
       visual.hit.width = visual.art.width; visual.hit.height = visual.art.height; visual.hit.rotation = motion; visual.hit.alpha = hit * 0.72;
       visual.badge.texture = this.atlas.badges[enemy.type]; visual.badge.tint = color;
-      visual.badge.visible = !isMine;
+      visual.badge.visible = !isMine && !part;
       visual.hazard.visible = isMine;
       if (isMine) {
         visual.hazard.position.set(x, y);
@@ -417,13 +499,13 @@ export class GameRenderer {
         visual.hazard.width = enemy.radius * 96 / 35; visual.hazard.height = visual.hazard.width;
       }
       visual.badge.width = enemy.radius * 2.95; visual.badge.height = enemy.radius * 2.95;
-      visual.badge.alpha = enemy.state === 'charge' || enemy.state === 'aim' ? 0.9 : 0.55;
-      visual.badge.rotation = enemy.type === 'dasher' || enemy.type === 'miniboss' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
+      visual.badge.alpha = machine ? 0.9 : enemy.state === 'charge' || enemy.state === 'aim' ? 0.9 : 0.55;
+      visual.badge.rotation = enemy.type === 'shield' || enemy.type === 'returner' ? enemy.angle : enemy.type === 'dasher' || enemy.type === 'miniboss' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
       visual.halo.visible = isMine || this.settings.quality !== 'low';
       visual.halo.width = enemy.radius * (isMine ? 2.8 : 4.3); visual.halo.height = visual.halo.width;
       visual.halo.tint = isMine ? 0x030811 : color;
       visual.halo.alpha = isMine ? 0.85 : enemy.type === 'boss' ? 0.22 : 0.11 + hit * 0.17;
-      const showHealth = enemy.hp < enemy.maxHp && enemy.type !== 'mine' && enemy.type !== 'boss' && enemy.type !== 'miniboss';
+      const showHealth = !disabled && enemy.hp < enemy.maxHp && !isMine && enemy.type !== 'core' && enemy.type !== 'boss' && enemy.type !== 'miniboss' && enemy.type !== 'palisade' && enemy.type !== 'reprise';
       visual.health.visible = showHealth; visual.bar.visible = showHealth;
       if (showHealth) {
         const width = Math.max(36, enemy.radius * 1.5);
@@ -497,7 +579,13 @@ export class GameRenderer {
       const { effect, core } = visual;
       effect.visible = true; core.visible = true;
       const hostile = bullet.owner === 'enemy', perfect = bullet.kind === 'perfect';
-      const angle = Math.atan2(bullet.vy, bullet.vx);
+      const angle = bullet.program?.length ? bullet.programAngle ?? Math.atan2(bullet.vy, bullet.vx) : Math.atan2(bullet.vy, bullet.vx);
+      const phase = bullet.program?.[bullet.programIndex ?? 0];
+      const paused = hostile && phase?.speed === 0;
+      if (paused) {
+        const path = spellReturnPreview(bullet);
+        if (path) this.renderReturnPath(this.warnings, path, bullet.color, true);
+      }
       effect.texture = hostile ? this.atlas.glow : this.atlas.bolt;
       effect.rotation = angle;
       effect.width = hostile ? Math.max(30, bullet.radius * 5) : perfect ? 115 : bullet.kind === 'special' ? 40 : bullet.kind === 'drone' ? 25 : 31;
@@ -506,6 +594,13 @@ export class GameRenderer {
       effect.alpha = hostile ? bullet.shape ? this.settings.quality === 'low' ? 0 : 0.12 : 0.22 : 0.85;
       const tailOffset = hostile ? 0 : perfect ? 28 : 8;
       effect.position.set(x - Math.cos(angle) * tailOffset, y - Math.sin(angle) * tailOffset);
+      if (paused) {
+        // A stopped bullet is still dangerous. This return marker is preserved on low quality.
+        const next = bullet.program?.[(bullet.programIndex ?? 0) + 1], direction = angle + (next?.reverse ? Math.PI : 0);
+        effect.texture = this.atlas.hostileCore; effect.rotation = direction;
+        effect.width = 17; effect.height = 8; effect.tint = 0xffffff; effect.alpha = 0.9;
+        effect.position.set(x + Math.cos(direction) * 18, y + Math.sin(direction) * 18);
+      }
       // Friendly shots retain the original crystal; enemies use opaque warm pointed shells.
       core.texture = hostile ? bullet.shape ? this.atlas.danmaku[bullet.shape] : this.atlas.hostileCore : this.assets.bullet;
       core.tint = hostile && bullet.shape ? bullet.color : 0xffffff;
@@ -601,8 +696,9 @@ export class GameRenderer {
     if (dashing && this.trailClock <= 0) { this.effects.trail(x, y, tilt); this.trailClock = 1 / 40; }
     const graph = this.playerMarks.clear();
     // The small ring is the actual hit circle; art and decorative rings never define damage.
-    if (player.focus) graph.circle(x, y, player.radius).stroke({ color: 0x07101e, width: 5, alpha: 0.95 });
-    graph.circle(x, y, player.radius).stroke({ color: WHITE, width: player.focus ? 2 : 1, alpha: player.focus || player.invincible > 0 ? 0.95 : 0.25 });
+    if (player.focus) graph.circle(x, y, BALANCE.player.hitRadius).stroke({ color: 0x07101e, width: 5, alpha: 0.95 });
+    graph.circle(x, y, BALANCE.player.hitRadius).stroke({ color: WHITE, width: player.focus ? 2 : 1, alpha: player.focus || player.invincible > 0 ? 0.95 : 0.45 });
+    graph.circle(x, y, 2).fill({ color: WHITE, alpha: 0.9 });
     graph.circle(x, y, 2.3).fill({ color: 0xf2fff8, alpha: 0.9 });
     const cos = Math.cos(player.angle), sin = Math.sin(player.angle), nx = -sin, ny = cos;
     const frontX = x + cos * 51, frontY = y + sin * 51;
@@ -630,9 +726,122 @@ export class GameRenderer {
       .lineTo(x + Math.cos(start + sweep) * radius, y + Math.sin(start + sweep) * radius).stroke({ color, width: 1.5, alpha: Math.min(0.65, alpha * 7) });
   }
 
+  private directionMark(graph: Graphics, x: number, y: number, angle: number, color: number, size = 10) {
+    graph.moveTo(x - Math.cos(angle - 0.55) * size, y - Math.sin(angle - 0.55) * size).lineTo(x, y)
+      .lineTo(x - Math.cos(angle + 0.55) * size, y - Math.sin(angle + 0.55) * size).stroke({ color, width: 2, alpha: 0.85 });
+  }
+
+  private renderReturnPath(graph: Graphics, path: SpellReturnPath, color: number, paused: boolean) {
+    const startX = paused ? path.turnX : path.x, startY = paused ? path.turnY : path.y;
+    const endX = paused ? path.endX : path.turnX, endY = paused ? path.endY : path.turnY;
+    graph.moveTo(startX, startY).lineTo(endX, endY).stroke({ color, width: 1.25, alpha: paused ? 0.22 : 0.12 });
+    const radius = Math.max(9, path.width / 2 + 4);
+    graph.circle(path.turnX, path.turnY, radius).stroke({ color: 0xffd9af, width: 1.5, alpha: paused ? 0.9 : 0.48 });
+    const angle = Math.atan2(path.endY - path.turnY, path.endX - path.turnX);
+    this.directionMark(graph, path.turnX + Math.cos(angle) * 24, path.turnY + Math.sin(angle) * 24, angle, color, paused ? 11 : 8);
+    if (paused) {
+      const progress = clamp(1 - path.remainingUntilReverse / Math.max(0.001, path.wait), 0, 1);
+      graph.arc(path.turnX, path.turnY, radius + 4, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffebcb, width: 2, alpha: 0.85 });
+    }
+  }
+
+  private renderSeason2Warning(graph: Graphics, enemy: Enemy, state: WorldState) {
+    const cue = season2Telegraph(enemy, state.difficulty);
+    if (!cue) return;
+    const { x, y, angle, color } = cue, progress = clamp(1 - cue.remaining / Math.max(0.001, cue.warning), 0, 1);
+    if (cue.kind === 'shield') {
+      const radius = enemy.radius + 9;
+      graph.arc(x, y, radius, angle - cue.spread / 2, angle + cue.spread / 2).stroke({ color: 0xffd69a, width: 7, alpha: 0.7 });
+      if (enemy.state === 'charge') this.directionMark(graph, x + Math.cos(angle) * (radius + 14), y + Math.sin(angle) * (radius + 14), angle, 0xfff0c5);
+      return;
+    }
+    if (cue.kind === 'wall') {
+      const points = cue.points;
+      let start = 0;
+      for (let i = 1; i <= points.length; i++) {
+        if (i < points.length && Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y) < 42) continue;
+        const a = points[start], b = points[i - 1];
+        if (a && b) {
+          graph.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: 0x0b1020, width: 8, alpha: 0.85 });
+          graph.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color, width: 3, alpha: 0.65 + progress * 0.3 });
+          const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+          const geometry = beamGeometry(midX, midY, angle, cue.travel ?? 1000, Math.hypot(b.x - a.x, b.y - a.y) + 16);
+          graph.poly(geometry.corners).fill({ color, alpha: 0.023 });
+          this.directionMark(graph, midX + Math.cos(angle) * 40, midY + Math.sin(angle) * 40, angle, 0xffd8d7);
+        }
+        start = i;
+      }
+    } else if (cue.kind === 'fan') {
+      this.sector(graph, x, y, angle - cue.spread / 2, cue.spread, Math.min(1000, cue.radius), color, 0.04);
+      const count = enemy.type === 'returner' ? 2 : 3;
+      for (let i = 0; i < count; i++) {
+        const heading = angle + (i / (count - 1) - 0.5) * cue.spread, distance = Math.min(cue.radius, 580);
+        this.directionMark(graph, x + Math.cos(heading) * distance, y + Math.sin(heading) * distance, heading + Math.PI, color, 12);
+      }
+    } else if (cue.kind === 'ring') {
+      graph.circle(x, y, enemy.radius + 24).stroke({ color, width: 3, alpha: 0.8 });
+      graph.circle(x, y, cue.radius).stroke({ color, width: 1.5, alpha: 0.3 });
+      for (let i = 0; i < 8; i++) { const heading = i * TAU / 8; this.directionMark(graph, x + Math.cos(heading) * cue.radius, y + Math.sin(heading) * cue.radius, heading + Math.PI, color); }
+    } else if (cue.kind === 'sample') {
+      for (const point of cue.points) {
+        graph.circle(point.x, point.y, cue.radius).stroke({ color: 0xffa675, width: 2, alpha: 0.7 });
+        graph.moveTo(point.x - 7, point.y).lineTo(point.x + 7, point.y).moveTo(point.x, point.y - 7).lineTo(point.x, point.y + 7).stroke({ color: 0xffd2a8, width: 2, alpha: 0.8 });
+      }
+    } else if (cue.kind === 'repair' && cue.points[0]) {
+      const point = cue.points[0];
+      graph.moveTo(x, y).lineTo(point.x, point.y).stroke({ color: 0x292431, width: 7, alpha: 0.9 });
+      graph.moveTo(x, y).lineTo(point.x, point.y).stroke({ color, width: 2 + progress, alpha: 0.65 });
+      graph.circle(point.x, point.y, 20).stroke({ color, width: 2, alpha: 0.7 });
+      this.directionMark(graph, x + (point.x - x) * progress, y + (point.y - y) * progress, Math.atan2(point.y - y, point.x - x), color);
+    } else if (cue.kind === 'core') {
+      graph.circle(x, y, enemy.radius + 7).stroke({ color: 0xffb095, width: 1.5, alpha: 0.6 });
+      this.directionMark(graph, x + Math.cos(angle) * 31, y + Math.sin(angle) * 31, angle, color, 11);
+    }
+    if (enemy.state === 'charge' || enemy.type === 'core') graph.arc(x, y, enemy.radius + 12, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color, width: 3, alpha: 0.9 });
+  }
+
+  private renderSpellWarnings(graph: Graphics, enemy: Enemy, state: WorldState) {
+    const definition = spellCardDefinition(enemy, state.difficulty);
+    if (enemy.spell?.stage === 'intro') graph.circle(enemy.x, enemy.y, enemy.radius + 25).stroke({ color: definition.color, width: 4, alpha: 0.8 });
+    for (const cue of spellTelegraphs(enemy)) {
+      const progress = clamp(1 - cue.remaining / Math.max(0.001, cue.warning), 0, 1), color = cue.color;
+      if (cue.kind === 'wall') {
+        const length = Math.hypot(cue.endX - cue.x, cue.endY - cue.y), ux = (cue.endX - cue.x) / Math.max(1, length), uy = (cue.endY - cue.y) / Math.max(1, length);
+        const gapStart = clamp((cue.gapCenter ?? -1000) - (cue.gapWidth ?? 0) / 2, 0, length);
+        const gapEnd = clamp((cue.gapCenter ?? -1000) + (cue.gapWidth ?? 0) / 2, 0, length);
+        for (const [start, end] of [[0, gapStart], [gapEnd, length]]) {
+          if (end - start < 1) continue;
+          const x = cue.x + ux * start, y = cue.y + uy * start, ex = cue.x + ux * end, ey = cue.y + uy * end;
+          graph.moveTo(x, y).lineTo(ex, ey).stroke({ color: 0x0e1120, width: 10, alpha: 0.8 });
+          graph.moveTo(x, y).lineTo(ex, ey).stroke({ color, width: 3 + progress, alpha: 0.75 });
+          for (let d = start + 25; d < end; d += 150) this.directionMark(graph, cue.x + ux * d + Math.cos(cue.angle) * 28, cue.y + uy * d + Math.sin(cue.angle) * 28, cue.angle, color);
+        }
+        if (gapEnd > gapStart) {
+          for (const offset of [gapStart, gapEnd]) {
+            const x = cue.x + ux * offset, y = cue.y + uy * offset;
+            graph.moveTo(x, y).lineTo(x + Math.cos(cue.angle) * 20, y + Math.sin(cue.angle) * 20).stroke({ color: 0xffe7cd, width: 2, alpha: 0.8 });
+          }
+        }
+      } else if (cue.kind === 'fan') {
+        this.sector(graph, cue.x, cue.y, cue.angle - cue.spread / 2, cue.spread, Math.min(cue.length, 1000), color, 0.04);
+      } else {
+        graph.circle(cue.x, cue.y, 48).stroke({ color, width: 3, alpha: 0.8 });
+        if (cue.motif === 'star') {
+          const points: number[] = [];
+          for (let i = 0; i < 10; i++) { const angle = -Math.PI / 2 + i * TAU / 10, radius = i % 2 ? 22 : 42; points.push(cue.x + Math.cos(angle) * radius, cue.y + Math.sin(angle) * radius); }
+          graph.poly(points).fill({ color, alpha: 0.08 }).stroke({ color, width: 2, alpha: 0.85 });
+        } else {
+          for (let i = 0; i < 8; i++) { const angle = i * TAU / 8; this.directionMark(graph, cue.x + Math.cos(angle) * 67, cue.y + Math.sin(angle) * 67, angle, color, 8); }
+        }
+      }
+      for (const path of cue.returnPaths ?? []) this.renderReturnPath(graph, path, color, false);
+      graph.arc(cue.x, cue.y, 19, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color, width: 3, alpha: 0.85 });
+    }
+  }
+
   private renderWarnings(state: WorldState, alpha: number) {
     const graph = this.warnings.clear();
-    const attacks = bossAttacks(state.difficulty), enemyConfig = enemyAttacks(state.difficulty);
+    const enemyConfig = enemyAttacks(state.difficulty);
     for (const indicator of state.indicators) {
       if (!this.visible(indicator.x, indicator.y, 200)) continue;
       const progress = clamp(1 - indicator.time / indicator.duration, 0, 1);
@@ -646,7 +855,11 @@ export class GameRenderer {
     }
     for (const enemy of state.enemies) {
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha);
-      if (enemy.type === 'miniboss' && enemy.miniboss) {
+      if (enemy.spell) {
+        this.renderSpellWarnings(graph, enemy, state);
+      } else if (enemy.season2) {
+        this.renderSeason2Warning(graph, enemy, state);
+      } else if (enemy.type === 'miniboss' && enemy.miniboss) {
         const cfg = miniBossAttacks(state.difficulty), brain = enemy.miniboss;
         if (['charge', 'dash', 'aim'].includes(enemy.state) && brain.laserIndex === 0) {
           const landing = miniBossLandingTelegraph(enemy, state.difficulty);
@@ -669,40 +882,6 @@ export class GameRenderer {
         } else if (enemy.state === 'phaseShift') {
           graph.circle(x, y, enemy.radius + 20).stroke({ color: 0xffd0a4, width: 4, alpha: 0.8 });
         }
-      } else if (enemy.type === 'boss' && (enemy.state === 'laserWarmup' || enemy.state === 'laser')) {
-        this.renderLaser(graph, enemy, x, y, attacks);
-      } else if (enemy.type === 'boss' && enemy.boss) {
-        const brain = enemy.boss, lanes = bossPatternLanes(enemy, state.difficulty);
-        if (lanes.length) {
-          const color = brain.skill === 'volley' ? 0xff9fbd : brain.skill === 'nova' ? 0xc7a0ff : 0xffce8f;
-          if (brain.skill === 'volley') {
-            const arc = bossVolleyArc(enemy, state.difficulty);
-            this.sector(graph, x, y, arc.angle - arc.width / 2, arc.width, 1700, color, 0.035);
-          } else {
-            const lane = lanes[0];
-            this.sector(graph, x, y, lane.angle + lane.width / 2, TAU - lane.width, 1700, color, 0.025);
-          }
-          for (const lane of lanes) {
-            this.sector(graph, x, y, lane.angle - lane.width / 2, lane.width, 1300, 0x88f4d6, 0.065);
-            for (let distance = 260; distance < 1250; distance += 170) {
-              const bx = x + Math.cos(lane.angle) * distance, by = y + Math.sin(lane.angle) * distance;
-              graph.moveTo(bx - Math.cos(lane.angle - 0.65) * 13, by - Math.sin(lane.angle - 0.65) * 13).lineTo(bx, by)
-                .lineTo(bx - Math.cos(lane.angle + 0.65) * 13, by - Math.sin(lane.angle + 0.65) * 13).stroke({ color: 0xbaffeb, width: 2, alpha: 0.65 });
-            }
-          }
-          graph.circle(x, y, enemy.radius + 18).stroke({ color, width: 3, alpha: 0.7 });
-          if (this.settings.quality !== 'low') {
-            const spin = this.settings.reducedMotion ? 0 : state.elapsed * 0.3;
-            for (let i = 0; i < 12; i++) {
-              const angle = spin + i * TAU / 12, radius = enemy.radius + 32;
-              graph.moveTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius)
-                .lineTo(x + Math.cos(angle + 0.025) * (radius + 18), y + Math.sin(angle + 0.025) * (radius + 18)).stroke({ color, width: 3, alpha: 0.4 });
-            }
-          }
-        } else if (enemy.state === 'phaseShift') {
-          const progress = 1 - enemy.timer / attacks.phaseShift;
-          graph.circle(x, y, enemy.radius + 25 + progress * 20).stroke({ color: 0xe4d0ff, width: 3, alpha: 0.85 });
-        }
       } else if (enemy.type === 'sniper' && (enemy.state === 'aim' || enemy.state === 'volley')) {
         const progress = clamp(1 - enemy.timer / enemyConfig.sniper.warning, 0, 1), locked = enemy.tactics?.locked ?? false;
         const beam = beamGeometry(x, y, enemy.angle, 6000, 5);
@@ -722,8 +901,16 @@ export class GameRenderer {
     }
     for (const hazard of state.hazards) {
       const { x, y, radius } = hazard;
-      if (!this.visible(x, y, radius)) continue;
       const progress = 1 - hazard.warning / hazard.warningDuration;
+      if (hazard.kind === 'beam') {
+        const geometry = beamGeometry(x, y, hazard.angle ?? 0, hazard.length ?? 0, hazard.width ?? radius * 2);
+        graph.poly(geometry.corners).fill({ color: 0xffa26f, alpha: hazard.active ? 0.63 : 0.06 + progress * 0.09 })
+          .stroke({ color: hazard.active ? 0xffe6c4 : 0xffb795, width: hazard.active ? 3 : 2, alpha: 0.8 });
+        graph.moveTo(x, y).lineTo(geometry.endX, geometry.endY).stroke({ color: 0xfff4dc, width: hazard.active ? Math.max(4, geometry.width * 0.26) : 1.5, alpha: hazard.active ? 0.85 : 0.45 });
+        if (!hazard.active) graph.arc(x, y, 23, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffd5b3, width: 3, alpha: 0.9 });
+        continue;
+      }
+      if (!this.visible(x, y, radius)) continue;
       graph.circle(x, y, radius).fill({ color: 0xff725b, alpha: hazard.active ? 0.55 : 0.06 + progress * 0.09 });
       graph.circle(x, y, radius).stroke({ color: hazard.active ? 0xffefe0 : 0xffa380, width: hazard.active ? 4 : 2, alpha: 0.95 });
       if (!hazard.active) {
@@ -748,44 +935,6 @@ export class GameRenderer {
       .fill({ color, alpha: locked ? 0.16 : 0.07 }).stroke({ color, width: locked ? 2 : 1, alpha: locked ? 0.85 : 0.4 });
   }
 
-  private renderLaser(graph: Graphics, enemy: Enemy, x: number, y: number, attacks: ReturnType<typeof bossAttacks>) {
-    const active = enemy.state === 'laser';
-    if (enemy.boss) {
-      const start = enemy.boss.lockedAngle;
-      const sweep = enemy.boss.sweepDirection * attacks.laser.angularSpeed * (attacks.laser.duration - attacks.laser.hold);
-      this.sector(graph, x, y, start, sweep, attacks.laser.length, 0xe49de5, active ? 0.025 : 0.075);
-      if (!active) {
-        const endBeam = beamGeometry(x, y, start + sweep, attacks.laser.length, attacks.laser.width);
-        graph.poly(endBeam.corners).fill({ color: 0xe49de5, alpha: 0.06 }).stroke({ color: 0xe49de5, width: 1, alpha: 0.4 });
-      }
-      const midpoint = start + sweep / 2, direction = enemy.boss.sweepDirection;
-      for (const radius of [300, 490, 680]) {
-        const bx = x + Math.cos(midpoint) * radius, by = y + Math.sin(midpoint) * radius;
-        const tangent = midpoint + direction * Math.PI / 2;
-        graph.moveTo(bx - Math.cos(tangent - 0.7) * 20, by - Math.sin(tangent - 0.7) * 20).lineTo(bx, by)
-          .lineTo(bx - Math.cos(tangent + 0.7) * 20, by - Math.sin(tangent + 0.7) * 20).stroke({ color: 0xffcfed, width: 3, alpha: 0.8 });
-      }
-    }
-    const beam = beamGeometry(x, y, enemy.angle, attacks.laser.length, attacks.laser.width);
-    const progress = clamp(1 - enemy.timer / attacks.laser.warning, 0, 1);
-    const locked = enemy.timer <= attacks.laser.warning;
-    graph.poly(beam.corners).fill({ color: active ? 0xf695d9 : locked ? 0xfaacdc : 0xc49aff, alpha: active ? 0.66 : 0.07 + progress * 0.1 });
-    graph.poly(beam.corners).stroke({ color: active ? 0xffd8f2 : 0xe2b5ff, width: active ? 3 : 2, alpha: active ? 1 : 0.5 + progress * 0.5 });
-    if (active) {
-      // White core stays inside the exact damage footprint. There is no wider decorative beam.
-      graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff5fd, width: attacks.laser.width * 0.27, alpha: 0.85 });
-      graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xffffff, width: 5, alpha: 1 });
-    } else {
-      graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xe0b8ff, width: 1, alpha: 0.4 });
-      const dx = Math.cos(enemy.angle), dy = Math.sin(enemy.angle), nx = -dy, ny = dx;
-      for (let distance = 220; distance < 1800; distance += 160) {
-        const bx = x + dx * distance, by = y + dy * distance;
-        graph.moveTo(bx - dx * 13 + nx * 12, by - dy * 13 + ny * 12).lineTo(bx, by)
-          .lineTo(bx - dx * 13 - nx * 12, by - dy * 13 - ny * 12).stroke({ color: 0xedc9ff, width: 2, alpha: 0.25 + progress * 0.45 });
-      }
-    }
-  }
-
   private renderOverlay(state: WorldState) {
     const ambient = this.ambient.clear();
     if (this.settings.quality !== 'low') {
@@ -798,7 +947,7 @@ export class GameRenderer {
       }
     }
     const graph = this.overlay.clear();
-    const dangerous = state.enemies.some(enemy => enemy.type === 'boss' && enemy.state === 'laserWarmup');
+    const dangerous = state.hazards.some(hazard => hazard.kind === 'beam' && !hazard.active);
     const warning = Math.max(this.warning, dangerous ? 0.22 : 0);
     // A cached gradient gives soft edge feedback without full-screen blur filters.
     this.damageEdge.alpha = this.damage * (this.settings.reducedMotion ? 0.18 : 0.34);
@@ -842,7 +991,7 @@ export class GameRenderer {
     for (const [id, visual] of this.pickups) { visual.root.visible = false; this.pickupFree.push(visual); this.pickups.delete(id); }
     for (const visual of this.bullets) { visual.effect.visible = false; visual.core.visible = false; }
     for (const visual of this.companions) visual.root.visible = false;
-    this.playerBeams.clear(); this.pickupHint.visible = false;
+    this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.pickupHint.visible = false;
   }
 
   getStats() { return { particles: this.initialized ? this.effects.count : 0, textures: this.initialized ? 14 + this.generated.length + this.effects.labelTextureCount : 0 }; }

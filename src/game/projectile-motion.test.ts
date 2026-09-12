@@ -43,8 +43,8 @@ describe('bounded danmaku trajectories', () => {
     const sim = new GameSimulation(34001, 'hard');
     const boss = sim.spawnEnemy('boss', 2000, 2000)!;
     sim.state.player.x = sim.state.player.prevX = 2520; sim.state.player.invincible = 999;
-    boss.timer = 0; boss.laserCooldown = 999;
-    for (let i = 0; i < 100; i++) sim.step(idle);
+    boss.spell!.cardIndex = 2;
+    for (let i = 0; i < 180; i++) sim.step(idle);
     const originals = new Set(sim.state.bullets);
     expect([...originals].some(b => b.shape && b.turnRate !== 0)).toBe(true);
     sim.reset(); sim.state.spawnTimer = 999;
@@ -53,5 +53,18 @@ describe('bounded danmaku trajectories', () => {
     expect(originals.has(shot)).toBe(true);
     expect(shot.shape).toBeUndefined();
     expect(shot).toMatchObject({ motionAge: 0, turnRate: 0, turnDelay: 0, turnDuration: 0, acceleration: 0 });
+    expect(shot.program).toBeUndefined(); expect(shot.attackGroup).toBeUndefined(); expect(shot.grazed).toBe(false);
+  });
+  it('integrates phase boundaries exactly, including a collidable stationary interval and one return', () => {
+    const program = [{ duration: 0.25, speed: 200 }, { duration: 0.65, speed: 0 }, { duration: 0.25, reverse: true }] as const;
+    for (const step of [1 / 60, 0.05, 0.1]) {
+      const b = bullet({ program }); let elapsed = 0, x = 0;
+      while (elapsed < 1.15 - 1e-10) {
+        const dt = Math.min(step, 1.15 - elapsed); const motion = advanceProjectileMotion(b, dt)!; x += motion.dx; elapsed += dt;
+        if (elapsed > 0.3 && elapsed < 0.85) { expect(b.speed).toBe(0); expect(x).toBeCloseTo(50, 8); }
+      }
+      expect(x).toBeCloseTo(0, 8); expect(b.programIndex).toBe(3);
+      advanceProjectileMotion(b, 0.1); expect(b.vx).toBeCloseTo(-200, 8);
+    }
   });
 });

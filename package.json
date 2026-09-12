@@ -1,6 +1,6 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "3.4.0",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "description": "Mafuyu Sekai — Neon Overdrive, a fixed-step WebGL arcade shooter",
@@ -16,7 +16,7 @@
     "lint": "eslint src tests scripts vite.config.ts playwright.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "test:assets": "node scripts/verify-assets.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "test:soak": "node scripts/soak.mjs",

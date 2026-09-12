@@ -118,47 +118,54 @@ test('Shift precise movement responds immediately and clears when focus is lost'
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.vx)).toBe(0);
 });
 
-test('Boss laser announces its locked sweep before activation and survives pause without consuming warning', async ({ page }) => {
+test('fixed arena beam warning locks its geometry and pause preserves its remaining time', async ({ page }) => {
   await openGame(page);
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-laser'));
-  await expect(page.getByLabel('首领行动')).toContainText('扫射方向已锁定');
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ season: 's1', mode: 'story', cardIndex: 3 }));
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.some(h => h.kind === 'beam' && !h.active))).toBe(true);
   const before = await page.evaluate(() => {
-    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
-    return { angle: boss.angle, timer: boss.timer };
+    const s = window.__MAFUYU_DEBUG__.state(), h = s.hazards.find(h => h.kind === 'beam')!;
+    return { id: h.id, angle: h.angle, width: h.width, warning: h.warning, camera: s.camera, arena: s.arena };
   });
-  expect(before.timer).toBeGreaterThan(1.7);
-  await page.keyboard.down('s'); await page.waitForTimeout(350); await page.keyboard.up('s');
+  expect(before.arena).toMatchObject({ width: 1600, height: 900 });
+  expect(before.width).toBe(42); expect(before.warning).toBeGreaterThan(0);
+  await page.keyboard.down('d'); await page.waitForTimeout(200); await page.keyboard.up('d');
   await page.keyboard.press('Escape');
-  const paused = await page.evaluate(() => {
-    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
-    return { angle: boss.angle, timer: boss.timer };
-  });
+  const paused = await page.evaluate(id => window.__MAFUYU_DEBUG__.state().hazards.find(h => h.id === id)!, before.id);
   expect(paused.angle).toBe(before.angle);
-  await page.waitForTimeout(250);
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!.timer)).toBe(paused.timer);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().camera.x)).toBe(before.camera.x);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(id => window.__MAFUYU_DEBUG__.state().hazards.find(h => h.id === id)!.warning, before.id)).toBe(paused.warning);
   await page.getByRole('button', { name: '继续游戏', exact: false }).click();
-  await expect(page.getByLabel('首领行动')).toContainText('激光扫射');
+  await expect.poll(() => page.evaluate(id => window.__MAFUYU_DEBUG__.state().hazards.some(h => h.id === id && h.active), before.id)).toBe(true);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
+  expect(await page.evaluate(() => ({ hazards: window.__MAFUYU_DEBUG__.state().hazards.length, arena: window.__MAFUYU_DEBUG__.state().arena }))).toEqual({ hazards: 0, arena: null });
   await expect(page.getByLabel('首领行动')).toHaveCount(0);
 });
 
-test('Boss phase change clears old ground hazards and restart clears the whole encounter', async ({ page }) => {
-  await openGame(page);
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-bombard'));
-  await expect(page.getByLabel('首领行动')).toContainText('连爆星环');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(3);
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.every(h => !h.active && h.warning > 0))).toBe(true);
-  await page.evaluate(() => {
-    const boss = window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!;
-    boss.hp = boss.maxHp * 0.64;
+for (const season of ['s1', 's2'] as const) {
+  test(`${season} advances all six cards before completion and clears encounter resources`, async ({ page }) => {
+    await openGame(page);
+    await page.evaluate(season => window.__MAFUYU_DEBUG__.practice({ season, mode: 'story', cardIndex: 0 }), season);
+    for (let card = 1; card <= 6; card++) {
+      await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().cardIndex)).toBe(card);
+      await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.role === 'boss')?.spell?.stage)).toBe('active');
+      expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().cardCount)).toBe(6);
+      expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('playing');
+      await page.evaluate(() => { const d = window.__MAFUYU_DEBUG__, boss = d.state().enemies.find(e => e.role === 'boss')!; d.damageEnemy(boss.id, 1e6); });
+      if (card < 6) {
+        await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().cardIndex)).toBe(card + 1);
+        expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
+      }
+    }
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('complete');
+    expect(await page.evaluate(() => ({ shots: window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').length,
+      parts: window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.role === 'part').length }))).toEqual({ shots: 0, parts: 0 });
+    await page.getByRole('button', { name: /继续.*无尽/ }).click();
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().mode)).toBe('endless');
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().seasonId)).toBe(season);
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().arena)).toBeNull();
   });
-  await expect(page.getByLabel('首领行动')).toContainText('阶段转换');
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().bossPhase)).toBe(2);
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
-  expect(await page.evaluate(() => ({ hazards: window.__MAFUYU_DEBUG__.state().hazards.length, wave: window.__MAFUYU_DEBUG__.state().wave, focus: window.__MAFUYU_DEBUG__.state().player.focus }))).toEqual({ hazards: 0, wave: 1, focus: false });
-});
+}
 
 test('difficulty persists, cannot change during a run, and keeps separate high scores through endless', async ({ page }) => {
   await openGame(page);
@@ -180,17 +187,18 @@ test('difficulty persists, cannot change during a run, and keeps separate high s
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
 });
 
-test('hard Boss uses a shorter committed warning and denser marked ground attack', async ({ page }) => {
+test('hard cards use their own HP and beam warning instead of old boss phase values', async ({ page }) => {
   await openGame(page);
   await page.getByRole('button', { name: '困难', exact: true }).click();
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-laser'));
-  await expect(page.getByLabel('首领行动')).toContainText('扫射方向已锁定');
-  const boss = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.type === 'boss')!);
-  expect(boss.maxHp).toBe(2430); expect(boss.timer).toBeGreaterThan(0.8); expect(boss.timer).toBeLessThanOrEqual(1.25);
-  await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-bombard'));
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(5);
-  const hazards = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards);
-  expect(hazards.every(h => h.radius === 85 && h.warningDuration >= 0.85)).toBe(true);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ season: 's1', cardIndex: 3 }));
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.some(h => h.kind === 'beam'))).toBe(true);
+  const values = await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.state(), boss = s.enemies.find(e => e.role === 'boss')!;
+    const h = s.hazards.find(h => h.kind === 'beam')!;
+    return { hp: boss.maxHp, width: h.width, duration: h.warningDuration, remaining: h.warning, difficulty: s.difficulty };
+  });
+  expect(values).toMatchObject({ hp: 1148, width: 52, duration: 0.8, difficulty: 'hard' });
+  expect(values.remaining).toBeGreaterThan(0); expect(values.remaining).toBeLessThanOrEqual(0.8);
 });
 
 test('third-wave miniboss coexists with spawning and exposes a locked laser without ending the wave', async ({ page }) => {
@@ -221,7 +229,7 @@ for (const difficulty of ['普通', '困难']) {
       const d = window.__MAFUYU_DEBUG__; d.scenario('miniboss');
       d.state().waveTime = 40;
     });
-    await expect(page.getByText('击败 ECHO 后进入第四波', { exact: true })).toBeVisible();
+    await expect(page.getByText(/击败首领后继续/)).toBeVisible();
     await page.waitForTimeout(800);
     expect(await page.evaluate(() => ({ wave: window.__MAFUYU_DEBUG__.state().wave, time: window.__MAFUYU_DEBUG__.state().waveTime }))).toEqual({ wave: 3, time: 40 });
     await page.evaluate(() => {
@@ -233,20 +241,22 @@ for (const difficulty of ['普通', '困难']) {
     const bounds = (await page.locator('#game-host').boundingBox())!;
     await page.mouse.click(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2);
     await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
-    await expect(page.getByText('击败 ECHO 后进入第四波', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/击败首领后继续/)).toHaveCount(0);
     expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossDefeated)).toBe(true);
     await page.waitForTimeout(200);
     expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
   });
-  test(`${difficulty} Boss emits sustained curved layered danmaku`, async ({ page }) => {
+  test(`${difficulty} flower card emits counter-rotating rings and restart removes every projectile`, async ({ page }) => {
     await openGame(page);
     await page.getByRole('button', { name: difficulty, exact: true }).click();
-    await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('boss-nova'));
-    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').length)).toBeGreaterThan(120);
-    const shots = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').map(b => ({ shape: b.shape, age: b.motionAge, turn: b.turnRate, speed: b.speed })));
-    expect(new Set(shots.map(b => b.shape)).size).toBeGreaterThan(1);
-    expect(shots.some(b => (b.age ?? 0) > 0.6 && (b.turn ?? 0) > 0)).toBe(true);
-    expect(shots.some(b => (b.turn ?? 0) < 0)).toBe(true);
+    await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ season: 's1', cardIndex: 2 }));
+    await expect.poll(() => page.evaluate(() => {
+      const shots = window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy');
+      return shots.some(b => (b.turnRate ?? 0) > 0) && shots.some(b => (b.turnRate ?? 0) < 0);
+    })).toBe(true);
+    const shots = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy'));
+    expect(shots.length).toBeGreaterThan(40);
+    expect(shots.some(b => (b.motionAge ?? 0) > 0.6)).toBe(true);
     await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
     expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().bullets.length)).toBe(0);
   });
@@ -291,14 +301,24 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [2560, 1440], [2560, 1
   test(`layout is usable at ${width}×${height} and maintains a 16:9 arena`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height });
     await openGame(page);
-    const shell = (await page.locator('#game-shell').boundingBox())!;
+    const shell = (await page.locator('#game-host').boundingBox())!;
     expect(shell.width / shell.height).toBeCloseTo(16 / 9, 2);
     const start = (await page.getByRole('button', { name: '开始游戏' }).boundingBox())!;
     expect(start.y).toBeGreaterThanOrEqual(0); expect(start.y + start.height).toBeLessThanOrEqual(height);
     await page.screenshot({ path: testInfo.outputPath('menu.png') });
     await page.getByRole('button', { name: '开始游戏' }).click();
     await expect(page.getByRole('button', { name: '暂停游戏' })).toBeVisible();
+    const arena = (await page.locator('#game-host').boundingBox())!;
+    const top = (await page.locator('.battle-top').boundingBox())!, bottom = (await page.locator('.battle-bottom').boundingBox())!;
+    expect(arena.width / arena.height).toBeCloseTo(16 / 9, 2);
+    expect(top.y + top.height).toBeLessThanOrEqual(arena.y + 1);
+    expect(bottom.y).toBeGreaterThanOrEqual(arena.y + arena.height - 1);
+    await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ season: 's2', cardIndex: 0 }));
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.find(e => e.role === 'boss')?.spell?.cues.length ?? 0)).toBeGreaterThan(0);
     await page.screenshot({ path: testInfo.outputPath('battle.png') });
+    await page.evaluate(() => { window.__MAFUYU_DEBUG__.settings({ quality: 'low', reducedMotion: true }); window.__MAFUYU_DEBUG__.practice({ season: 's1', cardIndex: 3 }); });
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.some(h => h.kind === 'beam' && !h.active))).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('low-beam-warning.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   });
 }

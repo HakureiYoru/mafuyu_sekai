@@ -1,4 +1,4 @@
-import { VIEW, WORLD } from './config';
+import { BALANCE, VIEW, WORLD } from './config';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, TAU } from './math';
 import type { CombatEvent, Difficulty, Enemy, EnemyShotOptions, MiniBossBrain, Player } from './types';
 
@@ -230,7 +230,7 @@ export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): 
   if (e.state === 'laser') {
     stop(e); e.angle = brain.lockedAngle;
     const beam = miniBossLaserGeometry(e, ctx.difficulty);
-    if (ctx.player.invincible <= EPSILON && pointInBeam(ctx.player.x, ctx.player.y, ctx.player.radius, beam)) {
+    if (ctx.player.invincible <= EPSILON && pointInBeam(ctx.player.x, ctx.player.y, BALANCE.player.hitRadius, beam)) {
       ctx.damagePlayer();
       if (ctx.player.hp <= 0) return;
     }

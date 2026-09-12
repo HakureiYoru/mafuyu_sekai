@@ -1,277 +1,197 @@
 import { describe, expect, it } from 'vitest';
-import { createBossBrain } from './boss-ai';
-import { BALANCE, STEP } from './config';
+import { BALANCE } from './config';
+import { clamp } from './math';
+import { advanceProjectileMotion } from './projectile-motion';
 import { GameSimulation } from './simulation';
-import type { InputAction } from './types';
+import { advanceSpellCard, SPELL_CARDS, spellTelegraphs } from './spellcards';
+import type { Bullet, Difficulty, Enemy, InputAction, SeasonId } from './types';
 
-type SweepDirection = 1 | -1;
-interface Placement { bossX: number; bossY: number; playerX: number; playerY: number }
-interface Route { moveX: number; moveY: number; ticks: number }
-const corners = [
-  { name: 'top left', bossX: 260, bossY: 260, playerX: 18, playerY: 18, inwardY: 1 },
-  { name: 'top right', bossX: 3740, bossY: 260, playerX: 3982, playerY: 18, inwardY: 1 },
-  { name: 'bottom left', bossX: 260, bossY: 3740, playerX: 18, playerY: 3982, inwardY: -1 },
-  { name: 'bottom right', bossX: 3740, bossY: 3740, playerX: 3982, playerY: 3982, inwardY: -1 },
-] as const;
-const difference = (to: number, from: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
-const walk = (moveX = 0, moveY = 0): InputAction => ({
-  moveX, moveY, aimX: 2000, aimY: 2000, shoot: false, dash: false, bomb: false, focus: false,
-});
-
-function encounter(distance: number, placement?: Placement) {
-  const sim = new GameSimulation(32026);
-  const boss = sim.spawnEnemy('boss', 2000, 2000)!;
-  const player = sim.state.player;
-  if (placement) {
-    boss.x = boss.prevX = placement.bossX;
-    boss.y = boss.prevY = placement.bossY;
-  }
-  player.x = player.prevX = placement?.playerX ?? boss.x + distance;
-  player.y = player.prevY = placement?.playerY ?? boss.y;
-  player.invincible = 0;
-  player.bombs = 0;
-  boss.boss = createBossBrain();
-  boss.state = 'chase';
-  boss.timer = 0;
-  return { sim, boss, player };
+const ARENA = { x: 1200, y: 1550, width: 1600, height: 900 };
+const HORIZON = 0.9, SAMPLES = 5, INTERVAL = HORIZON / SAMPLES;
+const DIRECTIONS = Array.from({ length: 24 }, (_, i) => ({ x: Math.cos(i * Math.PI / 12), y: Math.sin(i * Math.PI / 12) }));
+const STARTS = [[2000, 2220], [1218, 1568], [2782, 1568], [1218, 2432], [2782, 2432], [2000, 1976]] as const;
+interface Forecast { radius: number; points: { x: number; y: number }[] }
+function minimumDistance(ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay, t = clamp(-(ax * dx + ay * dy) / Math.max(1e-9, dx * dx + dy * dy), 0, 1);
+  return Math.hypot(ax + t * dx, ay + t * dy);
 }
-
-function startLaser(distance: number, direction: SweepDirection, placement?: Placement) {
-  const scene = encounter(distance, placement);
-  // Force only the next attack selection; its clocks, motion and damage are real.
-  scene.boss.boss!.sweepDirection = direction === 1 ? -1 : 1;
-  scene.boss.laserCooldown = 0;
-  scene.sim.step(walk());
-  expect(scene.boss.state).toBe('laserWarmup');
-  expect(scene.boss.boss!.sweepDirection).toBe(direction);
-  return scene;
-}
-
-function playLaser(distance: number, direction: SweepDirection, escape: boolean, placement?: Placement, inwardY = direction as number) {
-  const scene = startLaser(distance, direction, placement);
-  const { sim, boss, player } = scene;
-  const hp = player.hp, startAngle = boss.angle, initialTick = sim.state.tick;
-  let activeTicks = 0, damageEvents = 0, rescueEvents = 0, maxStep = 0;
-  let activationPosition: { x: number; y: number } | undefined;
-
-  for (let tick = 0; tick < 600; tick++) {
-    const warming = boss.state === 'laserWarmup';
-    if (!warming && boss.state !== 'laser') break;
-    if (boss.state === 'laser') activeTicks++;
-    // A 300 ms reaction delay, then one straight walk toward the advertised far edge.
-    // Stop at activation: survival must not rely on continually outrunning the beam.
-    const moving = escape && warming && sim.state.tick - initialTick >= 18;
-    const beforeX = player.x, beforeY = player.y;
-    const events = sim.step(walk(0, moving ? inwardY : 0));
-    maxStep = Math.max(maxStep, Math.hypot(player.x - beforeX, player.y - beforeY));
-    damageEvents += events.filter(event => event.type === 'damage').length;
-    rescueEvents += events.filter(event => event.type === 'dash' || event.type === 'bomb').length;
-    if (warming && boss.state === 'laser') activationPosition = { x: player.x, y: player.y };
-  }
-
-  expect(activeTicks).toBeGreaterThanOrEqual(180);
-  expect(boss.state).toBe('recover');
-  expect(direction * difference(boss.angle, startAngle)).toBeGreaterThan(0.9);
-  expect(sim.state.enemies).toHaveLength(1);
-  expect(sim.state.bullets).toHaveLength(0);
-  expect(maxStep).toBeLessThanOrEqual(300 * STEP + 1e-8);
-  expect(rescueEvents).toBe(0);
-  expect(player.bombs).toBe(0);
-  expect(activationPosition).toBeDefined();
-  expect(player.x).toBeCloseTo(activationPosition!.x, 8);
-  expect(player.y).toBeCloseTo(activationPosition!.y, 8);
-  return { ...scene, hp, startAngle, damageEvents };
-}
-
-function startBombard(placement?: Placement) {
-  const scene = encounter(400, placement);
-  scene.boss.boss!.cycle = 2;
-  scene.boss.laserCooldown = 999;
-  scene.sim.step(walk());
-  expect(scene.sim.state.hazards).toHaveLength(3);
-  expect(scene.sim.state.hazards.every(hazard => !hazard.active && hazard.sourceId === scene.boss.id)).toBe(true);
-  return scene;
-}
-
-function playBombard(escape: boolean, placement?: Placement, route: Route = { moveX: 1, moveY: 0, ticks: 36 }, wholePattern = false) {
-  const scene = startBombard(placement);
-  const { sim, player } = scene;
-  const hp = player.hp, startX = player.x, startY = player.y;
-  const marked = sim.state.hazards.map(hazard => ({ id: hazard.id, x: hazard.x, y: hazard.y }));
-  const activated = new Set<number>();
-  let damageEvents = 0, maxStep = 0, rescueEvents = 0, ringBursts = 0, maxLiveBullets = 0;
-  let finishedPattern = false;
-
-  for (let tick = 0; tick < (wholePattern ? 480 : 240); tick++) {
-    // Notice the markers after 350 ms. The complete combination requires keeping clear of later rings.
-    const moving = escape && tick >= 21 && tick < 21 + route.ticks;
-    const beforeX = player.x, beforeY = player.y;
-    const events = sim.step(walk(moving ? route.moveX : 0, moving ? route.moveY : 0));
-    maxStep = Math.max(maxStep, Math.hypot(player.x - beforeX, player.y - beforeY));
-    damageEvents += events.filter(event => event.type === 'damage').length;
-    rescueEvents += events.filter(event => event.type === 'dash' || event.type === 'bomb').length;
-    ringBursts += events.filter(event => event.type === 'enemyShot' && event.enemyType === 'boss').length;
-    maxLiveBullets = Math.max(maxLiveBullets, sim.state.bullets.filter(bullet => bullet.owner === 'enemy').length);
-    finishedPattern ||= scene.boss.state === 'recover';
-    for (const hazard of sim.state.hazards) {
-      const original = marked.find(mark => mark.id === hazard.id)!;
-      expect(original).toBeDefined();
-      expect(hazard.x).toBe(original.x);
-      expect(hazard.y).toBe(original.y);
-      if (hazard.active) activated.add(hazard.id);
+function crossesBeam(ax: number, ay: number, bx: number, by: number, x: number, y: number, angle: number, length: number, width: number): boolean {
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const from = [(ax - x) * cos + (ay - y) * sin, -(ax - x) * sin + (ay - y) * cos];
+  const to = [(bx - x) * cos + (by - y) * sin, -(bx - x) * sin + (by - y) * cos];
+  let enter = 0, leave = 1;
+  const limits = [[-10, length + 10], [-width / 2 - 10, width / 2 + 10]];
+  for (let axis = 0; axis < 2; axis++) {
+    const delta = to[axis] - from[axis];
+    if (Math.abs(delta) < 1e-8) { if (from[axis] < limits[axis][0] || from[axis] > limits[axis][1]) return false; }
+    else {
+      let low = (limits[axis][0] - from[axis]) / delta, high = (limits[axis][1] - from[axis]) / delta;
+      if (low > high) [low, high] = [high, low];
+      enter = Math.max(enter, low); leave = Math.min(leave, high);
+      if (enter > leave) return false;
     }
-    if (!wholePattern && sim.state.hazards.length === 0) break;
   }
-
-  expect(activated.size).toBe(3);
-  expect(sim.state.hazards).toHaveLength(0);
-  expect(maxStep).toBeLessThanOrEqual(300 * STEP + 1e-8);
-  expect(rescueEvents).toBe(0);
-  expect(player.bombs).toBe(0);
-  expect(player.x).toBeCloseTo(startX + (escape ? route.moveX * route.ticks * 300 * STEP : 0), 8);
-  expect(player.y).toBeCloseTo(startY + (escape ? route.moveY * route.ticks * 300 * STEP : 0), 8);
-  if (wholePattern) {
-    expect(finishedPattern).toBe(true);
-    expect(ringBursts).toBeGreaterThanOrEqual(6);
-    expect(maxLiveBullets).toBeGreaterThan(50);
+  return true;
+}
+function projectileForecast(bullet: Bullet): Forecast {
+  const copy = { ...bullet }, points = [{ x: copy.x, y: copy.y }];
+  for (let i = 0; i < SAMPLES; i++) {
+    const delta = advanceProjectileMotion(copy, INTERVAL);
+    copy.x += delta?.dx ?? copy.vx * INTERVAL; copy.y += delta?.dy ?? copy.vy * INTERVAL;
+    points.push({ x: copy.x, y: copy.y });
   }
-  return { ...scene, hp, startX, damageEvents };
+  return { radius: bullet.radius, points };
+}
+function start(season: SeasonId, difficulty: Difficulty, card: number, placement: readonly [number, number]) {
+  const sim = new GameSimulation(4004, difficulty);
+  sim.reset('story', 4004, difficulty, { season });
+  if (sim.state.status === 'upgrade') sim.chooseUpgrade(sim.state.build.choices[0]);
+  // Baseline movement tests deliberately have no optional defensive module or auto-firing companion.
+  sim.state.build.modules = [];
+  const boss = sim.spawnEnemy('boss', 2000, 1780)!;
+  for (let i = 0; i < card; i++) advanceSpellCard(boss, difficulty);
+  const p = sim.state.player;
+  p.x = p.prevX = placement[0]; p.y = p.prevY = placement[1]; p.invincible = 0;
+  return { sim, boss };
 }
 
-describe('unassisted routes through real Boss attacks', () => {
-  it.each([
-    [400, 1], [400, -1], [700, 1], [700, -1],
-  ] as const)('escapes the full laser sector at distance %i, sweep direction %i, then stands safely', (distance, direction) => {
-    const { sim, boss, player, hp, startAngle, damageEvents } = playLaser(distance, direction, true);
-    expect(sim.state.status).toBe('playing');
-    expect(player.hp).toBe(hp);
-    expect(player.invincible).toBe(0);
-    expect(damageEvents).toBe(0);
-
-    // Independent sector check, beyond the observed final ray with body-size margin.
-    const dx = player.x - boss.x, dy = player.y - boss.y;
-    const progress = direction * difference(Math.atan2(dy, dx), startAngle);
-    const sweep = direction * difference(boss.angle, startAngle);
-    expect(progress).toBeGreaterThan(sweep);
-    const clearance = Math.abs(dx * Math.sin(boss.angle) - dy * Math.cos(boss.angle));
-    expect(clearance).toBeGreaterThan(BALANCE.boss.laserWidth / 2 + player.radius + 20);
-  });
-
-  it('does damage to a stationary player, so safe routes cannot pass with an inactive laser', () => {
-    const { player, hp, damageEvents } = playLaser(700, 1, false);
-    expect(player.hp).toBeLessThan(hp);
-    expect(damageEvents).toBeGreaterThan(0);
-  });
-
-  it.each([1, -1] as const)('keeps the committed start angle while the player changes position, direction %i', direction => {
-    const { sim, boss, player } = startLaser(700, direction);
-    const committed = boss.angle, startY = player.y;
-    let warningTicks = 0;
-    while (boss.state === 'laserWarmup' && warningTicks < 180) {
-      sim.step(walk(0, direction));
-      expect(difference(boss.angle, committed)).toBeCloseTo(0, 10);
-      warningTicks++;
+/** Deterministic input-only route finder; uses visible committed attacks, never future AI decisions. */
+function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, senseDelay = 0.2): InputAction {
+  const w = sim.state, p = w.player;
+  if (p.dashTime > 0) return { ...previous, dash: false };
+  const bullets = w.bullets.filter(b => b.owner === 'enemy' && Math.hypot(b.x - p.x, b.y - p.y) < 660).map(projectileForecast);
+  // Pending emissions become readable after a real 200 ms reaction delay. Forecasts include the delay until release.
+  for (const cue of boss.spell!.cues) {
+    if (cue.warning - cue.remaining < senseDelay || cue.remaining > HORIZON) continue;
+    for (const shot of cue.shots) {
+      if (Math.hypot(shot.x - p.x, shot.y - p.y) > 660) continue;
+      const speed = shot.speed * (w.difficulty === 'hard' ? 1.28 : 1);
+      bullets.push({ radius: shot.radius, points: Array.from({ length: SAMPLES + 1 }, (_, i) => {
+        const age = i * INTERVAL - cue.remaining;
+        return age < 0 ? { x: 1e7, y: 1e7 } : { x: shot.x + Math.cos(shot.angle) * speed * age, y: shot.y + Math.sin(shot.angle) * speed * age };
+      }) });
     }
-    expect(warningTicks).toBeGreaterThanOrEqual(120);
-    expect(boss.state).toBe('laser');
-    expect(Math.abs(player.y - startY)).toBeGreaterThan(500);
-    expect(player.invincible).toBe(0);
-  });
-
-  it('walks out of all three committed ground blasts after a reaction delay without spending a rescue', () => {
-    const { sim, player, hp, startX, damageEvents } = playBombard(true);
-    expect(sim.state.status).toBe('playing');
-    expect(player.x - startX).toBeCloseTo(180, 8);
-    expect(player.hp).toBe(hp);
-    expect(player.invincible).toBe(0);
-    expect(damageEvents).toBe(0);
-  });
-
-  it('takes damage when remaining in a marked blast, validating the ground-hazard control', () => {
-    const { player, hp, damageEvents } = playBombard(false);
-    expect(player.hp).toBeLessThan(hp);
-    expect(damageEvents).toBeGreaterThan(0);
-  });
-
-  it.each(corners.flatMap(corner => ([1, -1] as const).map(direction => ({ ...corner, direction }))))(
-    'walks along the wall out of the laser at $name, direction $direction, and waits without damage', corner => {
-      const { sim, boss, player, hp, startAngle, damageEvents } = playLaser(0, corner.direction, true, corner, corner.inwardY);
-      expect(sim.state.status).toBe('playing');
-      expect(player.hp).toBe(hp);
-      expect(player.invincible).toBe(0);
-      expect(damageEvents).toBe(0);
-      const dx = player.x - boss.x, dy = player.y - boss.y;
-      const progress = corner.direction * difference(Math.atan2(dy, dx), startAngle);
-      const sweep = corner.direction * difference(boss.angle, startAngle);
-      expect(progress < 0 || progress > sweep).toBe(true);
-      const distanceToRay = (angle: number) => {
-        const along = Math.max(0, dx * Math.cos(angle) + dy * Math.sin(angle));
-        return Math.hypot(dx - Math.cos(angle) * along, dy - Math.sin(angle) * along);
-      };
-      expect(Math.min(distanceToRay(startAngle), distanceToRay(boss.angle)))
-        .toBeGreaterThan(BALANCE.boss.laserWidth / 2 + player.radius + 20);
-    },
-  );
-
-  it.each(corners)('escapes wall-clamped bombard and all accompanying rings at $name by continuing along the wall', corner => {
-    const { sim, player, hp, damageEvents } = playBombard(true, corner, { moveX: 0, moveY: corner.inwardY, ticks: 459 }, true);
-    expect(sim.state.status).toBe('playing');
-    expect(player.hp).toBe(hp);
-    expect(player.invincible).toBe(0);
-    expect(damageEvents).toBe(0);
-  });
-
-  it('keeps lethal ground damage terminal, clears pending hazards, and restores a clean run on reset', () => {
-    const { sim, player } = startBombard();
-    player.hp = 1;
-    const endings: string[] = [];
-    for (let tick = 0; tick < 180 && sim.state.status === 'playing'; tick++) {
-      endings.push(...sim.step(walk()).filter(event => event.type === 'failure' || event.type === 'complete').map(event => event.type));
+  }
+  const hazards = w.hazards.filter(h => h.active || h.warningDuration - h.warning >= senseDelay);
+  const goalAngle = Math.atan2(p.y - boss.y, p.x - boss.x) + 0.35;
+  let goalX = clamp(boss.x + Math.cos(goalAngle) * 520, ARENA.x + 65, ARENA.x + ARENA.width - 65);
+  let goalY = clamp(boss.y + Math.sin(goalAngle) * 520, ARENA.y + 65, ARENA.y + ARENA.height - 65);
+  let gateTime = 2.5;
+  for (const cue of boss.spell!.cues) {
+    if (cue.gapCenter === undefined || cue.warning - cue.remaining < senseDelay) continue;
+    const horizontal = cue.endY !== cue.y, speed = cue.shots[0].speed * (w.difficulty === 'hard' ? 1.28 : 1);
+    const distance = horizontal ? (p.x - cue.x) * Math.cos(cue.angle) : (p.y - cue.y) * Math.sin(cue.angle);
+    const arrival = cue.remaining + distance / speed;
+    if (arrival < 0 || arrival > gateTime) continue;
+    gateTime = arrival; goalX = horizontal ? p.x : cue.x + cue.gapCenter; goalY = horizontal ? cue.y + cue.gapCenter : p.y;
+  }
+  const rows = new Map<string, Bullet[]>();
+  for (const bullet of w.bullets) {
+    if (bullet.owner !== 'enemy' || bullet.radius !== 7) continue;
+    const horizontal = Math.abs(bullet.vy) < 1e-7, vertical = Math.abs(bullet.vx) < 1e-7;
+    if (!horizontal && !vertical) continue;
+    const key = `${horizontal ? 'h' : 'v'}:${(horizontal ? bullet.x : bullet.y).toFixed(2)}`;
+    const row = rows.get(key); if (row) row.push(bullet); else rows.set(key, [bullet]);
+  }
+  for (const row of rows.values()) {
+    if (row.length < 6) continue;
+    const horizontal = Math.abs(row[0].vy) < 1e-7;
+    const arrival = horizontal ? (p.x - row[0].x) / row[0].vx : (p.y - row[0].y) / row[0].vy;
+    if (arrival < 0 || arrival > gateTime) continue;
+    const coordinates = row.map(b => horizontal ? b.y : b.x).sort((a, b) => a - b);
+    if (!coordinates.some((coordinate, i) => i > 0 && coordinate - coordinates[i - 1] > 1 && coordinate - coordinates[i - 1] < 30)) continue;
+    let size = 50, center: number | undefined;
+    for (let i = 1; i < coordinates.length; i++) if (coordinates[i] - coordinates[i - 1] > size) {
+      size = coordinates[i] - coordinates[i - 1]; center = (coordinates[i] + coordinates[i - 1]) / 2;
     }
-    expect(endings).toEqual(['failure']);
-    expect(sim.state.status).toBe('failed');
-    expect(sim.state.hazards).toHaveLength(0);
-    expect(sim.state.enemies).toHaveLength(0);
-    expect(sim.state.bullets).toHaveLength(0);
-    const frozenTick = sim.state.tick;
-    for (let tick = 0; tick < 60; tick++) expect(sim.step(walk())).toHaveLength(0);
-    expect(sim.state.tick).toBe(frozenTick);
-    sim.reset();
-    expect(sim.state.status).toBe('playing');
-    expect(sim.state.tick).toBe(0);
-    expect(sim.state.hazards).toHaveLength(0);
-    expect(sim.state.player.hp).toBe(sim.state.player.maxHp);
-    sim.state.spawnTimer = 999;
-    sim.state.player.invincible = 0;
-    for (let tick = 0; tick < 180; tick++) expect(sim.step(walk()).some(event => event.type === 'damage')).toBe(false);
-    expect(sim.state.hazards).toHaveLength(0);
-  });
-
-  it('caps and staggers real enemy commitments, then releases the scheduling delay on restart', () => {
-    const sim = new GameSimulation(32026);
-    sim.state.spawnTimer = 999;
-    sim.state.player.invincible = 0;
-    sim.state.player.bombs = 0;
-    for (let i = 0; i < 9; i++) sim.spawnEnemy('sniper', 2500, 1800 + i * 50)!.cooldown = 0;
-    const starts: number[] = [];
-    let largest = 0;
-    for (let tick = 0; tick < 60; tick++) {
-      const events = sim.step(walk());
-      starts.push(...events.filter(event => event.type === 'attack' && event.text === 'windup').map(() => sim.state.elapsed));
-      const active = sim.state.enemies.filter(enemy => ['aim', 'charge', 'dash', 'volley', 'lay'].includes(enemy.state)).length;
-      largest = Math.max(largest, active);
-      expect(active).toBeLessThanOrEqual(3);
+    if (center === undefined) continue;
+    gateTime = arrival; goalX = horizontal ? p.x : center; goalY = horizontal ? center : p.y;
+  }
+  const score = (x: number, y: number, dash: boolean): number => {
+    const points = [{ x: p.x, y: p.y }];
+    let cost = dash ? 600 : 0;
+    for (let i = 1; i <= SAMPLES; i++) {
+      const time = i * INTERVAL, distance = dash ? 1080 * Math.min(0.18, time) + 300 * Math.max(0, time - 0.18) : 300 * time;
+      const rawX = p.x + x * distance, rawY = p.y + y * distance;
+      const point = { x: clamp(rawX, ARENA.x + 18, ARENA.x + ARENA.width - 18), y: clamp(rawY, ARENA.y + 18, ARENA.y + ARENA.height - 18) };
+      points.push(point);
+      cost += (Math.abs(rawX - point.x) + Math.abs(rawY - point.y)) * 5;
+      if (dash && time <= 0.18 + 1e-8) continue;
+      const bodyDistance = Math.hypot(point.x - boss.x, point.y - boss.y) - boss.radius - 18;
+      cost += bodyDistance < 8 ? 1e7 : Math.exp(-bodyDistance / 35) * 150;
+      for (const hazard of hazards) {
+        const low = Math.max((i - 1) * INTERVAL, hazard.active ? 0 : hazard.warning), high = Math.min(time, hazard.warning + hazard.life);
+        if (low > high) continue;
+        const before = points[i - 1], from = (low - (i - 1) * INTERVAL) / INTERVAL, to = (high - (i - 1) * INTERVAL) / INTERVAL;
+        const ax = before.x + (point.x - before.x) * from, ay = before.y + (point.y - before.y) * from;
+        const bx = before.x + (point.x - before.x) * to, by = before.y + (point.y - before.y) * to;
+        const hit = hazard.kind === 'beam'
+          ? crossesBeam(ax, ay, bx, by, hazard.x, hazard.y, hazard.angle ?? 0, hazard.length ?? 0, hazard.width ?? 0)
+          : minimumDistance(ax - hazard.x, ay - hazard.y, bx - hazard.x, by - hazard.y) < hazard.radius + 13;
+        if (hit) cost += 1e7 * (2 - time);
+      }
     }
-    expect(largest).toBe(3);
-    expect(starts).toHaveLength(3);
-    for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeGreaterThanOrEqual(0.28 - 1e-8);
-    expect(sim.state.player.hp).toBe(sim.state.player.maxHp);
-    sim.reset();
-    sim.state.spawnTimer = 999;
-    const fresh = sim.spawnEnemy('sniper', 2500, 2000)!;
-    fresh.cooldown = 0;
-    const events = sim.step(walk());
-    expect(fresh.state).toBe('aim');
-    expect(events.filter(event => event.type === 'attack' && event.text === 'windup')).toHaveLength(1);
-  });
+    for (const bullet of bullets) for (let i = 1; i <= SAMPLES; i++) {
+      if (dash && i === 1) continue;
+      if (bullet.points[i - 1].x === 1e7 || bullet.points[i].x === 1e7) continue;
+      const clearance = minimumDistance(bullet.points[i - 1].x - points[i - 1].x, bullet.points[i - 1].y - points[i - 1].y,
+        bullet.points[i].x - points[i].x, bullet.points[i].y - points[i].y) - bullet.radius - 7;
+      cost += clearance < 2 ? 1e7 * (2 - i * INTERVAL) : Math.exp(-clearance / 14) * 80;
+    }
+    const last = points.at(-1)!;
+    cost += Math.hypot(last.x - goalX, last.y - goalY) * (gateTime < 2.5 ? 2 : 0.1);
+    cost += (1 - (x * previous.moveX + y * previous.moveY)) * 2;
+    return cost;
+  };
+  let best = { x: 0, y: 0, dash: false, value: score(0, 0, false) };
+  for (const direction of DIRECTIONS) {
+    const value = score(direction.x, direction.y, false);
+    if (value < best.value) best = { ...direction, dash: false, value };
+  }
+  if (best.value > 1e5 && p.dashCooldown <= 0) for (const direction of DIRECTIONS) {
+    const value = score(direction.x, direction.y, true);
+    if (value < best.value) best = { ...direction, dash: true, value };
+  }
+  return { moveX: best.x, moveY: best.y, dash: best.dash, bomb: false, shoot: false, focus: false, aimX: boss.x, aimY: boss.y };
+}
+
+function runRoute(season: SeasonId, difficulty: Difficulty, card: number, placement: readonly [number, number], moving: boolean, seconds = 24) {
+  const { sim, boss } = start(season, difficulty, card, placement), p = sim.state.player;
+  let input: InputAction = { moveX: 0, moveY: 0, dash: false, bomb: false, shoot: false, aimX: boss.x, aimY: boss.y };
+  let damage = 0, dashes = 0, shots = 0, distance = 0;
+  const cues = new Set<number>(), hazardIds = new Set<number>();
+  for (let tick = 0; tick < seconds * 60 && sim.state.status === 'playing'; tick++) {
+    if (moving && tick % 6 === 0) input = steering(sim, boss, input);
+    const x = p.x, y = p.y, events = sim.step(input);
+    damage += events.filter(event => event.type === 'damage').length;
+    dashes += events.filter(event => event.type === 'dash').length;
+    shots += events.filter(event => event.type === 'enemyShot').length;
+    distance += Math.hypot(p.x - x, p.y - y);
+    for (const cue of spellTelegraphs(boss)) cues.add(cue.id);
+    for (const hazard of sim.state.hazards) hazardIds.add(hazard.id);
+  }
+  return { damage, dashes, shots, distance, cues: cues.size, hazards: hazardIds.size, elapsed: sim.state.elapsed,
+    hp: p.hp, invincible: p.invincible, bombs: p.bombs, index: boss.spell!.shotIndex };
+}
+
+describe('complete committed spellcard routes in the fixed arena', () => {
+  it.each((['s1', 's2'] as const).flatMap(season => (['normal', 'hard'] as const).flatMap(difficulty =>
+    Array.from({ length: 6 }, (_, card) => ({ season, difficulty, card, name: SPELL_CARDS[season][difficulty][card].name }))))) (
+    '$season $difficulty $name has a full input-only route from the ordinary start, corners and near-body range', ({ season, difficulty, card }) => {
+      const outcomes = STARTS.map(placement => runRoute(season, difficulty, card, placement, true));
+      for (const outcome of outcomes) {
+        expect(outcome.elapsed, JSON.stringify(outcomes)).toBeCloseTo(24, 6);
+        expect(outcome.index).toBeGreaterThanOrEqual(5);
+        expect(outcome.shots + outcome.hazards).toBeGreaterThan(5);
+        expect(outcome.damage, JSON.stringify(outcomes)).toBe(0);
+        expect(outcome.bombs).toBe(BALANCE.player.bombs);
+        expect(outcome.dashes).toBeLessThanOrEqual(Math.ceil(24 / BALANCE.dash.cooldown));
+        expect(outcome.distance).toBeGreaterThan(100);
+      }
+    });
+  it.each((['s1', 's2'] as const).flatMap(season => Array.from({ length: 6 }, (_, card) => ({ season, card }))))(
+    '$season card $card damages a stationary control under the same real simulation', ({ season, card }) => {
+      const outcome = runRoute(season, 'normal', card, STARTS[0], false, 20);
+      expect(outcome.damage).toBeGreaterThan(0); expect(outcome.dashes).toBe(0); expect(outcome.distance).toBe(0);
+    });
 });

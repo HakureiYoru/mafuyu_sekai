@@ -1637,3 +1637,98 @@ kbd {
     transform: none;
   }
 }
+
+/* The battlefield keeps one 16:9 view; status rails occupy their own layout space. */
+:root { --hud-top: 64px; --hud-bottom: 100px; }
+#game-shell { width: 100vw; height: 100dvh; aspect-ratio: auto; background: #050910; }
+#game-host { inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100vw, 177.7777778dvh); height: auto; aspect-ratio: 16 / 9; }
+#game-shell[data-in-run="true"] #game-host { width: min(100vw, calc((100dvh - var(--hud-top) - var(--hud-bottom)) * 16 / 9)); top: calc((100dvh + var(--hud-top) - var(--hud-bottom)) / 2); }
+.app { font-size: clamp(14px, 1.2vw, 18px); }
+.menu-simple { gap: 10px; width: min(100%, 480px); }
+.season-options { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 10px; margin-bottom: 6px; }
+.season-options button { border: 1px solid #405069; background: #0a1323; border-radius: 5px; padding: 12px 8px; font-size: 15px; line-height: 1.4; }
+.season-options button span { display: block; font-size: 12px; margin-top: 4px; color: #91a5c0; }
+.season-options button[aria-pressed="true"] { color: var(--mint); border-color: #83cbb8; background: #132d30; }
+.season-options button:disabled { cursor: not-allowed; opacity: .6; }
+.season-description { min-height: 20px; margin: 0; font-size: 12px; color: #b0c2d8; line-height: 1.6; }
+.save-notice { margin: 4px 0; font-size: 12px; color: #8fa8bf; line-height: 1.6; overflow-wrap: anywhere; }
+.save-session { color: #ffd293; }
+.menu-best { font-size: 12px; color: #a7bad2; }
+.battle-hud { padding: 0; font-size: 13px; }
+.battle-top,.battle-bottom { position: absolute; left: 0; right: 0; display: grid; gap: 24px; padding: 9px max(14px, calc((100vw - 1660px) / 2)); background: #0b1320; }
+.battle-top { height: var(--hud-top); top: 0; grid-template-columns: minmax(190px, 1fr) minmax(280px, 1.5fr) minmax(230px, 1fr); border-bottom: 1px solid #25344a; align-items: center; }
+.battle-bottom { height: var(--hud-bottom); bottom: 0; grid-template-columns: minmax(245px, 1fr) minmax(250px, 1.25fr) minmax(245px, 1fr); border-top: 1px solid #25344a; }
+.stage-summary,.encounter-summary,.battle-player,.battle-weapon,.battle-comms { min-width: 0; }
+.stage-summary>div:first-child,.encounter-summary>div:first-child,.compact-heading,.compact-growth,.compact-resource>span,.compact-dash { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.stage-summary>div:first-child { justify-content: flex-start; font-size: 12px; }
+.stage-summary strong { font-weight: 500; }
+.stage-summary>div>span:last-child { color: #a6b7ce; margin-left: auto; font-variant-numeric: tabular-nums; }
+.stage-title { display: block; font-size: 11px; line-height: 1.6; color: #91a7c1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.battle-hud .meter { height: 3px; margin: 3px 0 0; }
+.encounter-summary>div>strong { font-size: 13px; font-weight: 500; color: #e0d0ff; }
+.encounter-summary>div>span,.encounter-summary>span { font-size: 11px; color: #b7a8cf; display: block; }
+.encounter-summary p { font-size: 11px; color: #a3b4ca; line-height: 1.35; margin: 3px 0 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.battle-announcement { font-size: 12px; font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; color: var(--mint); }
+.battle-actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.battle-score { font-size: 16px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.battle-actions small { display: block; margin-top: 3px; font-size: 10px; color: #8da2bd; letter-spacing: 0; }
+.battle-bombs { color: #ffe1aa; font-size: 16px; }
+.battle-actions .icon-button { width: 30px; height: 30px; font-size: 15px; pointer-events: auto; }
+.compact-heading { height: 26px; font-size: 12px; }
+.compact-heading img { width: 24px; height: 24px; border-radius: 3px; object-fit: cover; }
+.compact-heading strong { color: #c6b4f5; margin-right: auto; }
+.battle-player .health-segments { display: flex; gap: 4px; height: 6px; margin: 6px 0; }
+.battle-player .health-segments span { flex: 1; height: 100%; background: #263548; border: 0; border-radius: 1px; }
+.battle-player .health-segments .filled { background: #9ce6cf; box-shadow: none; }
+.compact-growth { color: #92a9c4; font-size: 11px; margin-top: 5px; }
+.battle-player .support-status { display: inline; padding: 0; margin: 0; border: 0; font-size: 11px; color: #b4c8dc; }
+.compact-comms-toggle { display: flex; justify-content: space-between; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid #283549; color: #b3c8dd; padding: 0 0 4px; font-size: 11px; pointer-events: auto; }
+.compact-comms-toggle span { color: #83bcae; }
+.battle-comms p { font-size: 12px; color: #aebed3; line-height: 1.45; margin: 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px; }
+.module-summary { font-size: 10px; color: #8a97b1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 5px; }
+.compact-resource { display: inline-block; width: calc(50% - 8px); }
+.compact-resource+.compact-resource { margin-left: 16px; }
+.compact-resource>span { display: flex; color: #a1b6cc; font-size: 11px; }
+.compact-resource strong { color: #e3ebf5; font-size: 12px; font-weight: 500; }
+.compact-resource.is-hot>span,.compact-resource.is-hot strong { color: #ffb99b; }
+.compact-dash { height: 28px; margin-top: 11px; color: #a8bdce; font-size: 12px; }
+.compact-dash strong { font-weight: 500; }
+.compact-dash kbd { font-size: 10px; }
+.compact-dash.is-perfect { color: var(--mint); }
+.battle-hud .dash-meter { margin-top: 0; }
+.upgrade-dialog { width: min(950px, 100%); padding: 28px; }
+.upgrade-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.upgrade-card { min-width: 0; background: #101c30; border: 1px solid #557b85; border-radius: 6px; padding: 19px; display: flex; flex-direction: column; text-align: left; transition: border-color .15s, transform .15s; }
+.upgrade-card:hover { border-color: var(--mint); transform: translateY(-3px); }
+.upgrade-branch { display: flex; justify-content: space-between; gap: 10px; align-items: center; color: #92c4b7; font-size: 12px; margin-bottom: 28px; }
+.upgrade-branch kbd { font-size: 12px; }
+.upgrade-card>strong { color: #e2f7ef; font-size: 21px; font-weight: 500; }
+.upgrade-card p { font-size: 14px; color: #a9bcd5; line-height: 1.75; flex: 1; margin: 17px 0 22px; }
+.upgrade-confirm { border-top: 1px solid #334354; padding-top: 14px; display: flex; justify-content: space-between; font-size: 12px; color: #b8d9d3; }
+.branch-drone { border-color: #665883; }.branch-drone .upgrade-branch { color: #c5a6ec; }
+.branch-resource { border-color: #816d4a; }.branch-resource .upgrade-branch { color: #e7c897; }
+.upgrade-owned { color: #90a2bc; font-size: 12px; line-height: 1.7; margin: 20px 0; }
+.upgrade-dialog>.text-button { display: block; width: 100%; font-size: 12px; }
+.result-dialog .save-notice { margin: -7px 0 18px; }
+@media (max-width: 1000px) {
+  .battle-top,.battle-bottom { gap: 14px; padding-left: 12px; padding-right: 12px; }
+  .battle-top { grid-template-columns: minmax(170px, 1fr) minmax(230px, 1.4fr) auto; }
+  .battle-bottom { grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(220px, 1fr); }
+  .battle-score { display: none; }.battle-actions { gap: 9px; }
+  .upgrade-dialog { padding: 22px; }.upgrade-card { padding: 15px; }
+}
+@media (max-width: 720px) {
+  :root { --hud-top: 64px; --hud-bottom: 100px; }
+  .battle-top { grid-template-columns: minmax(100px, 1fr) minmax(110px, 1.3fr) auto; gap: 8px; }
+  .battle-bottom { grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr); gap: 14px; }
+  .battle-comms { display: none; }.battle-bombs small { display: none; }.battle-actions .icon-button:last-child { display: none; }
+  .stage-summary>div:first-child { font-size: 10px; gap: 5px; }.stage-summary .status-dot { display: none; }
+  .stage-title,.encounter-summary p,.encounter-summary>div>span { font-size: 10px; }
+  .encounter-summary>div>strong { font-size: 11px; }.compact-heading { font-size: 10px; gap: 5px; }
+  .compact-heading img { display: none; }.compact-heading .support-status { font-size: 10px; }
+  .compact-resource>span { font-size: 10px; }.compact-resource strong { font-size: 10px; }
+  .upgrade-cards { grid-template-columns: 1fr; gap: 10px; }.upgrade-card { padding: 14px; }
+  .upgrade-card>strong { font-size: 18px; }.upgrade-branch { margin-bottom: 9px; }.upgrade-card p { margin: 8px 0 12px; }
+  .upgrade-dialog { padding: 20px; }.dialog-overlay { font-size: 14px; padding: 14px; }
+}
+@media (max-height: 680px) { .menu-simple { gap: 7px; }.menu-title { font-size: 32px; }.menu-instructions { margin: 0; }.upgrade-dialog { padding: 20px; }.upgrade-branch { margin-bottom: 15px; } }

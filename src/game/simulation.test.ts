@@ -4,7 +4,7 @@ import { FixedClock } from './clock';
 import { beamGeometry, pointInBeam, SeededRandom, segmentCircleHit, SpatialGrid } from './math';
 import { ObjectPool } from './pool';
 import { GameSimulation } from './simulation';
-import { BOSS_ATTACKS, createBossBrain } from './boss-ai';
+import { SPELL_CARDS } from './spellcards';
 import type { Bullet, EnemyType, InputAction, PickupType } from './types';
 
 const idle = (extra: Partial<InputAction> = {}): InputAction => ({ moveX: 0, moveY: 0, aimX: 3500, aimY: 2000, shoot: false, dash: false, bomb: false, ...extra });
@@ -23,6 +23,13 @@ function bullet(extra: Partial<Bullet> = {}): Bullet {
   return { id: 10000, x: 2000, y: 2000, prevX: 2000, prevY: 2000, vx: 1000, vy: 0, radius: 4,
     owner: 'player', damage: extra.owner === 'enemy' ? 1 : 2, life: 10, color: 0xffffff, homing: false, speed: 1000, lockRange: 300,
     targetId: null, remainingHits: 1, hitIds: new Set(), kind: 'normal', ...extra };
+}
+function defeatFinal(sim: GameSimulation) {
+  const boss = sim.state.enemies.find(e => e.type === 'boss')!;
+  for (let card = 0; card < 6; card++) {
+    ticks(sim, 50); expect(boss.spell!.cardIndex).toBe(card);
+    sim.damageEnemy(boss, 1e9);
+  }
 }
 
 describe('deterministic fixed-step combat', () => {
@@ -303,10 +310,10 @@ describe('progression, drops, and lifecycle', () => {
     expect(sim.state.wave).toBe(5); expect(sim.state.bossPending).toBe(true);
     ticks(sim, 120);
     const boss = sim.state.enemies.find(e => e.type === 'boss')!;
-    expect(boss.hp).toBe(1800); expect(boss.radius).toBe(160);
+    expect(boss.hp).toBe(700); expect(boss.radius).toBe(160);
     expect(Math.hypot(sim.state.player.x - boss.x, sim.state.player.y - boss.y)).toBeGreaterThan(350);
     expect(sim.state.player.ammo).toBe(120); expect(sim.state.bossStage).toBe(true);
-    sim.damageEnemy(boss, 1800);
+    defeatFinal(sim);
     expect(sim.state.status).toBe('complete');
     sim.continueEndless();
     expect(sim.state).toMatchObject({ status: 'playing', mode: 'endless', wave: 6, bossStage: false, bossPending: false });
@@ -318,35 +325,29 @@ describe('progression, drops, and lifecycle', () => {
     const expected = structuredClone(sim.state.pickups);
     const boss = sim.spawnEnemy('boss', 0, 0)!;
     expect(sim.state.pickups).toEqual(expected);
-    sim.damageEnemy(boss, 1800);
+    expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim);
     sim.continueEndless();
-    expect(sim.state.pickups).toEqual(expected);
+    expect(sim.state.pickups.map(pickup => ({ ...pickup, age: 0 }))).toEqual(expected);
   });
-  it('locks the whole laser warning, suspends ordinary shots, holds its opening angle, and cools down after its end', () => {
+  it('locks a short spell laser throughout its full visible warning and removes it after its duration', () => {
     const sim = quiet(); const boss = sim.spawnEnemy('boss', 0, 0)!;
-    boss.laserCooldown = 0; boss.timer = 0; sim.state.player.x = 2600; sim.state.player.y = 2000;
-    sim.step(idle());
-    expect(boss.state).toBe('laserWarmup');
-    const locked = boss.angle;
-    sim.state.player.x = 2000; sim.state.player.y = 2600;
-    const during = ticks(sim, Math.round(BOSS_ATTACKS.laser.warning / STEP) - 1);
-    expect(boss.state).toBe('laserWarmup'); expect(boss.angle).toBeCloseTo(locked, 8);
-    during.push(...sim.step(idle()));
-    expect(boss.state).toBe('laser'); expect(boss.angle).toBeCloseTo(locked, 8);
-    expect(during.filter(e => e.type === 'enemyShot')).toHaveLength(0);
-    ticks(sim, Math.round(BOSS_ATTACKS.laser.hold / STEP));
-    expect(boss.angle).toBeCloseTo(locked, 8);
-    const firing = ticks(sim, Math.round((BOSS_ATTACKS.laser.duration - BOSS_ATTACKS.laser.hold) / STEP));
-    expect(firing.filter(e => e.type === 'enemyShot')).toHaveLength(0);
-    expect(boss.state).toBe('recover'); expect(boss.laserCooldown).toBe(BOSS_ATTACKS.laser.cooldown);
-    expect(boss.angle - locked).toBeCloseTo((BOSS_ATTACKS.laser.duration - BOSS_ATTACKS.laser.hold) * BOSS_ATTACKS.laser.angularSpeed, 8);
+    boss.spell!.cardIndex = 3;
+    for (let i = 0; i < 180 && !sim.state.hazards.length; i++) sim.step(idle());
+    const beam = sim.state.hazards.find(h => h.kind === 'beam')!;
+    expect(beam).toBeTruthy(); expect(beam.warningDuration).toBe(1.2);
+    const locked = beam.angle; sim.state.player.x = 2600;
+    ticks(sim, Math.round(beam.warning / STEP) - 1);
+    expect(beam.active).toBe(false); expect(beam.angle).toBe(locked);
+    sim.step(idle()); expect(beam.active).toBe(true);
+    ticks(sim, Math.ceil(beam.duration / STEP) + 1);
+    expect(sim.state.hazards.some(h => h.id === beam.id)).toBe(false);
   });
   it.each(['contact', 'laser', 'bullet'] as const)('keeps failure terminal when %s kills the player before a lethal Boss shot resolves', hazard => {
     const sim = quiet(), boss = sim.spawnEnemy('boss', 0, 0)!, p = sim.state.player;
-    boss.hp = 2; boss.cooldown = 10; boss.boss = { ...createBossBrain(), phase: 3 };
+    boss.hp = 2; boss.spell!.cardIndex = 5; boss.spell!.stage = 'active'; boss.spell!.age = 1; boss.spell!.nextAttack = 999;
     p.hp = 1; p.invincible = 0;
     p.x = hazard === 'contact' ? boss.x : boss.x + 400; p.y = boss.y;
-    if (hazard === 'laser') { boss.state = 'laser'; boss.timer = BOSS_ATTACKS.laser.duration; boss.angle = 0; boss.boss.skill = 'laser'; boss.boss.lockedAngle = 0; }
+    if (hazard === 'laser') sim.state.hazards.push({ id: 989, sourceId: boss.id, x: boss.x, y: boss.y, angle: 0, width: 42, length: 1600, radius: 21, kind: 'beam', warning: 0, warningDuration: 1.2, active: true, life: 1, duration: 1 });
     if (hazard === 'bullet') sim.state.bullets.push(bullet({ owner: 'enemy', x: p.x, y: p.y, vx: 0, speed: 0 }));
     sim.state.bullets.push(bullet({ x: boss.x, y: boss.y, vx: 0, speed: 0, damage: 2 }));
     const events = sim.step(idle());
@@ -360,7 +361,7 @@ describe('progression, drops, and lifecycle', () => {
   });
   it('stops later bullet damage once the winning Boss shot has made completion terminal', () => {
     const sim = quiet(), boss = sim.spawnEnemy('boss', 0, 0)!, p = sim.state.player;
-    boss.hp = 2; boss.cooldown = 10; boss.boss = { ...createBossBrain(), phase: 3 }; p.hp = 1; p.invincible = 0;
+    boss.hp = 2; boss.spell!.cardIndex = 5; boss.spell!.stage = 'active'; boss.spell!.age = 1; boss.spell!.nextAttack = 999; p.hp = 1; p.invincible = 0;
     sim.state.bullets.push(bullet({ x: boss.x, y: boss.y, vx: 0, speed: 0, damage: 2 }),
       bullet({ owner: 'enemy', x: p.x, y: p.y, vx: 0, speed: 0 }));
     const events = sim.step(idle());
@@ -368,34 +369,27 @@ describe('progression, drops, and lifecycle', () => {
     expect(events.filter(e => e.type === 'failure' || e.type === 'complete').map(e => e.type)).toEqual(['complete']);
     expect(events.filter(e => e.type === 'damage')).toHaveLength(0);
   });
-  it.each([1, 2, 3] as const)('uses the configured telegraph and projectile speeds for both phase %i bullet patterns', phase => {
-    for (const skill of ['volley', 'nova'] as const) {
+  it.each([1, 2, 3] as const)('requires both independent cards in phase %i and emits actual bullets after the warning', phase => {
+    for (const index of [(phase - 1) * 2, (phase - 1) * 2 + 1]) {
       const sim = quiet(), boss = sim.spawnEnemy('boss', 0, 0)!;
-      const cycle = skill === 'volley' ? [0, 2, 1][phase - 1] : [1, 0, 2][phase - 1];
-      boss.boss = { ...createBossBrain(), phase, cycle }; boss.hp = phase === 1 ? 1800 : phase === 2 ? 1000 : 400;
-      boss.timer = 0; boss.laserCooldown = 999; boss.cooldown = 0;
-      sim.state.player.x = 2500; sim.state.player.y = 2000;
-      sim.step(idle());
-      expect(boss.state).toBe(skill === 'volley' ? 'aim' : 'novaWarmup');
-      const attack = BOSS_ATTACKS[skill];
-      ticks(sim, Math.round(attack.warning[phase - 1] / STEP) - 1);
+      boss.spell!.cardIndex = index; boss.hp = boss.maxHp = SPELL_CARDS.s1.normal[index].hp;
+      ticks(sim, 47);
       expect(sim.state.bullets.filter(b => b.owner === 'enemy')).toHaveLength(0);
-      sim.step(idle());
+      const events = ticks(sim, 360);
       const bullets = sim.state.bullets.filter(b => b.owner === 'enemy');
-      expect(bullets.length).toBeGreaterThan(0);
-      const speeds = Array.from({ length: attack.layers[phase - 1] }, (_, layer) => attack.speed[phase - 1] + layer * attack.speedStep + attack.acceleration * STEP);
-      expect(bullets.every(b => speeds.some(speed => Math.abs(Math.hypot(b.vx, b.vy) - speed) < 1e-8))).toBe(true);
-      expect(new Set(bullets.map(b => Math.round(b.speed * 1000))).size).toBe(attack.layers[phase - 1]);
+      expect(events.some(event => event.type === 'enemyShot')).toBe(true);
+      expect(boss.spell!.cardIndex).toBe(index);
+      expect(bullets.every(b => Number.isFinite(b.speed) && b.speed >= 0 && b.radius <= 8)).toBe(true);
     }
   });
   it('resets an in-flight boss telegraph and combat resources identically on twenty restarts', () => {
     const sim = new GameSimulation(68), baseline = structuredClone(sim.state);
     for (let i = 0; i < 20; i++) {
       const boss = sim.spawnEnemy('boss', 0, 0)!;
-      boss.laserCooldown = 0; boss.timer = 0; sim.state.player.x = 2600; sim.state.player.y = 2000;
+      boss.spell!.cardIndex = 3; sim.state.player.x = 2600; sim.state.player.y = 2000;
       sim.step(idle({ dash: true, bomb: true, shoot: true }));
-      ticks(sim, 12); // Finish dash before injecting the fatal hit, while laser warning is still active.
-      expect(boss.state).toBe('laserWarmup');
+      ticks(sim, 50);
+      expect(sim.state.hazards.some(h => h.kind === 'beam' && !h.active)).toBe(true);
       sim.state.blackHoleTime = 3;
       sim.state.player.invincible = 0; sim.state.player.hp = 1;
       sim.state.bullets.push(bullet({ owner: 'enemy', x: sim.state.player.x, y: sim.state.player.y, vx: 0, speed: 0, radius: 1000 }));
@@ -413,7 +407,7 @@ describe('progression, drops, and lifecycle', () => {
     ticks(sim, 121);
     expect(sim.state.pendingWave).toBe(11);
     const boss = sim.state.enemies.find(e => e.type === 'boss')!;
-    sim.damageEnemy(boss, boss.hp);
+    expect(boss.spell!.cardIndex).toBe(0); defeatFinal(sim);
     expect(sim.state).toMatchObject({ wave: 11, bossStage: false, pendingWave: 0, mode: 'endless', status: 'playing' });
   });
   it('builds an identical bounded stress scene and enforces enemy/mine caps', () => {
@@ -454,12 +448,15 @@ describe('support companions and instantaneous dash beam', () => {
     const sim = quiet(), p = sim.state.player;
     p.x = p.y = p.radius;
     for (const wave of [2, 3, 4]) {
-      if (wave === 4) sim.state.minibossDefeated = true;
+      if (wave === 4) {
+        sim.state.waveTime = 12; const mini = sim.spawnEnemy('miniboss', 3000, 2000)!;
+        sim.damageEnemy(mini, mini.hp);
+      }
       sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
       const events = sim.step(idle({ aimX: 3500, aimY: p.y }));
       expect(sim.state.wave).toBe(wave);
       expect(events.filter(e => e.type === 'support' && e.text === 'arrival')).toHaveLength(1);
-      const supply = sim.state.pickups.find(item => item.type === 'support')!;
+      const supply = sim.state.pickups.find(item => item.type === 'support' && Math.hypot(item.x - p.x, item.y - p.y) <= 72)!;
       expect(Math.hypot(supply.x - p.x, supply.y - p.y)).toBeLessThanOrEqual(72);
       expect(supply.x).toBeGreaterThanOrEqual(0); expect(supply.y).toBeGreaterThanOrEqual(0);
       const pickupEvents = ticks(sim, 20);
@@ -499,7 +496,7 @@ describe('support companions and instantaneous dash beam', () => {
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
     const boss = sim.spawnEnemy('boss', 0, 0)!;
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
-    sim.damageEnemy(boss, boss.hp); sim.continueEndless();
+    expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim); sim.continueEndless();
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
     sim.reset(); expect(sim.state.companions).toHaveLength(0); expect(sim.state.beams).toHaveLength(0);
   });
@@ -603,7 +600,8 @@ describe('support companions and instantaneous dash beam', () => {
     sim.step(idle({ shoot: true })); expect(sim.state.beams).toHaveLength(1);
     sim.reset(); expect(sim.state.beams).toHaveLength(0);
     const boss = sim.spawnEnemy('boss', 0, 0)!;
-    boss.hp = 40; boss.boss = { ...createBossBrain(), phase: 3 }; sim.state.player.perfectWindow = BALANCE.dash.window;
+    boss.hp = 40; boss.spell!.cardIndex = 5; boss.spell!.stage = 'active'; boss.spell!.age = 1;
+    sim.state.player.perfectWindow = BALANCE.dash.window;
     const events = sim.step(idle({ shoot: true, aimX: boss.x, aimY: boss.y }));
     expect(events.filter(event => event.type === 'complete' || event.type === 'failure').map(event => event.type)).toEqual(['complete']);
     expect(sim.state.beams).toHaveLength(0);

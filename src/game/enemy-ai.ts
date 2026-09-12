@@ -300,6 +300,7 @@ export function updateEnemyAi(enemy: Enemy, dt: number, decide: boolean, context
   const distance = Math.hypot(context.player.x - enemy.x, context.player.y - enemy.y);
   if (enemy.type === 'basic') { updateBasic(enemy, dt, decide, context, distance); return; }
   const type = enemy.type;
+  if (type !== 'dasher' && type !== 'sniper' && type !== 'sprayer' && type !== 'minelayer') return;
   const committed = enemy.state === 'charge' || enemy.state === 'aim' || enemy.state === 'dash' || enemy.state === 'volley' || enemy.state === 'lay';
   if (!context.allowAttack && committed) { recover(enemy, type, context); return; }
   if (enemy.state === 'recover') { recovery(enemy, type, dt, decide, context, distance); return; }

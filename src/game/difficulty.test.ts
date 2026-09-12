@@ -66,7 +66,7 @@ describe('difficulty through the simulation boundary', () => {
   it.each(difficulties)('%s applies the separate Boss HP multiplier to both bosses', difficulty => {
     const boss = quiet(difficulty).spawnEnemy('boss', 1000, 1000)!;
     const mini = quiet(difficulty).spawnEnemy('miniboss', 2500, 2000)!;
-    expect(boss.maxHp).toBe(difficulty === 'hard' ? 2430 : 1800);
+    expect(boss.maxHp).toBe(difficulty === 'hard' ? 945 : 700);
     expect(mini.maxHp).toBe(difficulty === 'hard' ? 1620 : 1200);
     expect(mini.speed).toBeCloseTo(difficulty === 'hard' ? 312 : 240);
     expect(mini.radius).toBe(64);
@@ -117,7 +117,11 @@ describe('difficulty through the simulation boundary', () => {
     expect(sim.state.enemies).toHaveLength(0); expect(sim.state.bullets).toHaveLength(0); expect(sim.state.indicators).toHaveLength(0);
     expect(sim.spawnEnemy('basic', 2400, 2000)!.hp).toBe(9);
     const boss = sim.spawnEnemy('boss', 2000, 2000)!;
-    sim.damageEnemy(boss, boss.hp); sim.continueEndless();
+    for (let card = 0; card < 6; card++) {
+      for (let tick = 0; tick < 50; tick++) sim.step(idle());
+      expect(boss.spell?.cardIndex).toBe(card); sim.damageEnemy(boss, boss.hp);
+    }
+    sim.continueEndless();
     expect(sim.state).toMatchObject({ difficulty: 'hard', mode: 'endless', status: 'playing', wave: 6 });
     expect(sim.state.bullets).toHaveLength(0);
     sim.reset('story', 3301, 'normal'); sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9;

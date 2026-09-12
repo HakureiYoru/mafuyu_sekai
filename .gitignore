@@ -7,3 +7,5 @@ out
 test-results
 playwright-report
 .tmp
+docs/validation/v4-browser-run
+docs/validation/v4-browser-clean

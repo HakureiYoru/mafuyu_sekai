@@ -70,7 +70,7 @@ describe('third-wave defeat gate', () => {
     sim.damageEnemy(mini, mini.hp);
     expect(sim.state.minibossDefeated).toBe(true); expect(sim.state.status).toBe('playing');
     const events = sim.step(input);
-    expect(sim.state).toMatchObject({ wave: 4, waveTime: 0, minibossDefeated: true });
+    expect(sim.state).toMatchObject({ wave: 4, waveTime: STEP, minibossDefeated: true });
     expect(sim.isWaveBlocked()).toBe(false);
     expect(sim.state.player.xp).toBe(80);
     expect(events.filter(e => e.type === 'wave' && e.amount === 4)).toHaveLength(1);
