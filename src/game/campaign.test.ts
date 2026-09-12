@@ -52,7 +52,7 @@ describe('campaign objectives and stage gates', () => {
       let actions = advance(director, 75);
       if (stage === 2 || stage === 4) {
         const id: EncounterId = stage === 2 ? 's2:palisade' : 's2:reprise';
-        expect(actions).toEqual([{ type: 'encounter', id, stage }]);
+        expect(actions).toEqual([{ type: 'catchup', stage, minLevel: stage === 2 ? 5 : 7, companions: 1, overflowXp: 60 }, { type: 'encounter', id, stage }]);
         expect(director.state.completedStages).not.toContain(stage);
         expect(advance(director, 40)).toEqual([]); expect(director.resolveChoice()).toEqual([]);
         expect(director.defeatEncounter('s1:mafuyu')).toEqual([]);
@@ -67,7 +67,27 @@ describe('campaign objectives and stage gates', () => {
     expect(clears).toEqual([1, 2, 3, 4, 5, 6]);
     expect(choices.filter(a => a.type === 'choice').map(a => a.index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(director.state.choiceIndex).toBe(7); expect(director.state.phase).toBe('encounter');
+    expect(director.state.catchupStages).toEqual([2, 4]);
     expect(director.defeatEncounter('s2:final')).toEqual([{ type: 'complete', season: 's2' }]);
+  });
+
+  it('awards catch-up at the exact pre-Boss boundary without repeating on waits, menus or duplicate defeat calls', () => {
+    const director = new CampaignDirector('s2'); director.start(); director.resolveChoice();
+    director.step(75); director.resolveChoice();
+    expect(advance(director, 75 - STEP)).toEqual([]); expect(director.state.catchupStages).toEqual([]);
+    expect(director.step(STEP)).toEqual([
+      { type: 'catchup', stage: 2, minLevel: 5, companions: 1, overflowXp: 60 },
+      { type: 'encounter', id: 's2:palisade', stage: 2 },
+    ]);
+    expect(director.state.completedStages).toEqual([1]);
+    expect(director.start()).toEqual([]); expect(advance(director, 300)).toEqual([]); expect(director.resolveChoice()).toEqual([]);
+    expect(director.defeatEncounter('s2:palisade').some(a => a.type === 'catchup')).toBe(false);
+    expect(director.defeatEncounter('s2:palisade')).toEqual([]);
+    expect(director.state.catchupStages).toEqual([2]);
+    expect(new CampaignDirector('s2').state.catchupStages).toEqual([]);
+    const firstSeason = new CampaignDirector('s1'); firstSeason.start();
+    expect(advance(firstSeason, 88).some(a => a.type === 'catchup')).toBe(false);
+    expect(firstSeason.state.catchupStages).toEqual([]);
   });
 
   it('covers all six new enemy families by stage four and keeps the six authored stage names', () => {

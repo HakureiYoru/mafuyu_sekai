@@ -1,6 +1,7 @@
 import type { SpellBrain } from './spellcards';
 import type { Season2Brain } from './season2-ai';
 import type { CampaignProgress } from './campaign';
+import type { KeyBindings } from './settings';
 
 export type Difficulty = 'normal' | 'hard';
 export type SeasonId = 's1' | 's2';
@@ -11,14 +12,15 @@ export interface PlayerBuild { modules: ModuleId[]; levelFloor: number; resonanc
 export interface ArenaRect { x: number; y: number; width: number; height: number }
 export type EnemyType = 'basic' | 'dasher' | 'sniper' | 'sprayer' | 'minelayer' | 'mine' | 'boss' | 'miniboss' | 'shield' | 'weaver' | 'returner' | 'sampler' | 'repairer' | 'carrier' | 'palisade' | 'reprise' | 'arm' | 'node' | 'core';
 export type EnemyRole = 'mob' | 'miniboss' | 'boss' | 'part' | 'hazard';
-export type PickupType = 'xp' | 'hp' | 'bomb' | 'ammo' | 'coolant' | 'miniBomb' | 'blackHole' | 'support';
+export type PickupType = 'xp' | 'hp' | 'bomb' | 'supply' | 'coolant' | 'miniBomb' | 'blackHole' | 'support';
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'upgrade' | 'failed' | 'complete' | 'error';
 export type Quality = 'low' | 'medium' | 'high';
 export interface Vec2 { x: number; y: number }
 export interface MovingBody extends Vec2 { prevX: number; prevY: number; vx: number; vy: number; radius: number }
-export interface InputAction { moveX: number; moveY: number; aimX: number; aimY: number; shoot: boolean; dash: boolean; bomb: boolean; focus?: boolean }
+export interface InputAction { moveX: number; moveY: number; aimX: number; aimY: number; shoot: boolean; dash: boolean; bomb: boolean; focus?: boolean; beam?: boolean; command?: boolean }
 export interface Player extends MovingBody {
-  hp: number; maxHp: number; bombs: number; level: number; xp: number; ammo: number; heat: number;
+  hp: number; maxHp: number; bombs: number; level: number; xp: number; heat: number;
+  commandTargetId: number | null; commandTime: number; commandCooldown: number;
   angle: number; invincible: number; dashTime: number; dashCooldown: number; dashVx: number; dashVy: number;
   perfectWindow: number; shotCooldown: number; specialCooldown: number; idleTime: number; heatLock: number; overheated: boolean; focus: boolean;
 }
@@ -29,6 +31,8 @@ export interface MiniBossBrain {
 export type EnemyBulletShape = 'rice' | 'orb' | 'kunai';
 export interface ProjectileMotionPhase { duration: number; speed?: number; turnRate?: number; reverse?: boolean }
 export interface EnemyShotOptions {
+  attackGroup?: 'wall';
+  friendlyDamage?: number; friendlyHits?: number;
   shape?: EnemyBulletShape; turnRate?: number; turnDelay?: number; turnDuration?: number;
   acceleration?: number; maxSpeed?: number;
   program?: readonly ProjectileMotionPhase[];
@@ -40,6 +44,7 @@ export interface AreaHazard extends Vec2 {
   angle?: number; width?: number; length?: number; angularSpeed?: number;
 }
 export interface Enemy extends MovingBody {
+  weakpoint?: { x: number; y: number; radius: number; hp: number; maxHp: number }; shieldBrokenUntil?: number;
   id: number; type: EnemyType; hp: number; maxHp: number; speed: number; angle: number;
   state: 'chase' | 'charge' | 'dash' | 'recover' | 'aim' | 'laserWarmup' | 'laser' | 'arming' | 'lay' | 'volley' | 'phaseShift' | 'novaWarmup' | 'nova' | 'bombardWarmup' | 'bombard';
   timer: number; cooldown: number; laserCooldown: number; attackIndex: number; hitTime: number;
@@ -50,6 +55,7 @@ export interface Enemy extends MovingBody {
   spell?: SpellBrain; season2?: Season2Brain; parentId?: number; disabledUntil?: number; slowUntil?: number;
 }
 export interface Bullet extends MovingBody {
+  friendlyDamage?: number; friendlyHits?: number;
   id: number; owner: 'player' | 'enemy'; damage: number; life: number; color: number;
   homing: boolean; speed: number; lockRange: number; targetId: number | null; remainingHits: number;
   hitIds: Set<number>; kind: 'normal' | 'perfect' | 'special' | 'burst' | 'drone' | 'module';
@@ -59,7 +65,7 @@ export interface Bullet extends MovingBody {
   sourceId?: number; grazed?: boolean; homingTime?: number; turnSpeed?: number; bornTick?: number;
   attackGroup?: 'wall';
 }
-export interface Companion extends MovingBody { id: number; angle: number; shotCooldown: number; targetId: number | null }
+export interface Companion extends MovingBody { id: number; angle: number; shotCooldown: number; targetId: number | null; transit?: number; orbitTargetId?: number | null; transitX?: number; transitY?: number }
 export interface PlayerBeam extends Vec2 { id: number; angle: number; length: number; width: number; life: number; duration: number }
 export interface Pickup extends Vec2 { id: number; type: PickupType; value: number; age: number }
 export interface SpawnIndicator extends Vec2 { id: number; type: EnemyType; time: number; duration: number; encounterId?: string }
@@ -73,19 +79,23 @@ export interface WorldState {
   companions: Companion[]; beams: PlayerBeam[]; hazards: AreaHazard[];
   seasonId: SeasonId; campaign: CampaignProgress; build: PlayerBuild; arena: ArenaRect | null;
 }
-export type CombatEventType = 'shot' | 'enemyShot' | 'hit' | 'kill' | 'dash' | 'bomb' | 'damage' | 'pickup' | 'levelup' | 'leveldown' | 'wave' | 'boss' | 'bossLow' | 'complete' | 'failure' | 'spawn' | 'attack' | 'beam' | 'support' | 'upgrade' | 'card';
+export type CombatEventType = 'shot' | 'enemyShot' | 'hit' | 'kill' | 'dash' | 'bomb' | 'damage' | 'pickup' | 'levelup' | 'leveldown' | 'wave' | 'boss' | 'bossLow' | 'complete' | 'failure' | 'spawn' | 'attack' | 'beam' | 'support' | 'upgrade' | 'card' | 'interrupt' | 'shieldBreak' | 'command' | 'module' | 'xpLoss';
 export interface CombatEvent extends Vec2 {
+  damageSource?: string;
+  hitResult?: 'body' | 'shield' | 'weakpoint' | 'part'; moduleId?: ModuleId;
   type: CombatEventType; color?: number; amount?: number; text?: string; angle?: number;
   enemyType?: EnemyType; pickupType?: PickupType; targetId?: number;
   seasonId?: SeasonId; encounterId?: string;
 }
-export interface GameSettings { quality: Quality; masterVolume: number; musicVolume: number; sfxVolume: number; screenShake: number; reducedMotion: boolean }
+export interface ModuleState { id: ModuleId; status: 'ready' | 'active' | 'cooldown' | 'consumed'; remaining: number }
+export interface GameSettings { quality: Quality; masterVolume: number; musicVolume: number; sfxVolume: number; screenShake: number; reducedMotion: boolean; damageNumbers: 'all' | 'important' | 'off'; keybindings: KeyBindings }
 export interface CommsMessage { id: number; speaker: string; text: string; color: string; avatar: 'player' | 'enemy' }
 export interface PerformanceStats { fps: number; frameP95: number; frameP99: number; updateMs: number; renderMs: number; enemies: number; bullets: number; particles: number; pickups: number; voices: number; textures: number }
 export interface HudSnapshot {
   phase: GamePhase; loading: number; error: string | null; mode: 'story' | 'endless'; score: number; bestScore: number;
   wave: number; waveProgress: number; elapsed: number; kills: number; hp: number; maxHp: number;
-  bombs: number; level: number; xp: number; xpNeeded: number; ammo: number; maxAmmo: number; heat: number;
+  bombs: number; level: number; xp: number; xpNeeded: number; heat: number;
+  commandTargetId: number | null; commandTime: number; commandCooldown: number; moduleStates: readonly ModuleState[];
   overheated: boolean; dashCooldown: number; perfectWindow: number; bossHp: number; bossMaxHp: number;
   bossStage: boolean; bossPhase: number; bossAction: string; focus: boolean; companions: number; comms: CommsMessage | null; announcement: string; settings: GameSettings; stats: PerformanceStats;
   difficulty: Difficulty; minibossHp: number; minibossMaxHp: number; minibossAction: string; waveBlocked: boolean;

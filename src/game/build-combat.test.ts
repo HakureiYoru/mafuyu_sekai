@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameSimulation } from './simulation';
-import { STEP } from './config';
+import { BALANCE, STEP } from './config';
 import { FixedClock } from './clock';
 import type { Bullet, InputAction, ModuleId } from './types';
 
@@ -26,7 +26,7 @@ function hit(sim: GameSimulation, enemy: ReturnType<typeof target>, kind: Bullet
 }
 
 describe('v4 combat modules use non-recursive sources', () => {
-  it('adds pierce and two wings without another ammunition or heat charge; precision requires continuous focus', () => {
+  it('adds pierce and two wings without another heat charge; precision requires continuous focus', () => {
     const sim = run(['piercing', 'wingShots', 'precision']);
     sim.state.player.specialCooldown = 999;
     ticks(sim, 21, input({ focus: true }));
@@ -34,7 +34,7 @@ describe('v4 combat modules use non-recursive sources', () => {
     const rounds = sim.state.bullets.filter(b => b.owner === 'player');
     expect(rounds.filter(b => b.kind === 'module')).toHaveLength(2);
     expect(rounds.filter(b => b.kind === 'normal').every(b => b.damage === 2.4 && b.remainingHits >= 2)).toBe(true);
-    expect(sim.state.player.ammo).toBe(119);
+    expect(sim.state.player.heat).toBeCloseTo(BALANCE.heat.rate * STEP);
     sim.clearInput(); sim.state.player.shotCooldown = 0;
     sim.step(input({ shoot: true }));
     expect(sim.state.bullets.filter(b => b.bornTick === sim.state.tick && b.kind === 'normal').every(b => b.damage === 2)).toBe(true);
@@ -82,7 +82,7 @@ describe('v4 combat modules use non-recursive sources', () => {
     const main = target(sim, 2600, 2000), side = target(sim, 2900, 2127); main.radius = side.radius = 18;
     sim.state.player.perfectWindow = 0.5;
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2900, y: 2127 }));
-    sim.step(input({ shoot: true }));
+    sim.step(input({ beam: true }));
     expect(main.hp).toBe(960); expect(side.hp).toBe(988);
     expect(sim.state.beams).toHaveLength(3);
     expect(sim.state.bullets.some(b => b.owner === 'enemy')).toBe(true);
@@ -101,10 +101,10 @@ describe('v4 combat modules use non-recursive sources', () => {
 
 describe('v4 resource state, collision core and progression', () => {
   it('uses radius 7 for enemy bullets and radius 18 for bodies, with a disjoint graze band', () => {
-    const sim = run(['graze']); const p = sim.state.player; p.invincible = 0; p.ammo = 50; p.heat = 50; p.idleTime = 0;
+    const sim = run(['graze']); const p = sim.state.player; p.invincible = 0; p.heat = 50; p.idleTime = 0; p.commandCooldown = 4;
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2020, radius: 6, life: 10 }));
-    sim.step(input()); expect(p.hp).toBe(5); expect(p.ammo).toBe(51);
-    ticks(sim, 5); expect(p.ammo).toBe(51);
+    sim.step(input()); expect(p.hp).toBe(5); expect(p.heat).toBe(48); expect(p.commandCooldown).toBeCloseTo(4 - STEP - 0.1);
+    ticks(sim, 5); expect(p.heat).toBe(48); expect(p.commandCooldown).toBeCloseTo(4 - 6 * STEP - 0.1);
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2012, radius: 6 }));
     sim.step(input()); expect(p.hp).toBe(4);
     p.invincible = 0; target(sim, 2030, 2000).radius = 18;

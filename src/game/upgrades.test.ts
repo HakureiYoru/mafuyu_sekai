@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addResonanceXp, buildDamageMultiplier, chooseModule, createBuild, MODULES, offerModules } from './upgrades';
+import { addResonanceXp, BEHAVIOR_MODULES, buildDamageMultiplier, chooseModule, createBuild, FINAL_OFFER_EXCLUSIONS, MODULES, offerModules } from './upgrades';
 import type { ModuleId } from './types';
 
 describe('deterministic one-time module choices', () => {
@@ -46,6 +46,32 @@ describe('deterministic one-time module choices', () => {
   it('never offers the special-bullet upgrade before its weapon unlock', () => {
     for (let seed = 0; seed < 100; seed++) expect(offerModules(createBuild(), 3, seed)).not.toContain('chain');
     expect(Array.from({ length: 100 }, (_, seed) => offerModules(createBuild(), 4, seed)).some(offer => offer.includes('chain'))).toBe(true);
+  });
+  it('always offers a usable behavior change in both opening choices even after the first behavior was selected', () => {
+    for (let seed = 0; seed < 120; seed++) {
+      const build = createBuild();
+      for (let choice = 0; choice < 2; choice++) {
+        const offers = offerModules(build, 1, seed);
+        const behavior = offers.find(id => BEHAVIOR_MODULES.includes(id));
+        expect(behavior, `${seed}:${choice}`).toBeDefined();
+        expect(new Set(offers.map(id => MODULES[id].branch)).size).toBe(3);
+        expect(offers).not.toContain('chain');
+        expect(chooseModule(build, behavior!)).toBe(true);
+      }
+    }
+  });
+  it('does not offer wave-only upgrades at the last choice, while preserving three unique reachable options', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const build = createBuild();
+      for (let index = 0; index < 6; index++) {
+        const offers = offerModules(build, 7, seed);
+        expect(chooseModule(build, offers[index % 3])).toBe(true);
+      }
+      const final = offerModules(build, 7, seed);
+      expect(final).toHaveLength(3); expect(new Set(final).size).toBe(3);
+      expect(final.every(id => !FINAL_OFFER_EXCLUSIONS.includes(id) && !build.modules.includes(id))).toBe(true);
+      expect(offerModules(build, 10, seed + 1)).toEqual(final);
+    }
   });
 });
 

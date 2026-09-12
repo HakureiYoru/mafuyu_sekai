@@ -8,6 +8,7 @@ import { SEASONS } from './campaign';
 import { PROFILE_KEY, PROFILE_BACKUP_KEY, SaveRepository } from './profile';
 import { SPELL_CARDS, spellCardDefinition } from './spellcards';
 import { MODULES } from './upgrades';
+import { normalizeSettings } from './settings';
 import type { GameRenderer } from './renderer';
 import type { CombatEvent, Difficulty, EnemyType, GamePhase, GameSettings, HudSnapshot, ModuleId, PerformanceStats, RunStartOptions, RuntimeControls, SeasonId, WorldState } from './types';
 
@@ -16,14 +17,8 @@ const BEST_KEY = 'mafuyu-sekai:best:v3';
 const DIFFICULTY_KEY = 'mafuyu-sekai:difficulty:v3';
 const bestKey = (difficulty: Difficulty) => difficulty === 'normal' ? BEST_KEY : `${BEST_KEY}:hard`;
 function loadDifficulty(): Difficulty { try { return localStorage.getItem(DIFFICULTY_KEY) === 'hard' ? 'hard' : 'normal'; } catch { return 'normal'; } }
-const clampVolume = (value: unknown, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
 export function validateSettings(raw: Partial<GameSettings>): GameSettings {
-  return {
-    quality: ['low', 'medium', 'high'].includes(raw.quality ?? '') ? raw.quality! : DEFAULT_SETTINGS.quality,
-    masterVolume: clampVolume(raw.masterVolume, DEFAULT_SETTINGS.masterVolume), musicVolume: clampVolume(raw.musicVolume, DEFAULT_SETTINGS.musicVolume),
-    sfxVolume: clampVolume(raw.sfxVolume, DEFAULT_SETTINGS.sfxVolume), screenShake: clampVolume(raw.screenShake, DEFAULT_SETTINGS.screenShake),
-    reducedMotion: typeof raw.reducedMotion === 'boolean' ? raw.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
-  };
+  return normalizeSettings(raw);
 }
 function loadSettings() {
   try {
@@ -73,7 +68,7 @@ export class GameRuntime implements RuntimeControls {
     this.audio = new GameAudio(this.settings);
     this.input = new InputController(host, () => this.phase === 'playing', () => this.pause(), () => {
       if (this.phase === 'playing') this.pause(); else if (this.phase === 'paused') this.resume();
-    });
+    }, this.settings.keybindings);
     this.resizeObserver = new ResizeObserver(() => {
       if (!this.renderer || this.disposed) return;
       try { this.renderer.resize(); if (this.phase !== 'playing') this.renderer.render(this.simulation.state, 1, 0); } catch (error) { this.fail(error); }
@@ -168,6 +163,7 @@ export class GameRuntime implements RuntimeControls {
     this.settings = validateSettings({ ...this.settings, ...partial });
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings)); } catch { /* Preferences still apply for this session. */ }
     this.audio.setSettings(this.settings); this.renderer?.setSettings(this.settings);
+    this.input.setBindings(this.settings.keybindings);
     if (this.phase !== 'playing') this.renderer?.render(this.simulation.state, 1, 0);
     this.publish();
   };
@@ -227,7 +223,7 @@ export class GameRuntime implements RuntimeControls {
         urgent ||= previousReady !== (player.dashCooldown <= 0) || previousOverheated !== player.overheated || previousWindow !== (player.perfectWindow > 0)
           || previousCharges !== this.simulation.dashCharges || previousMiniState !== previousMiniboss?.state;
         this.dialogue.update(dt); this.processEvents(events);
-        urgent ||= events.some(event => ['damage', 'dash', 'bomb', 'levelup', 'leveldown', 'boss', 'complete', 'failure', 'support', 'card', 'upgrade'].includes(event.type) || ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '') || event.type === 'attack' && event.enemyType === 'boss');
+        urgent ||= events.some(event => ['damage', 'dash', 'bomb', 'levelup', 'xpLoss', 'boss', 'complete', 'failure', 'support', 'card', 'upgrade', 'command', 'module', 'beam'].includes(event.type) || ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '') || event.type === 'attack' && event.enemyType === 'boss');
         const status = this.simulation.state.status;
         if (status !== 'playing') {
           this.phase = status;
@@ -252,9 +248,9 @@ export class GameRuntime implements RuntimeControls {
     for (const event of events) {
       if (event.type === 'wave') this.announce(`${this.simulation.state.seasonId === 's2' ? 'STAGE' : 'WAVE'} ${String(this.simulation.state.wave).padStart(2, '0')}  /  ${SEASONS[this.season].stages[this.simulation.state.wave - 1]?.name ?? '越过边界'}`);
       else if (event.type === 'boss') this.announce(this.season === 's2' ? 'LACUNA / 镜界终章' : 'MAFUYU / 核心信号出现');
-      else if (event.type === 'card') this.announce(`符卡 ${event.amount ?? ''} / ${event.text ?? ''}`, 1.6);
+      else if (event.type === 'card') this.announce(event.text === 'cleared' ? `符卡 ${event.amount ?? ''} 击破` : `符卡 ${event.amount ?? ''} / ${event.text ?? ''}`, event.text === 'cleared' ? 0.55 : 1.6);
       else if (event.type === 'levelup') this.announce(`WEAPON LEVEL ${this.simulation.state.player.level}  /  光芒增强`, 1.5);
-      else if (event.type === 'support') this.announce(event.text === 'arrival' ? '支援模块到达 · 靠近拾取' : `子机接入 ${event.amount ?? this.simulation.state.companions.length}/3 · 自动掩护`, 2.5);
+      else if (event.type === 'support') this.announce(event.text === 'arrival' ? '支援模块到达 · 靠近拾取' : event.text === 'catchup' ? `追赶补给 · 武装保底 Lv${event.amount ?? this.simulation.state.player.level}` : `子机接入 ${event.amount ?? this.simulation.state.companions.length}/3 · 自动掩护`, 2.5);
       else if (event.type === 'attack' && event.enemyType === 'boss' && event.text === 'phase') this.announce(`共鸣阶段 ${event.amount} · 攻势变化`, 1.6);
       else if (event.type === 'attack' && event.enemyType === 'miniboss' && event.text === 'arrival') this.announce('ECHO / 游猎回声入侵', 1.6);
       else if (event.type === 'kill' && event.enemyType === 'miniboss') this.announce('回声击破 · 支援补给已掉落', 2);
@@ -300,7 +296,8 @@ export class GameRuntime implements RuntimeControls {
       minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.type === 'palisade' ? 'PALISADE · 优先破坏侧臂，穿过弹墙间隙' : 'REPRISE · 留意停驻弹的原路折返' : '',
       waveBlocked: this.simulation.isWaveBlocked(),
       elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, bombs: player.bombs,
-      level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level), ammo: player.ammo, maxAmmo: BALANCE.ammo.max,
+      level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level),
+      commandTargetId: player.commandTargetId, commandTime: player.commandTime, commandCooldown: player.commandCooldown, moduleStates: this.simulation.moduleStates,
       heat: player.heat, overheated: player.overheated, dashCooldown: player.dashCooldown, perfectWindow: player.perfectWindow,
       bossHp: boss?.hp ?? 0, bossMaxHp: boss?.maxHp ?? 0, bossStage: state.bossStage || state.bossPending,
       bossPhase: boss?.spell ? Math.floor(boss.spell.cardIndex / 2) + 1 : 1, bossAction: boss?.spell ? boss.spell.stage === 'intro' ? '符卡切换 · 准备新弹幕' : 'Shift 精准穿行 · 跟随弹幕变化换位' : '', focus: player.focus,
@@ -360,7 +357,7 @@ export class GameRuntime implements RuntimeControls {
         if (name === 'arsenal') {
           state.wave = 4; state.player.level = 5; state.spawnTimer = 3600;
           state.pickups.push({ id: 900001, type: 'support', x: 2000, y: 2000, value: 3, age: 0 });
-          for (const [index, type] of (['hp', 'ammo', 'coolant', 'bomb', 'miniBomb', 'blackHole', 'support'] as const).entries()) {
+          for (const [index, type] of (['hp', 'supply', 'coolant', 'bomb', 'miniBomb', 'blackHole', 'support'] as const).entries()) {
             state.pickups.push({ id: 900010 + index, type, x: 1630 + index * 90, y: 2240, value: 1, age: 0 });
           }
           for (let i = 0; i < 4; i++) this.simulation.spawnEnemy('basic', 2450 + i * 180, 2000);

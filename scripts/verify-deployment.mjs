@@ -62,6 +62,49 @@ try {
   await page.keyboard.up('KeyD');
   report.movement = await page.evaluate(origin => { const p = window.__MAFUYU_DEBUG__.state().player; return { from: origin, to: { x: p.x, y: p.y } }; }, origin);
   assert.equal(await page.locator('#game-host canvas').count(), 1);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.advanceStage());
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'upgrade');
+  await page.keyboard.press('1');
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().wave === 2);
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.advanceStage());
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().announcement.startsWith('追赶补给'));
+  report.catchup = await page.evaluate(() => {
+    const d = window.__MAFUYU_DEBUG__, s = d.state(); return { level: s.player.level, companions: s.companions.length, announcement: d.snapshot().announcement };
+  });
+  assert.ok(report.catchup.level >= 5); assert.ok(report.catchup.companions >= 1);
+  assert.match(report.catchup.announcement, /武装保底 Lv5/);
+  report.controlsFixture = 'Arsenal practice after the persistence check; durable stationary targets and a heat lock isolate DOM Q/E input. Practice must not alter the campaign save.';
+  const savedBeforePractice = await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v1'));
+  await page.evaluate(() => {
+    const d = window.__MAFUYU_DEBUG__; d.scenario('arsenal');
+    const s = d.state();
+    for (const e of s.enemies) { e.hp = e.maxHp = 10000; e.speed = 0; e.cooldown = 999; }
+    s.player.heat = 100; s.player.overheated = true; s.player.heatLock = 30;
+  });
+  const aimTarget = async () => {
+    const point = await page.evaluate(() => {
+      const s = window.__MAFUYU_DEBUG__.state(), r = document.querySelector('#game-host').getBoundingClientRect();
+      return { x: r.left + (2450 - s.camera.x + 800) / 1600 * r.width, y: r.top + (2000 - s.camera.y + 450) / 900 * r.height };
+    });
+    await page.mouse.move(point.x, point.y);
+  };
+  await aimTarget(); await page.mouse.down(); await page.keyboard.press('r');
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow > 3);
+  assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().beams.length), 0);
+  await page.keyboard.press('q');
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().beams.length > 0);
+  report.beam = await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.state(); return { storedSeconds: s.player.perfectWindow, beams: s.beams.length, overheated: s.player.overheated };
+  });
+  assert.equal(report.beam.storedSeconds, 0); assert.equal(report.beam.overheated, true);
+  await page.mouse.up(); await aimTarget(); await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().player.commandTargetId !== null);
+  report.command = await page.evaluate(() => {
+    const p = window.__MAFUYU_DEBUG__.state().player; return { targetId: p.commandTargetId, seconds: p.commandTime, cooldown: p.commandCooldown };
+  });
+  assert.ok(report.command.seconds > 3 && report.command.cooldown > 7);
+  assert.equal(await page.getByRole('meter', { name: '弹药' }).count(), 0);
+  assert.equal(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v1')), savedBeforePractice);
   await mkdir('.tmp', { recursive: true });
   await page.screenshot({ path: `.tmp/deployed-v${version}.png` });
   assert.equal(report.errors.length, 0); report.result = 'passed';

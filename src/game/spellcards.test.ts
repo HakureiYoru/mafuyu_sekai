@@ -11,7 +11,8 @@ const ARENA = { x: 1200, y: 1550, width: 1600, height: 900 };
 const STEP = 1 / 60;
 function harness(season: SeasonId = 's1', difficulty: Difficulty = 'normal', card = 0) {
   const player: Player = { x: 2000, y: 2220, prevX: 2000, prevY: 2220, vx: 0, vy: 0, radius: 18,
-    hp: 5, maxHp: 5, bombs: 3, level: 7, xp: 0, ammo: 120, heat: 0, angle: 0, invincible: 0,
+    hp: 5, maxHp: 5, bombs: 3, level: 7, xp: 0, heat: 0, angle: 0, invincible: 0,
+    commandTargetId: null, commandTime: 0, commandCooldown: 0,
     dashTime: 0, dashCooldown: 0, dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0,
     specialCooldown: 0, idleTime: 0, heatLock: 0, overheated: false, focus: false };
   const enemy: Enemy = { id: 1, type: 'boss', archetypeId: season === 's1' ? 'mafuyu' : 'lacuna', x: 2000, y: 1780,
@@ -78,7 +79,7 @@ function harness(season: SeasonId = 's1', difficulty: Difficulty = 'normal', car
 
 describe('independent six-card encounters', () => {
   it.each(['s1', 's2'] as const)('%s retains the agreed six names and exact normal/hard HP without shared mutable brains', season => {
-    const expected = season === 's1' ? [700, 750, 800, 850, 900, 1000] : [1200, 1400, 1500, 1600, 1700, 1800];
+    const expected = season === 's1' ? [700, 750, 800, 850, 900, 1000] : [2040, 2380, 2550, 2720, 2890, 3060];
     expect(SPELL_CARDS[season].normal.map(card => card.hp)).toEqual(expected);
     expect(SPELL_CARDS[season].hard.map(card => card.hp)).toEqual(expected.map(hp => Math.round(hp * 1.35)));
     expect(new Set(SPELL_CARDS[season].normal.map(card => card.pattern)).size).toBe(6);

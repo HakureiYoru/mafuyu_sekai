@@ -279,6 +279,7 @@ test('support craft fight while overheated, beam fires through the heat lock, re
   await page.keyboard.press('r');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
   await page.mouse.down();
+  await page.keyboard.press('q');
   await page.waitForFunction(() => {
     if (!window.__MAFUYU_DEBUG__.state().beams.length) return false;
     window.__MAFUYU_DEBUG__.pause();

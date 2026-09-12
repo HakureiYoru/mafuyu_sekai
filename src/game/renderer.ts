@@ -3,29 +3,31 @@ import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem } from './effects';
 import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
-import { season2Telegraph } from './season2-ai';
+import { season2Telegraphs } from './season2-ai';
+import type { Season2Telegraph } from './season2-ai';
 import { spellCardDefinition, spellReturnPreview, spellTelegraphs } from './spellcards';
 import type { SpellReturnPath } from './spellcards';
 import { beamGeometry, clamp, lerp, TAU } from './math';
+import { keyLabel } from './settings';
 import type { CombatEvent, Enemy, EnemyBulletShape, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
 
 type AssetKey = keyof typeof ASSET_URLS;
 const SUPPORT_ASSET_URLS = {
-  drone: 'drone.png', ammo: 'ammo.png', coolant: 'coolant.png', support: 'support-module.png',
+  drone: 'drone.png', supply: 'ammo.png', coolant: 'coolant.png', support: 'support-module.png',
   bomb: 'bomb.svg', miniBomb: 'mini-bomb.svg', blackHole: 'black-hole.svg', mine: 'mine.svg',
 } as const;
 type SupportAssetKey = keyof typeof SUPPORT_ASSET_URLS;
 interface EnemyVisual { root: Container; halo: Sprite; badge: Sprite; hazard: Sprite; art: Sprite; hit: Sprite; health: Sprite; bar: Sprite; seen: number }
 interface PickupVisual { root: Container; glow: Sprite; backing: Sprite; icon: Sprite; seen: number }
-interface BulletVisual { effect: Sprite; core: Sprite }
+interface BulletVisual { effect: Sprite; core: Sprite; heavy: Sprite }
 interface CompanionVisual { root: Container; glow: Sprite; ship: Sprite; barrel: Sprite }
 interface Atlas { glow: Texture; spark: Texture; ring: Texture; bolt: Texture; hostile: Texture; hostileCore: Texture; player: Texture; mine: Texture; diamond: Texture; cross: Texture; pickupPlate: Texture; caution: Texture; badges: Record<EnemyType, Texture>; danmaku: Record<EnemyBulletShape, Texture> }
 const WHITE = 0xf5f2ff;
 const BADGE_TYPES: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss',
   'shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier', 'palisade', 'reprise', 'arm', 'node', 'core'];
 const badgeCell = (index: number) => ({ x: index % 8 * 128, y: index < 8 ? 128 : 384 + Math.floor((index - 8) / 8) * 128 });
-const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, ammo: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
-const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '生命恢复', ammo: '弹药补充', coolant: '冷却胶囊', bomb: '炸弹 +1', miniBomb: '范围爆破', blackHole: '引力黑洞', support: '支援子机' };
+const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, supply: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
+const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '生命恢复', supply: '技能补给', coolant: '冷却胶囊', bomb: '炸弹 +1', miniBomb: '范围爆破', blackHole: '引力黑洞', support: '支援子机' };
 
 function canvasTexture(width: number, height: number, paint: (context: CanvasRenderingContext2D) => void): Texture {
   const canvas = document.createElement('canvas');
@@ -213,6 +215,8 @@ export class GameRenderer {
   private readonly pickupHintLayer = new Container();
   private readonly overlay = new Graphics();
   private readonly playerMarks = new Graphics();
+  private readonly combatMarks = new Graphics();
+  private readonly attachments = new Graphics();
   private readonly ambient = new Graphics();
   private readonly edgeFeedback = new Container();
   private readonly enemies = new Map<number, EnemyVisual>();
@@ -224,6 +228,8 @@ export class GameRenderer {
   private assets!: Record<AssetKey, Texture>;
   private supportAssets!: Record<SupportAssetKey, Texture>;
   private pickupHint!: Text;
+  private skillHint!: Text;
+  private commandHint!: Text;
   private atlas!: Atlas;
   private generated: Texture[] = [];
   private effects!: EffectSystem;
@@ -244,6 +250,8 @@ export class GameRenderer {
   private damage = 0;
   private flash = 0;
   private warning = 0;
+  private recoil = 0;
+  private recoilAngle = 0;
   private cameraX = WORLD.width / 2;
   private cameraY = WORLD.height / 2;
   private pointer = { x: VIEW.width / 2, y: VIEW.height / 2, inside: false };
@@ -289,13 +297,19 @@ export class GameRenderer {
     this.app.stage.addChild(this.scene);
     this.scene.addChild(this.world, this.ambient, this.edgeFeedback, this.overlay);
     // Warnings stay above enemy art. Hostile projectiles and the player stay above every beam.
-    this.world.addChild(this.backdrop, this.arenaMarks, this.pickupLayer, this.effects.particles, this.machineLinks, this.enemyLayer,
-      this.playerBeams, this.mineHazards, this.warnings, this.companionLayer, this.bulletLayer,
+    this.world.addChild(this.backdrop, this.arenaMarks, this.pickupLayer, this.effects.particles, this.machineLinks, this.enemyLayer, this.attachments,
+      this.playerBeams, this.mineHazards, this.warnings, this.combatMarks, this.companionLayer, this.bulletLayer,
       this.bulletCoreLayer, this.playerLayer, this.playerMarks, this.effects.labels, this.pickupHintLayer);
     this.pickupHint = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 17,
       fontWeight: '700', fill: 0xdffff3, stroke: { color: 0x0b1820, width: 5 } }, resolution: 1.5 });
     this.pickupHint.anchor.set(0.5); this.pickupHint.visible = false;
     this.pickupHintLayer.addChild(this.pickupHint);
+    const hint = (color: number) => {
+      const text = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 19,
+        fontWeight: '700', fill: color, stroke: { color: 0x0a1320, width: 5 } }, resolution: 1.5 });
+      text.anchor.set(0.5); text.visible = false; this.pickupHintLayer.addChild(text); return text;
+    };
+    this.skillHint = hint(0xffebba); this.commandHint = hint(0xbceeff);
     this.buildBackground();
     this.playerGlow = centered(atlas.glow, 148, 0x82ffe0); this.playerGlow.alpha = 0.18; this.playerGlow.blendMode = 'add';
     this.playerRing = centered(atlas.player, 84, 0x91ffe4); this.playerRing.alpha = 0.9;
@@ -400,6 +414,7 @@ export class GameRenderer {
     this.damage = Math.max(0, this.damage - delta * 1.5);
     this.flash = Math.max(0, this.flash - delta * 2.3);
     this.warning = Math.max(0, this.warning - delta * 0.6);
+    this.recoil = Math.max(0, this.recoil - delta);
     const shake = this.settings.reducedMotion ? 0 : this.shake * this.settings.screenShake;
     this.world.position.set(VIEW.width / 2 - this.cameraX + Math.sin(this.clock * 83) * shake,
       VIEW.height / 2 - this.cameraY + Math.cos(this.clock * 107) * shake * 0.7);
@@ -408,6 +423,7 @@ export class GameRenderer {
     this.renderMachines(state, alpha);
     this.renderPickups(state);
     this.renderEnemies(state, alpha);
+    this.renderCombatMarks(state, alpha);
     this.renderPlayerBeams(state);
     this.renderCompanions(state, alpha);
     this.renderBullets(state, alpha);
@@ -466,6 +482,7 @@ export class GameRenderer {
   }
 
   private renderEnemies(state: WorldState, alpha: number) {
+    const attachments = this.attachments.clear();
     for (const enemy of state.enemies) {
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha);
       if (!this.visible(x, y, enemy.radius * 2)) continue;
@@ -485,10 +502,11 @@ export class GameRenderer {
       visual.art.texture = isMine ? this.supportAssets.mine : part ? this.atlas.badges[enemy.type] : this.assets.enemy;
       visual.art.tint = part ? disabled ? 0x757782 : color : 0xffffff;
       visual.art.alpha = disabled ? 0.45 : isMine && enemy.state === 'arming' ? 0.55 : 1;
-      visual.art.width = artSize * (1 + hit * 0.08); visual.art.height = artSize * (1 - hit * 0.05);
+      const bounce = this.settings.reducedMotion ? 0 : hit;
+      visual.art.width = artSize * (1 + bounce * 0.05); visual.art.height = artSize * (1 - bounce * 0.035);
       visual.art.rotation = isMine ? 0 : part ? enemy.angle : motion;
       visual.hit.visible = !isMine && !part;
-      visual.hit.width = visual.art.width; visual.hit.height = visual.art.height; visual.hit.rotation = motion; visual.hit.alpha = hit * 0.72;
+      visual.hit.width = visual.art.width; visual.hit.height = visual.art.height; visual.hit.rotation = motion; visual.hit.alpha = hit * (this.settings.reducedMotion ? 0.22 : 0.72);
       visual.badge.texture = this.atlas.badges[enemy.type]; visual.badge.tint = color;
       visual.badge.visible = !isMine && !part;
       visual.hazard.visible = isMine;
@@ -500,6 +518,7 @@ export class GameRenderer {
       }
       visual.badge.width = enemy.radius * 2.95; visual.badge.height = enemy.radius * 2.95;
       visual.badge.alpha = machine ? 0.9 : enemy.state === 'charge' || enemy.state === 'aim' ? 0.9 : 0.55;
+      if ((enemy.shieldBrokenUntil ?? 0) > state.elapsed) { visual.badge.alpha = 0.25; visual.badge.tint = 0x7b879c; }
       visual.badge.rotation = enemy.type === 'shield' || enemy.type === 'returner' ? enemy.angle : enemy.type === 'dasher' || enemy.type === 'miniboss' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
       visual.halo.visible = isMine || this.settings.quality !== 'low';
       visual.halo.width = enemy.radius * (isMine ? 2.8 : 4.3); visual.halo.height = visual.halo.width;
@@ -512,6 +531,7 @@ export class GameRenderer {
         visual.health.position.set(-width / 2 - 1, -enemy.radius * 1.15 - 13); visual.health.width = width + 2;
         visual.bar.position.set(-width / 2, visual.health.y + 1); visual.bar.width = width * clamp(enemy.hp / enemy.maxHp, 0, 1); visual.bar.tint = color;
       }
+      if (!disabled && !isMine && !part) this.renderAttachment(attachments, enemy, x, y);
     }
     for (const [id, visual] of this.enemies) if (visual.seen !== this.generation) {
       visual.root.visible = false; visual.hazard.visible = false; this.enemyFree.push(visual); this.enemies.delete(id);
@@ -547,8 +567,7 @@ export class GameRenderer {
       visual.glow.visible = !isXp || this.settings.quality !== 'low';
       if (!isXp) {
         const eligible = pickup.type === 'hp' ? state.player.hp < state.player.maxHp
-          : pickup.type === 'ammo' ? state.player.ammo < BALANCE.ammo.max
-            : pickup.type === 'coolant' ? state.player.heat > 0 : true;
+          : pickup.type === 'coolant' ? state.player.heat > 0 : true;
         const distance = (pickup.x - state.player.x) ** 2 + (pickup.y - state.player.y) ** 2;
         if (eligible && distance < nearestDistance) { nearest = pickup; nearestDistance = distance; }
       }
@@ -564,6 +583,65 @@ export class GameRenderer {
     }
   }
 
+  private renderAttachment(graph: Graphics, enemy: Enemy, x: number, y: number) {
+    if (!['shield', 'sniper', 'sprayer', 'weaver', 'sampler', 'repairer', 'palisade', 'reprise'].includes(enemy.type)) return;
+    const windup = ['charge', 'aim', 'laserWarmup'].includes(enemy.state);
+    const firing = ['volley', 'laser', 'dash'].includes(enemy.state);
+    const recovering = enemy.state === 'recover';
+    const locked = enemy.season2 ? windup : enemy.tactics?.locked ?? false;
+    const angle = enemy.angle, dx = Math.cos(angle), dy = Math.sin(angle), nx = -dy, ny = dx;
+    const reach = enemy.radius + (windup ? 15 : firing ? 19 : recovering ? 5 : 9);
+    const color = firing ? 0xffe1b2 : windup ? 0xffbd80 : 0xa4969b;
+    const alpha = windup || firing ? 0.95 : recovering ? 0.36 : 0.55;
+    // Only the weapon frame changes pose; the original portrait and its center stay legible.
+    for (const side of [-1, 1]) {
+      const ax = x + nx * side * enemy.radius * 0.8, ay = y + ny * side * enemy.radius * 0.8;
+      graph.moveTo(ax - dx * 9, ay - dy * 9).lineTo(ax + dx * reach * 0.6, ay + dy * reach * 0.6)
+        .stroke({ color: 0x111421, width: 7, alpha: 0.85 });
+      graph.moveTo(ax - dx * 9, ay - dy * 9).lineTo(ax + dx * reach * 0.6, ay + dy * reach * 0.6)
+        .stroke({ color, width: locked || firing ? 3 : 1.5, alpha });
+    }
+    const lamps = enemy.type === 'sampler' ? Math.min(3, enemy.season2?.points.length ?? 0) : windup ? locked ? 3 : 1 : firing ? 3 : 0;
+    for (let i = 0; i < 3; i++) {
+      const lx = x - dx * (enemy.radius + 7) + nx * (i - 1) * 10, ly = y - dy * (enemy.radius + 7) + ny * (i - 1) * 10;
+      graph.circle(lx, ly, 3).fill({ color: i < lamps ? 0xffe5b8 : 0x403846, alpha: 1 });
+    }
+    if (recovering) {
+      const bx = x + dx * reach, by = y + dy * reach;
+      graph.moveTo(bx - nx * 6, by - ny * 6).lineTo(bx + nx * 6, by + ny * 6).stroke({ color: 0xa59b9c, width: 3, alpha: 0.65 });
+    }
+  }
+
+  private renderCombatMarks(state: WorldState, alpha: number) {
+    const graph = this.combatMarks.clear();
+    this.commandHint.visible = false;
+    for (const enemy of state.enemies) {
+      if (enemy.hp <= 0 || (enemy.disabledUntil ?? 0) > state.elapsed) continue;
+      const weak = enemy.weakpoint;
+      if (weak && weak.hp > 0 && this.visible(weak.x, weak.y, 50)) {
+        // This circle is the exposed weakpoint supplied by the simulation, including its real radius.
+        graph.circle(weak.x, weak.y, weak.radius).fill({ color: 0x18151f, alpha: 0.55 }).stroke({ color: 0x131322, width: 6 });
+        graph.circle(weak.x, weak.y, weak.radius).stroke({ color: 0xffe0a1, width: 2, alpha: 1 });
+        graph.poly([weak.x, weak.y - 9, weak.x + 9, weak.y, weak.x, weak.y + 9, weak.x - 9, weak.y])
+          .stroke({ color: 0xfff0c7, width: 2, alpha: 1 });
+        graph.arc(weak.x, weak.y, weak.radius + 5, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(weak.hp / weak.maxHp, 0, 1))
+          .stroke({ color: 0xffd596, width: 3, alpha: 0.9 });
+      }
+      if (state.player.commandTime <= 0 || state.player.commandTargetId !== enemy.id) continue;
+      const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha), radius = enemy.radius + 20;
+      if (!this.visible(x, y, radius)) continue;
+      for (const signX of [-1, 1]) for (const signY of [-1, 1]) {
+        const cx = x + signX * radius, cy = y + signY * radius;
+        graph.moveTo(cx - signX * 13, cy).lineTo(cx, cy).lineTo(cx, cy - signY * 13).stroke({ color: 0x091722, width: 7 });
+        graph.moveTo(cx - signX * 13, cy).lineTo(cx, cy).lineTo(cx, cy - signY * 13).stroke({ color: 0xafe7ff, width: 2.5 });
+      }
+      graph.arc(x, y, radius + 7, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(state.player.commandTime / BALANCE.command.duration, 0, 1))
+        .stroke({ color: 0xb9eaff, width: 2, alpha: 0.85 });
+      this.commandHint.visible = true; this.commandHint.position.set(x, y - radius - 21);
+      this.commandHint.text = `集火 · ${(Math.ceil(state.player.commandTime * 10) / 10).toFixed(1)}s`;
+    }
+  }
+
   private renderBullets(state: WorldState, alpha: number) {
     let used = 0;
     for (const bullet of state.bullets) {
@@ -571,12 +649,12 @@ export class GameRenderer {
       if (!this.visible(x, y, 100)) continue;
       let visual = this.bullets[used];
       if (!visual) {
-        const effect = centered(this.atlas.bolt, 10), core = centered(this.assets.bullet, 16);
-        this.bulletLayer.addChild(effect); this.bulletCoreLayer.addChild(core);
-        visual = { effect, core }; this.bullets.push(visual);
+        const effect = centered(this.atlas.bolt, 10), core = centered(this.assets.bullet, 16), heavy = centered(this.atlas.player, 40, 0xffecac);
+        this.bulletLayer.addChild(effect); this.bulletCoreLayer.addChild(heavy, core);
+        visual = { effect, core, heavy }; this.bullets.push(visual);
       }
       used++;
-      const { effect, core } = visual;
+      const { effect, core, heavy } = visual;
       effect.visible = true; core.visible = true;
       const hostile = bullet.owner === 'enemy', perfect = bullet.kind === 'perfect';
       const angle = bullet.program?.length ? bullet.programAngle ?? Math.atan2(bullet.vy, bullet.vx) : Math.atan2(bullet.vy, bullet.vx);
@@ -611,9 +689,15 @@ export class GameRenderer {
         const size = bullet.radius * (bullet.shape === 'orb' ? 3.25 : bullet.shape === 'rice' ? 4 : 4.5);
         core.width = core.height = size;
       }
+      heavy.visible = hostile && (bullet.friendlyDamage ?? 0) > 0 && (bullet.friendlyHits ?? 0) > 0;
+      if (heavy.visible) {
+        heavy.position.set(x, y); heavy.rotation = angle; heavy.alpha = 1;
+        heavy.width = heavy.height = Math.max(34, bullet.radius * 4.8);
+      }
     }
     for (let index = used; index < this.bullets.length; index++) {
       this.bullets[index].effect.visible = false; this.bullets[index].core.visible = false;
+      this.bullets[index].heavy.visible = false;
     }
   }
 
@@ -683,23 +767,30 @@ export class GameRenderer {
     const dashing = player.dashTime > 0, ready = player.perfectWindow > 0;
     const tilt = this.settings.reducedMotion ? 0 : clamp(player.vx / 300, -1, 1) * 0.075;
     this.playerArt.rotation = tilt; this.playerHit.rotation = tilt;
-    this.playerArt.width = dashing ? 91 : 83; this.playerArt.height = dashing ? 75 : 83;
+    const stretchDash = dashing && !this.settings.reducedMotion;
+    this.playerArt.width = stretchDash ? 91 : 83; this.playerArt.height = stretchDash ? 75 : 83;
+    const recoil = this.settings.reducedMotion ? 0 : Math.sin(clamp(this.recoil / 0.09, 0, 1) * Math.PI) * 2.5;
+    this.playerArt.position.set(-Math.cos(this.recoilAngle) * recoil, -Math.sin(this.recoilAngle) * recoil);
+    this.playerHit.position.copyFrom(this.playerArt.position);
     this.playerHit.width = this.playerArt.width; this.playerHit.height = this.playerArt.height;
-    this.playerHit.alpha = this.damage > 0.65 ? (this.damage - 0.65) * 1.6 : 0;
-    this.playerArt.alpha = player.invincible > 0 && !dashing ? 0.68 + Math.sin(this.clock * 24) * 0.18 : 1;
+    this.playerHit.alpha = this.damage > 0.65 ? (this.damage - 0.65) * (this.settings.reducedMotion ? 0.35 : 1.6) : 0;
+    this.playerArt.alpha = player.invincible > 0 && !dashing ? this.settings.reducedMotion ? 0.8 : 0.68 + Math.sin(this.clock * 24) * 0.18 : 1;
     this.playerRing.tint = ready ? 0xffe8ac : dashing ? 0xc4ffef : 0x85f6dd;
     this.playerRing.rotation = this.settings.reducedMotion ? 0 : state.elapsed * 0.15;
     this.playerRing.width = ready ? 103 : 84; this.playerRing.height = this.playerRing.width;
     this.playerGlow.tint = ready ? 0xffd49a : 0x82ffe0; this.playerGlow.alpha = ready ? 0.35 : 0.19;
     this.playerGlow.visible = this.settings.quality !== 'low' || ready;
+    this.skillHint.visible = ready || player.overheated;
+    this.skillHint.position.set(x, y + 71);
+    this.skillHint.text = ready ? `${keyLabel(this.settings.keybindings.beam)} 贯穿炮` : '过热 · 松开射击';
     this.trailClock -= dt;
     if (dashing && this.trailClock <= 0) { this.effects.trail(x, y, tilt); this.trailClock = 1 / 40; }
     const graph = this.playerMarks.clear();
     // The small ring is the actual hit circle; art and decorative rings never define damage.
     if (player.focus) graph.circle(x, y, BALANCE.player.hitRadius).stroke({ color: 0x07101e, width: 5, alpha: 0.95 });
     graph.circle(x, y, BALANCE.player.hitRadius).stroke({ color: WHITE, width: player.focus ? 2 : 1, alpha: player.focus || player.invincible > 0 ? 0.95 : 0.45 });
-    graph.circle(x, y, 2).fill({ color: WHITE, alpha: 0.9 });
     graph.circle(x, y, 2.3).fill({ color: 0xf2fff8, alpha: 0.9 });
+    if (player.invincible > 0) graph.circle(x, y, 35).stroke({ color: 0xe5fff6, width: 1.5, alpha: 0.85 });
     const cos = Math.cos(player.angle), sin = Math.sin(player.angle), nx = -sin, ny = cos;
     const frontX = x + cos * 51, frontY = y + sin * 51;
     graph.poly([frontX + cos * 8, frontY + sin * 8, frontX - cos * 3 + nx * 4, frontY - sin * 3 + ny * 4,
@@ -708,10 +799,17 @@ export class GameRenderer {
       graph.moveTo(x, y - 39).arc(x, y, 39, -Math.PI / 2, -Math.PI / 2 + (1 - player.dashCooldown / BALANCE.dash.cooldown) * TAU)
         .stroke({ color: 0x98eedd, width: 2, alpha: 0.65 });
     }
-    if (player.overheated || player.ammo < 20) {
-      const color = player.overheated ? 0xffa46e : 0x8edbff;
+    if (ready) {
+      graph.arc(x, y, 48, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(player.perfectWindow / BALANCE.dash.window, 0, 1))
+        .stroke({ color: 0xffe6a9, width: 3, alpha: 0.95 });
+      // A short launch bracket communicates stored energy without drawing a permanent "safe" lane.
+      for (const side of [-1, 1]) graph.moveTo(x + cos * 55 + nx * side * 11, y + sin * 55 + ny * side * 11)
+        .lineTo(x + cos * 78 + nx * side * 11, y + sin * 78 + ny * side * 11).stroke({ color: 0xffe6ad, width: 2, alpha: 0.9 });
+    }
+    if (player.overheated || player.heat >= 70) {
+      const color = player.overheated ? 0xffa46e : 0xffd393;
       graph.roundRect(x - 24, y + 48, 48, 4, 2).fill({ color: 0x111523, alpha: 0.9 });
-      graph.roundRect(x - 24, y + 48, Math.max(2, 48 * (player.overheated ? player.heat / 100 : player.ammo / 120)), 4, 2).fill(color);
+      graph.roundRect(x - 24, y + 48, Math.max(2, 48 * player.heat / 100), 4, 2).fill(color);
     }
   }
 
@@ -745,9 +843,7 @@ export class GameRenderer {
     }
   }
 
-  private renderSeason2Warning(graph: Graphics, enemy: Enemy, state: WorldState) {
-    const cue = season2Telegraph(enemy, state.difficulty);
-    if (!cue) return;
+  private renderSeason2Warning(graph: Graphics, enemy: Enemy, cue: Season2Telegraph) {
     const { x, y, angle, color } = cue, progress = clamp(1 - cue.remaining / Math.max(0.001, cue.warning), 0, 1);
     if (cue.kind === 'shield') {
       const radius = enemy.radius + 9;
@@ -776,7 +872,8 @@ export class GameRenderer {
       const count = enemy.type === 'returner' ? 2 : 3;
       for (let i = 0; i < count; i++) {
         const heading = angle + (i / (count - 1) - 0.5) * cue.spread, distance = Math.min(cue.radius, 580);
-        this.directionMark(graph, x + Math.cos(heading) * distance, y + Math.sin(heading) * distance, heading + Math.PI, color, 12);
+        this.directionMark(graph, x + Math.cos(heading) * distance, y + Math.sin(heading) * distance,
+          heading + (enemy.type === 'returner' || enemy.type === 'reprise' ? Math.PI : 0), color, 12);
       }
     } else if (cue.kind === 'ring') {
       graph.circle(x, y, enemy.radius + 24).stroke({ color, width: 3, alpha: 0.8 });
@@ -858,7 +955,7 @@ export class GameRenderer {
       if (enemy.spell) {
         this.renderSpellWarnings(graph, enemy, state);
       } else if (enemy.season2) {
-        this.renderSeason2Warning(graph, enemy, state);
+        for (const cue of season2Telegraphs(enemy, state.difficulty)) this.renderSeason2Warning(graph, enemy, cue);
       } else if (enemy.type === 'miniboss' && enemy.miniboss) {
         const cfg = miniBossAttacks(state.difficulty), brain = enemy.miniboss;
         if (['charge', 'dash', 'aim'].includes(enemy.state) && brain.laserIndex === 0) {
@@ -942,7 +1039,7 @@ export class GameRenderer {
         const star = this.stars[index];
         const drift = this.settings.reducedMotion ? 0 : this.clock * 3;
         const y = (star.y - drift % VIEW.height + VIEW.height) % VIEW.height;
-        const opacity = 0.08 + (Math.sin(this.clock * 0.7 + star.phase) + 1) * 0.035;
+        const opacity = this.settings.reducedMotion ? 0.1 : 0.08 + (Math.sin(this.clock * 0.7 + star.phase) + 1) * 0.035;
         ambient.circle(star.x, y, index % 7 === 0 ? 1.8 : 0.85).fill({ color: index % 2 ? 0xbec1e9 : 0xadffe9, alpha: opacity });
       }
     }
@@ -957,7 +1054,8 @@ export class GameRenderer {
     if (this.pointer.inside && state.status === 'playing') {
       const x = this.pointer.x + this.world.x - (VIEW.width / 2 - this.cameraX);
       const y = this.pointer.y + this.world.y - (VIEW.height / 2 - this.cameraY);
-      const color = state.player.overheated ? 0xffae82 : state.player.perfectWindow > 0 ? 0xffe5a9 : 0xc4ffed;
+      const ready = state.player.perfectWindow > 0;
+      const color = ready ? 0xffe5a9 : state.player.overheated ? 0xffae82 : 0xc4ffed;
       graph.circle(x, y, 9).stroke({ color: 0x101927, width: 4, alpha: 0.8 });
       graph.circle(x, y, 9).stroke({ color, width: 1, alpha: 0.8 });
       graph.circle(x, y, 1.8).fill(color);
@@ -966,6 +1064,12 @@ export class GameRenderer {
         graph.moveTo(x + Math.cos(angle) * 14, y + Math.sin(angle) * 14)
           .lineTo(x + Math.cos(angle) * 19, y + Math.sin(angle) * 19).stroke({ color, width: 1.5, alpha: 0.85 });
       }
+      if (ready) graph.arc(x, y, 24, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(state.player.perfectWindow / BALANCE.dash.window, 0, 1))
+        .stroke({ color: 0xffe5a9, width: 2, alpha: 0.9 });
+      if (state.companions.length > 0 && state.player.commandCooldown <= 0) {
+        for (const side of [-1, 1]) graph.moveTo(x + side * 27, y - 5).lineTo(x + side * 30, y).lineTo(x + side * 27, y + 5)
+          .stroke({ color: 0x9edfff, width: 2, alpha: 0.9 });
+      }
     }
   }
 
@@ -973,11 +1077,13 @@ export class GameRenderer {
     if (!this.initialized) return;
     for (const event of events) {
       this.effects.handle(event);
-      if (event.type === 'damage') { this.damage = 1; this.shake = Math.max(this.shake, 18); }
-      if (event.type === 'bomb') { this.flash = 1; this.shake = Math.max(this.shake, 24); }
-      if (event.type === 'dash') this.shake = Math.max(this.shake, 3);
-      if (event.type === 'beam') this.shake = Math.max(this.shake, 9);
-      if (event.type === 'kill') this.shake = Math.max(this.shake, event.enemyType === 'boss' ? 24 : 1.5);
+      if (event.type === 'shot' && event.text !== 'drone') { this.recoil = 0.09; this.recoilAngle = event.angle ?? 0; }
+      if (event.type === 'damage') { this.damage = 1; this.shake = Math.max(this.shake, 12); }
+      if (event.type === 'bomb') { this.flash = 1; this.shake = Math.max(this.shake, 16); }
+      if (event.type === 'dash') this.shake = Math.max(this.shake, 2);
+      if (event.type === 'beam') { this.shake = Math.max(this.shake, 8); this.recoil = 0.09; this.recoilAngle = event.angle ?? 0; }
+      if (event.type === 'shieldBreak' || event.type === 'interrupt') this.shake = Math.max(this.shake, 3);
+      if (event.type === 'kill' && ['boss', 'miniboss', 'palisade', 'reprise', 'arm'].includes(event.enemyType ?? '')) this.shake = Math.max(this.shake, event.enemyType === 'boss' ? 18 : 5);
       if (event.type === 'boss' || (event.type === 'attack' && event.enemyType === 'boss' && event.text !== 'impact')) this.warning = 1;
       if (event.type === 'attack' && event.text === 'impact') this.shake = Math.max(this.shake, 4);
     }
@@ -986,15 +1092,16 @@ export class GameRenderer {
   resetEffects() {
     if (!this.initialized) return;
     this.effects.reset();
-    this.shake = 0; this.damage = 0; this.flash = 0; this.warning = 0; this.trailClock = 0;
+    this.shake = 0; this.damage = 0; this.flash = 0; this.warning = 0; this.trailClock = 0; this.recoil = 0; this.recoilAngle = 0;
     for (const [id, visual] of this.enemies) { visual.root.visible = false; visual.hazard.visible = false; this.enemyFree.push(visual); this.enemies.delete(id); }
     for (const [id, visual] of this.pickups) { visual.root.visible = false; this.pickupFree.push(visual); this.pickups.delete(id); }
-    for (const visual of this.bullets) { visual.effect.visible = false; visual.core.visible = false; }
+    for (const visual of this.bullets) { visual.effect.visible = false; visual.core.visible = false; visual.heavy.visible = false; }
     for (const visual of this.companions) visual.root.visible = false;
-    this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.pickupHint.visible = false;
+    this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.combatMarks.clear(); this.attachments.clear();
+    this.pickupHint.visible = false; this.skillHint.visible = false; this.commandHint.visible = false;
   }
 
-  getStats() { return { particles: this.initialized ? this.effects.count : 0, textures: this.initialized ? 14 + this.generated.length + this.effects.labelTextureCount : 0 }; }
+  getStats() { return { particles: this.initialized ? this.effects.count : 0, textures: this.initialized ? 16 + this.generated.length + this.effects.labelTextureCount : 0 }; }
   debugStress() { if (this.initialized) this.effects.debugStress(this.cameraX, this.cameraY); }
 
   destroy() {

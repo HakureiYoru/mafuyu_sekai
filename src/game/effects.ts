@@ -1,14 +1,16 @@
 import { Container, Sprite, Text, Texture } from 'pixi.js';
 import { QUALITY } from './config';
 import { TAU } from './math';
+import { MODULES } from './upgrades';
 import type { CombatEvent, GameSettings } from './types';
 
 export interface EffectTextures { glow: Texture; spark: Texture; ring: Texture; player: Texture }
 interface Particle {
   sprite: Sprite; x: number; y: number; vx: number; vy: number; life: number; total: number;
-  startSize: number; endSize: number; stretch: number; spin: number; opacity: number; damping: number;
+  startSize: number; endSize: number; stretch: number; spin: number; opacity: number; damping: number; priority: number;
 }
-interface FloatLabel { label: Text; life: number; total: number; x: number; y: number; amount: number; pending: number; commit: number; target: number | null }
+interface FloatLabel { label: Text; life: number; total: number; x: number; y: number; amount: number; pending: number; commit: number; target: number | null; priority: number; key: string | null }
+const damageText = (amount: number) => `${Number(amount.toFixed(1))}`;
 
 /** All randomness and clocks here are cosmetic; none feed back into the simulation. */
 export class EffectSystem {
@@ -21,6 +23,7 @@ export class EffectSystem {
   private settings: GameSettings;
   private seed = 0x5eed1234;
   private stressBounds: { x: number; y: number } | null = null;
+  private emissionPriority = 0;
 
   constructor(private readonly textures: EffectTextures, settings: GameSettings) {
     this.settings = settings;
@@ -37,21 +40,31 @@ export class EffectSystem {
     this.settings = settings;
     const cap = QUALITY[settings.quality].particles;
     while (this.active.length > cap) this.release(this.active.length - 1);
+    for (let i = this.floats.length - 1; i >= 0; i--) {
+      if (this.floats[i].amount > 0 && (settings.damageNumbers === 'off' || (settings.damageNumbers === 'important' && this.floats[i].priority === 0))) this.releaseLabel(i);
+    }
   }
 
   private add(x: number, y: number, texture: Texture, color: number, life: number, size: number, endSize: number, vx = 0, vy = 0, opacity = 1, stretch = 1, angle = 0, additive = true) {
-    if (this.active.length >= QUALITY[this.settings.quality].particles) return;
+    const cap = QUALITY[this.settings.quality].particles;
+    // Keep the total budget unchanged. Important outcomes can replace decoration at capacity.
+    if (!this.stressBounds && this.emissionPriority === 0 && this.active.length >= cap - 24) return;
+    if (this.active.length >= cap) {
+      const replace = this.active.findIndex(particle => particle.priority < this.emissionPriority);
+      if (replace < 0) return;
+      this.release(replace);
+    }
     let particle = this.free.pop();
     if (!particle) {
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       this.particles.addChild(sprite);
-      particle = { sprite, x: 0, y: 0, vx: 0, vy: 0, life: 0, total: 0, startSize: 0, endSize: 0, stretch: 1, spin: 0, opacity: 1, damping: 3 };
+      particle = { sprite, x: 0, y: 0, vx: 0, vy: 0, life: 0, total: 0, startSize: 0, endSize: 0, stretch: 1, spin: 0, opacity: 1, damping: 3, priority: 0 };
     }
     const sprite = particle.sprite;
     sprite.visible = true; sprite.texture = texture; sprite.tint = color; sprite.rotation = angle;
     sprite.blendMode = additive ? 'add' : 'normal';
-    Object.assign(particle, { x, y, vx, vy, life, total: life, startSize: size, endSize, opacity, stretch, spin: 0, damping: 3 });
+    Object.assign(particle, { x, y, vx, vy, life, total: life, startSize: size, endSize, opacity, stretch, spin: 0, damping: 3, priority: this.emissionPriority });
     sprite.position.set(x, y); sprite.width = size * stretch; sprite.height = size; sprite.alpha = opacity;
     this.active.push(particle);
   }
@@ -76,7 +89,7 @@ export class EffectSystem {
   }
 
   ring(x: number, y: number, color: number, start: number, end: number, life = 0.45) {
-    this.add(x, y, this.textures.ring, color, life, start, end, 0, 0, 0.75);
+    this.add(x, y, this.textures.ring, color, life, start, this.settings.reducedMotion ? start + Math.min(90, end - start) : end, 0, 0, this.settings.reducedMotion ? 0.5 : 0.75);
   }
 
   trail(x: number, y: number, angle: number) {
@@ -85,14 +98,26 @@ export class EffectSystem {
     this.add(x, y, this.textures.glow, 0x70ffdf, 0.22, 72, 25, 0, 0, 0.23);
   }
 
-  private label(x: number, y: number, message: string, color: number, amount = 0, target: number | null = null) {
-    const existing = target === null ? null : this.floats.find(float => float.target === target && float.life > 0.15);
+  private label(x: number, y: number, message: string, color: number, amount = 0, target: number | null = null, priority = amount > 0 ? 0 : 2, key: string | null = null) {
+    const existing = key !== null ? this.floats.find(float => float.key === key && float.life > 0.15)
+      : target === null ? null : this.floats.find(float => float.target === target && float.life > 0.15);
     if (existing && amount > 0) {
       existing.pending += amount;
       existing.life = Math.min(1.1, existing.life + 0.1);
+      if (priority > existing.priority) { existing.priority = priority; existing.label.style.fill = color; }
       return;
     }
-    if (this.floats.length >= 36) return;
+    if (existing && key !== null) {
+      existing.label.text = message; existing.label.style.fill = color;
+      existing.x = x; existing.y = y - 32; existing.life = existing.total = 0.85;
+      return;
+    }
+    if (priority === 0 && this.floats.length >= 32) return;
+    if (this.floats.length >= 36) {
+      const replace = this.floats.findIndex(float => float.priority < priority);
+      if (replace < 0) return;
+      this.releaseLabel(replace);
+    }
     let float = this.floatFree.pop();
     if (!float) {
       const label = new Text({ text: '', style: {
@@ -101,19 +126,27 @@ export class EffectSystem {
       }, resolution: 1.5 });
       label.anchor.set(0.5);
       this.labels.addChild(label);
-      float = { label, life: 0, total: 0, x, y, amount: 0, pending: 0, commit: 0, target };
+      float = { label, life: 0, total: 0, x, y, amount: 0, pending: 0, commit: 0, target, priority, key };
     }
     float.label.visible = true;
     float.label.text = message;
     float.label.style.fill = color;
     float.label.style.fontSize = amount > 15 ? 26 : amount > 0 ? 19 : 21;
-    Object.assign(float, { life: 0.85, total: 0.85, x: x + (this.random() - 0.5) * 10, y: y - 32, amount, pending: 0, commit: 0.1, target });
+    Object.assign(float, { life: 0.85, total: 0.85, x: x + (this.random() - 0.5) * 10, y: y - 32, amount, pending: 0, commit: 0.1, target, priority, key });
     this.floats.push(float);
+  }
+
+  private releaseLabel(index: number) {
+    const float = this.floats[index];
+    float.label.visible = false; this.floatFree.push(float);
+    this.floats[index] = this.floats[this.floats.length - 1]; this.floats.pop();
   }
 
   handle(event: CombatEvent) {
     const { x, y, angle = 0 } = event;
     const color = event.color ?? 0x90f9e2;
+    this.emissionPriority = ['damage', 'beam', 'shieldBreak', 'interrupt', 'command', 'module', 'support', 'levelup', 'xpLoss'].includes(event.type)
+      || event.hitResult === 'weakpoint' || event.hitResult === 'part' || event.text === 'deviceBurst' || event.type === 'card' && event.text === 'cleared' ? 2 : 0;
     switch (event.type) {
       case 'shot':
         this.add(x, y, this.textures.glow, color, 0.075, event.text === 'drone' ? 34 : 70, 15, 0, 0, 0.6);
@@ -123,16 +156,41 @@ export class EffectSystem {
         this.add(x, y, this.textures.glow, 0xff8959, 0.09, 45, 0, 0, 0, 0.4);
         break;
       case 'attack':
-        if (event.text === 'impact') {
+        if (event.text === 'deviceBurst') {
+          // The ring atlas has radius 59 in a 128px frame; match the instantaneous blast footprint.
+          const size = (event.amount ?? 140) * 128 / 59;
+          this.add(x, y, this.textures.ring, 0xffd69a, 0.3, size, size, 0, 0, 0.9);
+          this.burst(x, y, 0xffc27d, 18, 200, 5);
+          this.add(x, y, this.textures.glow, 0xffbc74, 0.2, 150, 60, 0, 0, this.settings.reducedMotion ? 0.12 : 0.24);
+        } else if (event.text === 'impact') {
           this.ring(x, y, 0xffc8a0, 18, (event.amount ?? 100) * 2, 0.35);
           this.burst(x, y, 0xffa574, 16, 210, 5);
         }
         break;
-      case 'hit':
-        this.burst(x, y, color, 5, 200, 4, angle);
-        if ((event.amount ?? 0) > 0) this.label(x, y, `${Math.round(event.amount!)}`, color, event.amount, event.targetId ?? null);
+      case 'hit': {
+        const shield = event.hitResult === 'shield', weak = event.hitResult === 'weakpoint', part = event.hitResult === 'part';
+        const tint = shield ? 0xcad8eb : weak ? 0xffe9a8 : part ? 0xffc097 : color;
+        // Deflections rebound against the incoming shot; real hits continue along its direction.
+        this.burst(x, y, tint, shield ? 3 : weak || part ? 10 : 5, shield ? 100 : 200, shield ? 3 : weak ? 5 : 4, angle + (shield ? Math.PI : 0));
+        if (weak || part) this.ring(x, y, tint, 8, part ? 100 : 60, 0.22);
+        const important = weak || part || (event.amount ?? 0) >= 10;
+        if ((event.amount ?? 0) > 0 && this.settings.damageNumbers !== 'off' && (this.settings.damageNumbers === 'all' || important)) {
+          this.label(x, y, damageText(event.amount!), tint, event.amount, event.targetId ?? null, important ? 1 : 0,
+            event.targetId === undefined ? null : `damage-${event.targetId}-${event.hitResult ?? 'body'}`);
+        }
         break;
+      }
       case 'kill':
+        if (event.hitResult === 'part') {
+          this.ring(x, y, 0xffd3a0, 15, 115, 0.35);
+          for (let i = 0; i < 5; i++) {
+            const direction = angle + i * TAU / 5, speed = this.settings.reducedMotion ? 50 : 160;
+            this.add(x, y, this.textures.spark, i % 2 ? 0xe2cad4 : 0xffd3a0, 0.38, 6, 2,
+              Math.cos(direction) * speed, Math.sin(direction) * speed, 0.95, 2.2, direction, false);
+          }
+          this.label(x, y, event.enemyType === 'node' ? '节点停机' : '部件击破', 0xffd9ad);
+          break;
+        }
         this.ring(x, y, color, 16, event.enemyType === 'boss' ? 850 : 125, event.enemyType === 'boss' ? 1.2 : 0.4);
         this.burst(x, y, color, event.enemyType === 'boss' ? 80 : 12, event.enemyType === 'boss' ? 650 : 280, 5);
         this.add(x, y, this.textures.glow, color, 0.22, 135, 15, 0, 0, 0.45);
@@ -154,7 +212,7 @@ export class EffectSystem {
       case 'pickup':
         this.burst(x, y, color, event.pickupType === 'xp' ? 3 : 10, 110, 3);
         if (event.pickupType !== 'xp' && event.pickupType !== 'support') {
-          const names = { hp: '生命恢复', bomb: '炸弹 +1', ammo: '弹药补充', coolant: '快速冷却', miniBomb: '微型爆破', blackHole: '黑洞引力', xp: '' };
+          const names = { hp: '生命恢复', bomb: '炸弹 +1', supply: '技能补给', coolant: '快速冷却', miniBomb: '微型爆破', blackHole: '黑洞引力', xp: '' };
           this.label(x, y, event.text ?? names[event.pickupType ?? 'xp'], color);
         }
         break;
@@ -164,7 +222,30 @@ export class EffectSystem {
         this.burst(x, y, 0xbaffec, 28, 270, 5);
         this.label(x, y - 26, `LEVEL ${event.amount ?? ''}`, 0xbbffef);
         break;
-      case 'leveldown': this.label(x, y, '武装降级', 0xffa6bb); break;
+      case 'leveldown': this.label(x, y, event.text === 'XP LOST' ? '经验损失' : '武装降级', 0xffa6bb); break;
+      case 'xpLoss': if ((event.amount ?? 0) > 0) this.label(x, y, `${event.text === '共鸣经验' ? '共鸣经验' : '经验'} −${Math.round(event.amount!)}`, 0xffb4c7); break;
+      case 'shieldBreak':
+        this.burst(x, y, 0xd1e7ff, 16, 250, 7, angle); this.ring(x, y, 0xd1e7ff, 22, 135, 0.3);
+        this.label(x, y, '护盾击破', 0xe0eeff); break;
+      case 'interrupt':
+        this.ring(x, y, 0xffdc9f, 12, 90, 0.25); this.burst(x, y, 0xffdc9f, 8, 170, 4, angle);
+        this.label(x, y, '打断', 0xffe8b7); break;
+      case 'command':
+        if (event.text === 'issued') { this.ring(x, y, 0xa6eaff, 85, 35, 0.25); this.label(x, y - 18, '子机集火', 0xbaedff); }
+        else if (event.text === 'ready') this.label(x, y, '集火就绪', 0xbaedff);
+        break;
+      case 'module':
+        this.burst(x, y, 0xc2d8ff, 6, 100, 4);
+        this.label(x, y, event.moduleId ? MODULES[event.moduleId].name : event.text ?? '模块触发', 0xd3e6ff, 0, null, 2, `module-${event.moduleId ?? 'trigger'}`); break;
+      case 'upgrade':
+        this.ring(x, y, 0xc2d8ff, 20, 150, 0.45); break;
+      case 'card':
+        if (event.text === 'cleared') {
+          this.ring(x, y, 0xffe3b9, 150, 35, 0.32);
+          this.burst(x, y, 0xe3d1ff, 18, 170, 5);
+          this.label(x, y, `符卡 ${event.amount ?? ''} 击破`, 0xffedc8, 0, null, 2, 'card-cleared');
+        }
+        break;
       case 'spawn': this.ring(x, y, color, 70, 15, 0.3); break;
       case 'beam': {
         const dx = Math.cos(angle), dy = Math.sin(angle);
@@ -184,9 +265,10 @@ export class EffectSystem {
       case 'support':
         this.burst(x, y, 0xa4ecff, 15, 155, 4);
         if (!this.settings.reducedMotion) this.ring(x, y, 0xa1edff, 18, 120, 0.55);
-        this.label(x, y - 10, event.text === 'arrival' ? '子机补给抵达' : `子机接入 ${event.amount ?? 1}/3`, 0xbdf5ff);
+        this.label(x, y - 10, event.text === 'arrival' ? '子机补给抵达' : `子机接入 ${event.amount ?? 1}/3`, 0xbdf5ff, 0, null, 2, `support-${event.text ?? 'deployed'}`);
         break;
     }
+    this.emissionPriority = 0;
   }
 
   update(dt: number) {
@@ -217,25 +299,24 @@ export class EffectSystem {
       const float = this.floats[index];
       float.life -= delta; float.commit -= delta;
       if (float.life <= 0) {
-        float.label.visible = false;
-        this.floatFree.push(float);
-        this.floats[index] = this.floats[this.floats.length - 1]; this.floats.pop();
+        this.releaseLabel(index);
         continue;
       }
       if (float.pending && float.commit <= 0) {
         float.amount += float.pending; float.pending = 0;
-        float.label.text = `${Math.round(float.amount)}`; float.commit = 0.1;
+        float.label.text = damageText(float.amount); float.commit = 0.1;
       }
       float.y -= delta * (this.settings.reducedMotion ? 9 : 30);
       float.label.position.set(float.x, float.y);
       float.label.alpha = Math.min(1, float.life / 0.2);
-      const size = Math.min(1.12, 1 + Math.max(0, float.life - 0.65));
+      const size = this.settings.reducedMotion ? 1 : Math.min(1.12, 1 + Math.max(0, float.life - 0.65));
       float.label.scale.set(size);
     }
   }
 
   reset() {
     this.stressBounds = null;
+    this.emissionPriority = 0;
     while (this.active.length) this.release(this.active.length - 1);
     for (const float of this.floats) { float.label.visible = false; this.floatFree.push(float); }
     this.floats.length = 0;

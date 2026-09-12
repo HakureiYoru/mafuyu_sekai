@@ -52,11 +52,11 @@ describe('third-wave defeat gate', () => {
     const sniper = sim.spawnEnemy('sniper', 2500, 1800)!; sniper.cooldown = 0;
     const basic = sim.spawnEnemy('basic', 2350, 2300)!;
     const elapsed = sim.state.elapsed, x = basic.x, y = basic.y;
-    sim.state.player.ammo = 20; sim.state.player.heat = 80; sim.state.player.dashCooldown = 2;
+    sim.state.player.heat = 80; sim.state.player.dashCooldown = 2;
     const events = ticks(sim, 150);
     expect(sim.state).toMatchObject({ wave: 3, waveTime: 40, status: 'playing', minibossDefeated: false });
     expect(sim.state.elapsed - elapsed).toBeCloseTo(2.5, 8);
-    expect(sim.state.player.ammo).toBeGreaterThan(20); expect(sim.state.player.heat).toBe(0);
+    expect(sim.state.player.heat).toBe(0);
     expect(sim.state.player.dashCooldown).toBe(0); expect(mini.timer).toBeLessThan(1e9);
     expect(Math.hypot(basic.x - x, basic.y - y)).toBeGreaterThan(0);
     expect(events.some(e => e.type === 'enemyShot')).toBe(true);

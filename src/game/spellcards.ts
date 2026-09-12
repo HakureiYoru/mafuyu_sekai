@@ -42,7 +42,8 @@ const CARD_NAMES = {
   s1: ['零响针雨', '交错织幕', '逆相花庭', '镜面折光', '无声刻印', '空白终曲'],
   s2: ['切片弹墙', '斜向编织', '武装节点', '停驻复奏', '内外环交替', '分区终曲'],
 } as const;
-const CARD_HP = { s1: [700, 750, 800, 850, 900, 1000], s2: [1200, 1400, 1500, 1600, 1700, 1800] } as const;
+// Fixed v4.1 HP: medium carryover + real seven-choice builds measured 72–87s before this 1.7× calibration.
+const CARD_HP = { s1: [700, 750, 800, 850, 900, 1000], s2: [2040, 2380, 2550, 2720, 2890, 3060] } as const;
 const CARD_PATTERNS: Record<SeasonId, readonly SpellPattern[]> = {
   s1: ['needles', 'weave', 'flower', 'mirrors', 'seals', 'blank'],
   s2: ['slices', 'diagonals', 'nodes', 'reprise', 'rings', 'partition'],

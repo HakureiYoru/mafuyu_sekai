@@ -33,7 +33,7 @@ describe('precise movement and forgiving dash input', () => {
       const sim = quiet(); sim.state.player.level = 5;
       const shots = sim.step(input({ shoot: true, focus })).filter(event => event.type === 'shot');
       const bullets = sim.state.bullets;
-      return { count: bullets.length, damage: bullets.map(b => b.damage), ammo: sim.state.player.ammo,
+      return { count: bullets.length, damage: bullets.map(b => b.damage),
         heat: sim.state.player.heat, shots: shots.length, angles: bullets.map(b => Math.atan2(b.vy, b.vx)) };
     });
     expect(outcomes[0].count).toBeGreaterThan(1);

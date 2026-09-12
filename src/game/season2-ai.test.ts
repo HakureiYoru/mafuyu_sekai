@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ENEMIES, STEP, WORLD } from './config';
 import { FixedClock } from './clock';
 import { angleDelta, clamp } from './math';
-import { createSeason2Brain, onSeason2Death, returningProgram, season2Attacks, season2Telegraph, season2WallPoints, shieldDamageMultiplier, updateSeason2Ai } from './season2-ai';
+import { breakShield, createSeason2Brain, onSeason2Death, returningProgram, season2Attacks, season2Telegraph, season2Telegraphs, season2WallPoints, shieldDamageMultiplier, updateSeason2Ai } from './season2-ai';
+import { interruptEnemy } from './enemy-ai';
 import type { Season2AiContext } from './season2-ai';
 import type { AreaHazard, CombatEvent, Difficulty, Enemy, EnemyShotOptions, EnemyType, Player } from './types';
 
@@ -17,7 +18,7 @@ function enemy(type: EnemyType, id = 1, x = 2000, y = 2000): Enemy {
 function harness(type: EnemyType, difficulty: Difficulty = 'normal') {
   const e = enemy(type), enemies = [e];
   const player: Player = { x: 2420, y: 2000, prevX: 2420, prevY: 2000, vx: 0, vy: 0, radius: 7,
-    hp: 5, maxHp: 5, bombs: 0, level: 4, xp: 0, ammo: 120, heat: 0, angle: Math.PI, invincible: 0,
+    hp: 5, maxHp: 5, bombs: 0, level: 4, xp: 0, heat: 0, angle: Math.PI, invincible: 0, commandTargetId: null, commandTime: 0, commandCooldown: 0,
     dashTime: 0, dashCooldown: 0, dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0, specialCooldown: 0,
     idleTime: 0, heatLock: 0, overheated: false, focus: false };
   const shots: { sourceId: number; x: number; y: number; angle: number; speed: number; radius: number; options?: EnemyShotOptions; time: number }[] = [];
@@ -87,6 +88,43 @@ describe('second-season ownership and shared warnings', () => {
 });
 
 describe('distinct ordinary enemy solutions', () => {
+  it.each(difficulties)('%s cancels weaver fire and repair healing through a finite exposed weakpoint', difficulty => {
+    for (const type of ['weaver', 'repairer'] as const) {
+      const h = harness(type, difficulty), target = enemy('shield', 2, 2200, 2000); target.hp = 5;
+      if (type === 'repairer') h.enemies.push(target);
+      h.tick(); expect(h.e.state).toBe('charge');
+      expect(h.e.weakpoint).toMatchObject({ radius: 24, hp: difficulty === 'hard' ? 6 : 4 });
+      expect(interruptEnemy(h.e, 99, h.ctx.elapsed, h.ctx.emit)).toBe(true);
+      expect(h.e.cooldown).toBeCloseTo(season2Attacks(difficulty)[type].cooldown + 0.7);
+      h.permit(false); h.run(240);
+      expect(h.e.weakpoint).toBeUndefined(); expect(h.e.season2!.targetId).toBeNull();
+      expect(h.shots.filter(shot => shot.sourceId === h.e.id)).toHaveLength(0); expect(h.events.filter(event => event.type === 'interrupt')).toHaveLength(1);
+      expect(target.hp).toBe(5); expect(h.e.season2!.healedIds).toHaveLength(0);
+    }
+  });
+  it('assigns at most one shield to a support and moves between it and the player without instant turning', () => {
+    const h = harness('shield'), support = enemy('weaver', 2, 1750, 2000), second = enemy('shield', 3, 1950, 2040);
+    h.enemies.push(support, second); h.permit(false); h.e.angle = Math.PI;
+    h.tick();
+    expect(h.e.season2!.guardTargetId).toBe(support.id); expect(second.season2!.guardTargetId).toBeNull();
+    expect(h.e.vx).toBeLessThan(0);
+    expect(Math.abs(angleDelta(Math.PI, h.e.angle))).toBeCloseTo(season2Attacks().shield.turnSpeed * STEP);
+    h.permit(true); h.tick(); expect(h.e.state).toBe('chase');
+    support.hp = 0; h.tick(); expect(h.e.season2!.guardTargetId).toBeNull();
+  });
+  it.each(difficulties)('%s marks only shield center fire and exposes one nonrenewable 1.2 second break', difficulty => {
+    const h = harness('shield', difficulty); h.tick(); h.until(() => h.shots.length > 0);
+    expect(h.shots.map(s => s.options?.friendlyDamage ?? 0)).toEqual([0, 8, 0]);
+    expect(h.shots[1].options!.friendlyHits).toBe(3);
+    h.until(() => h.e.state === 'charge');
+    const start = h.ctx.elapsed, before = h.shots.length;
+    expect(breakShield(h.e, start, h.ctx.emit)).toBe(true);
+    expect(breakShield(h.e, start + 0.3, h.ctx.emit)).toBe(false);
+    expect(h.e.shieldBrokenUntil).toBeCloseTo(start + 1.2);
+    h.run(71); expect(h.shots).toHaveLength(before);
+    expect(shieldDamageMultiplier(h.e, h.e.x + 100, h.e.y, h.ctx.elapsed)).toBe(1);
+    expect(h.events.filter(event => event.type === 'shieldBreak')).toHaveLength(1);
+  });
   it('makes a frontal shield resist rather than grant immunity, with an exposed recovery window', () => {
     const e = enemy('shield');
     expect(shieldDamageMultiplier(e, e.x + 100, e.y)).toBe(0.25);
@@ -122,6 +160,7 @@ describe('distinct ordinary enemy solutions', () => {
       expect(clearance - h.player.radius).toBeGreaterThanOrEqual(17);
     }
     expect(h.shots.every(shot => shot.speed === cfg.speed)).toBe(true);
+    expect(h.shots.every(shot => shot.options?.attackGroup === 'wall')).toBe(true);
     expect(h.shots[0].options!.program![0].duration * cfg.speed * (difficulty === 'hard' ? 1.28 : 1)).toBeCloseTo(preview.travel!, 8);
   });
   it.each(difficulties)('%s returning blades declare one finite reversal and a visible stationary interval', difficulty => {
@@ -180,6 +219,33 @@ describe('distinct ordinary enemy solutions', () => {
 });
 
 describe('destructible parts and finite death derivatives', () => {
+  it.each(difficulties)('%s gives PALISADE left wall and delayed right aimed fan separate locked geometry', difficulty => {
+    const h = harness('palisade', difficulty), cfg = season2Attacks(difficulty).palisade;
+    h.tick(); const start = h.ctx.elapsed, warnings = season2Telegraphs(h.e, difficulty);
+    expect(warnings.map(w => w.kind)).toEqual(['wall', 'fan']);
+    const left = h.enemies.find(e => e.type === 'arm' && e.season2!.heading === -1)!;
+    const right = h.enemies.find(e => e.type === 'arm' && e.season2!.heading === 1)!;
+    const fan = warnings[1], angle = h.e.angle;
+    h.player.y += 130; h.until(() => h.shots.length > 0);
+    expect(h.ctx.elapsed - start).toBeCloseTo(cfg.warning, 8);
+    expect(h.shots.every(shot => shot.sourceId === left.id)).toBe(true);
+    expect(h.shots.map(({ x, y }) => ({ x, y }))).toEqual(warnings[0].points);
+    expect(h.shots.every(shot => (shot.x - h.e.x) * -Math.sin(angle) + (shot.y - h.e.y) * Math.cos(angle) < 0)).toBe(true);
+    const wallTime = h.ctx.elapsed; h.until(() => h.shots.some(shot => shot.sourceId === right.id));
+    const batch = h.shots.filter(shot => shot.sourceId === right.id);
+    expect(h.ctx.elapsed - wallTime).toBeGreaterThanOrEqual(cfg.batchGap / 2 - 1e-8);
+    expect(h.ctx.elapsed - wallTime).toBeLessThan(cfg.batchGap / 2 + STEP);
+    expect(batch).toHaveLength(cfg.fanCount);
+    expect(batch.every(shot => shot.speed === 180 && shot.x === fan.x && shot.y === fan.y)).toBe(true);
+    expect(batch.every(shot => shot.options?.attackGroup === undefined)).toBe(true);
+    expect(batch[0].angle).toBeCloseTo(fan.angle - fan.spread / 2);
+    expect(batch.at(-1)!.angle).toBeCloseTo(fan.angle + fan.spread / 2);
+    right.hp = 0; onSeason2Death(right, h.ctx);
+    expect(season2Telegraphs(h.e, difficulty).some(w => w.kind === 'fan')).toBe(false);
+    h.permit(false); h.until(() => h.e.state === 'recover');
+    expect(h.shots.filter(shot => shot.sourceId === right.id)).toHaveLength(cfg.fanCount);
+    expect(h.shots.filter(shot => shot.sourceId === left.id)).toHaveLength(warnings[0].points.length * cfg.batches);
+  });
   it('emits exactly three warning cores once per carrier death and observes the global core cap', () => {
     const h = harness('carrier'); h.e.hp = 0;
     onSeason2Death(h.e, h.ctx); onSeason2Death(h.e, h.ctx);

@@ -658,27 +658,6 @@ kbd {
 .support-slots i { width: 7px; height: 7px; border: 1px solid #52736f; border-radius: 50%; }
 .support-slots i.active { background: #9ff8df; border-color: #9ff8df; }
 .support-status strong { font-weight: 500; font-variant-numeric: tabular-nums; }
-.ammo-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: .55em;
-}
-.ammo-heading .hud-eyebrow {
-  font-size: .65em;
-  color: #9bb1cc;
-}
-.ammo-heading strong {
-  font-size: 1.7em;
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: .03em;
-  font-variant-numeric: tabular-nums;
-}
-.ammo-heading small {
-  font-size: .4em;
-  color: #8d9bb0;
-}
 .heat-label {
   display: flex;
   justify-content: space-between;
@@ -1732,3 +1711,40 @@ kbd {
   .upgrade-dialog { padding: 20px; }.dialog-overlay { font-size: 14px; padding: 14px; }
 }
 @media (max-height: 680px) { .menu-simple { gap: 7px; }.menu-title { font-size: 32px; }.menu-instructions { margin: 0; }.upgrade-dialog { padding: 20px; }.upgrade-branch { margin-bottom: 15px; } }
+
+/* Action states stay in the status rail, leaving the entire 16:9 battlefield clear. */
+.battle-weapon .compact-resource { display: block; width: 100%; }
+.weapon-skills { display: grid; grid-template-columns: 1fr 1.2fr 1.1fr; gap: 7px; margin-top: 10px; }
+.skill-chip { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 4px; border: 1px solid #2c3b51; border-radius: 4px; background: #111b2c; color: #93a7bf; }
+.skill-chip kbd { font-size: 10px; min-width: 20px; padding: 3px; text-align: center; background: #0a1422; border: 1px solid #48536a; border-radius: 3px; }
+.skill-chip>span { display: flex; flex-direction: column; gap: 3px; white-space: nowrap; font-size: 10px; }
+.skill-chip strong { font-weight: 500; font-size: 11px; font-variant-numeric: tabular-nums; }
+.skill-chip.is-ready { border-color: #40665e; color: #b7eddc; }
+.skill-chip.is-beam-ready { background: #2c271b; border-color: #a18a4e; color: #ffe5a9; }
+.skill-chip.is-commanding { background: #152a38; border-color: #6bacc8; color: #b9eaff; }
+.battle-comms p { min-height: 28px; line-height: 14px; }
+.battle-comms .module-summary { margin-top: 3px; }
+.module-live { display: flex; gap: 8px; font-size: 10px; line-height: 14px; white-space: nowrap; overflow: hidden; }
+.module-live>span { overflow: hidden; text-overflow: ellipsis; }
+.module-active,.module-ready { color: #abe9d6; }.module-cooldown { color: #e6c99d; }.module-consumed { color: #9fa4b4; }
+.damage-number-setting { margin-top: 22px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; font-size: 13px; color: #aec2d7; }
+.damage-number-setting small { grid-column: 1 / -1; color: #8b9eb7; font-size: 11px; line-height: 1.6; }
+.segmented-options { display: flex; gap: 5px; }
+.segmented-options button { border: 1px solid #40516b; border-radius: 3px; background: #101b2d; color: #a4b5cb; padding: 7px 10px; font-size: 12px; }
+.segmented-options button[aria-pressed="true"] { border-color: #8ed5be; background: #1b342f; color: #c6f6e5; }
+.keybind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.keybind-grid>button { display: flex; justify-content: space-between; gap: 8px; align-items: center; min-width: 0; padding: 10px; border: 1px solid #34465f; border-radius: 4px; color: #b7c8db; background: #101b2d; font-size: 12px; }
+.keybind-grid kbd { font-size: 11px; color: #dceaff; white-space: nowrap; }
+.keybind-grid>button.is-listening { border-color: #b9edd5; background: #223d35; color: #d6ffe9; }
+.binding-notice,.binding-fixed { font-size: 11px; color: #97adc6; line-height: 1.6; margin: 10px 0 0; }
+.binding-notice { min-height: 18px; color: #c2e5d9; }
+.settings-section .setting-section-title>.text-button { font-size: 11px; margin-left: auto; }
+.paused-modules { border-top: 1px solid #34425a; margin-top: 22px; padding-top: 16px; }
+.paused-modules summary { cursor: pointer; font-size: 14px; color: #d4e6f1; }.paused-modules summary>span { color: #91a4ba; margin-left: 12px; font-size: 12px; }
+.paused-modules>div { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
+.paused-modules article { background: #111e30; border: 1px solid #2c4056; padding: 10px; border-radius: 4px; }
+.paused-modules article>div { display: flex; justify-content: space-between; gap: 6px; align-items: center; font-size: 11px; }
+.paused-modules strong { font-size: 12px; font-weight: 500; color: #d7e8f5; }
+.paused-modules article p { font-size: 11px; line-height: 1.7; color: #9bafc7; margin: 6px 0 0; }
+@media (max-width: 1000px) { .weapon-skills { gap: 4px; }.skill-chip { gap: 4px; padding: 5px 3px; }.skill-chip kbd { min-width: 17px; padding: 2px; font-size: 9px; } }
+@media (max-width: 720px) { .keybind-grid { grid-template-columns: 1fr 1fr; }.paused-modules>div { grid-template-columns: 1fr; }.skill-chip>span { font-size: 9px; }.skill-chip strong { font-size: 10px; }.skill-chip { gap: 3px; }.skill-chip kbd { font-size: 8px; min-width: 14px; }.damage-number-setting { grid-template-columns: 1fr; } }

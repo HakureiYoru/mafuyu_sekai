@@ -59,7 +59,8 @@ async function sample(wallSeconds, forceGc = false) {
         enemies: state.enemies.length, mines: state.enemies.filter(enemy => enemy.type === 'mine').length,
         hazards: state.hazards.length, bullets: state.bullets.length, pickups: state.pickups.length, indicators: state.indicators.length,
         companions: state.companions.length, beams: state.beams.length, droneBullets: state.bullets.filter(bullet => bullet.kind === 'drone').length,
-        player: { hp: state.player.hp, level: state.player.level, ammo: state.player.ammo, heat: state.player.heat, bombs: state.player.bombs },
+        player: { hp: state.player.hp, level: state.player.level, heat: state.player.heat, bombs: state.player.bombs, beamCharge: state.player.perfectWindow,
+          commandTime: state.player.commandTime, commandCooldown: state.player.commandCooldown },
         stats: snapshot.stats, finite: bodies.every(body => Number.isFinite(body.x) && Number.isFinite(body.y)) && Number.isFinite(state.elapsed) && Number.isFinite(state.score),
         bot: window.__MAFUYU_SOAK__?.summary(),
       };
@@ -123,7 +124,7 @@ try {
   await page.evaluate(() => {
     const debug = window.__MAFUYU_DEBUG__, canvas = document.querySelector('#game-host canvas');
     debug.state().player.invincible = 3600;
-    const held = new Set(), counts = { updates: 0, keyDowns: 0, pointerMoves: 0, dashes: 0, beamsObserved: 0, droneBulletsObserved: 0 };
+    const held = new Set(), counts = { updates: 0, keyDowns: 0, pointerMoves: 0, dashes: 0, beamPresses: 0, commands: 0, beamsObserved: 0, droneBulletsObserved: 0 };
     const transitions = [];
     let shooting = false, previousPhase = 'playing', lastDash = -10, lastBeamId = 0, stopped = false;
     const key = (code, down) => {
@@ -162,6 +163,10 @@ try {
       canvas.dispatchEvent(new window.PointerEvent('pointermove', pointer)); counts.pointerMoves++;
       if (!shooting) { canvas.dispatchEvent(new window.PointerEvent('pointerdown', pointer)); shooting = true; }
       if (player.dashCooldown <= 0 && state.elapsed - lastDash >= 3.2) { key('KeyR', true); key('KeyR', false); lastDash = state.elapsed; counts.dashes++; }
+      if (player.perfectWindow > 0 && player.dashTime <= 0) { key('KeyQ', true); key('KeyQ', false); counts.beamPresses++; }
+      if (target && player.commandCooldown <= 0 && Math.hypot(target.x - player.x, target.y - player.y) <= 560 + target.radius) {
+        key('KeyE', true); key('KeyE', false); counts.commands++;
+      }
     };
     const timer = window.setInterval(update, 100);
     window.__MAFUYU_SOAK__ = { stop: () => { stopped = true; window.clearInterval(timer); release(); }, summary: () => ({ ...counts, transitions: [...transitions] }) };
@@ -204,7 +209,7 @@ try {
   check(Math.abs(report.simulatedTicks / 60 - report.simulatedSeconds) < 0.02, 'Tick count disagrees with the fixed 60 Hz simulation elapsed time.');
   check(final.bot.transitions.length === 0, 'The bot observed an unexpected phase transition during the run.');
   check(final.bot.pointerMoves > seconds * 5 && final.bot.dashes > 0, 'The input bot did not drive the game throughout the run.');
-  check(final.bot.beamsObserved > 0 && final.bot.droneBulletsObserved > 0, 'The run did not exercise support projectiles and the dash beam.');
+  check(final.bot.beamsObserved > 0 && final.bot.droneBulletsObserved > 0 && final.bot.commands > 0 && final.bot.beamPresses > 0, 'The run did not exercise support projectiles, manual Q and E.');
   const retained = report.samples.filter(row => row.gc && !row.gc.unavailable && typeof row.heap.usedSize === 'number');
   report.retainedHeapSamples = retained.map(row => ({ wallSeconds: row.wallSeconds, usedBytes: row.heap.usedSize, gcDurationMs: row.gc.durationMs }));
   if (retained.length >= 2) check(retained.at(-1).heap.usedSize <= retained[0].heap.usedSize * 3 + 64 * 1048576, 'Retained JS heap exceeded three times baseline plus 64 MiB after GC.');
@@ -237,5 +242,6 @@ try {
 } finally {
   report.finishedAt = new Date().toISOString();
   await persist();
+  await writeFile(`${output}/soak-v${report.version}.json`, JSON.stringify(report, null, 2) + '\n');
   try { await browser?.close(); } finally { server.kill(); }
 }

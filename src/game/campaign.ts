@@ -34,6 +34,8 @@ export interface CampaignProgress {
   activeEncounter: EncounterId | null;
   completedStages: number[];
   defeatedEncounters: EncounterId[];
+  /** Catch-up is awarded before the guarding encounter, once per authored stage. */
+  catchupStages: number[];
   /** Number of choices already committed; the initial season-two offer has index zero. */
   choiceIndex: number;
 }
@@ -41,6 +43,7 @@ export type CampaignAction =
   | { type: 'stageStarted'; stage: number }
   | { type: 'stageCleared'; stage: number }
   | { type: 'encounter'; id: EncounterId; stage: number }
+  | { type: 'catchup'; stage: 2 | 4; minLevel: 5 | 7; companions: 1; overflowXp: 60 }
   | { type: 'choice'; index: number; stage: number }
   | { type: 'complete'; season: SeasonId };
 
@@ -53,7 +56,7 @@ export class CampaignDirector {
 
   constructor(season: SeasonId) {
     this.state = { season, stage: 1, stageElapsed: 0, phase: season === 's2' ? 'choice' : 'stage',
-      activeEncounter: null, completedStages: [], defeatedEncounters: [], choiceIndex: 0 };
+      activeEncounter: null, completedStages: [], defeatedEncounters: [], catchupStages: [], choiceIndex: 0 };
   }
 
   start(): CampaignAction[] {
@@ -78,6 +81,10 @@ export class CampaignDirector {
     if (progress.activeEncounter) { progress.phase = 'encounter'; return actions; }
     if (stage.exitEncounter && !progress.defeatedEncounters.includes(stage.exitEncounter)) {
       progress.phase = 'encounter'; progress.activeEncounter = stage.exitEncounter;
+      if (progress.season === 's2' && (progress.stage === 2 || progress.stage === 4) && !progress.catchupStages.includes(progress.stage)) {
+        progress.catchupStages.push(progress.stage);
+        actions.push({ type: 'catchup', stage: progress.stage, minLevel: progress.stage === 2 ? 5 : 7, companions: 1, overflowXp: 60 });
+      }
       actions.push({ type: 'encounter', id: stage.exitEncounter, stage: progress.stage });
     } else actions.push(...this.clearStage());
     return actions;

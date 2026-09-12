@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { InputState } from './input';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { InputController, InputState } from './input';
 import { FixedClock } from './clock';
+import { DEFAULT_KEYBINDINGS, rebindKey } from './settings';
 
 describe('input transitions', () => {
   it('consumes a bomb once until a new physical key press', () => {
@@ -18,6 +19,86 @@ describe('input transitions', () => {
     input.keyDown('KeyW'); input.keyDown('KeyR'); input.shoot = true;
     input.clear();
     expect(input.read(10, 20)).toMatchObject({ moveX: 0, moveY: 0, dash: false, bomb: false, shoot: false, aimX: 810, aimY: 470 });
+  });
+  it('consumes manual Q and E once independently of held main fire and keyboard repeat', () => {
+    const input = new InputState(); input.shoot = true;
+    input.keyDown('KeyQ'); input.keyDown('KeyE');
+    expect(input.read(0, 0)).toMatchObject({ beam: true, command: true, shoot: true });
+    input.keyDown('KeyQ', true); input.keyDown('KeyE');
+    expect(input.read(0, 0)).toMatchObject({ beam: false, command: false, shoot: true });
+    input.keyUp('KeyQ'); input.keyDown('KeyQ');
+    expect(input.read(0, 0)).toMatchObject({ beam: true, command: false });
+    input.keyUp('KeyE'); input.keyDown('KeyE'); input.clear();
+    expect(input.read(0, 0)).toMatchObject({ beam: false, command: false, shoot: false });
+  });
+  it('uses remapped movement/actions and clears the old held keys on rebinding', () => {
+    const input = new InputState(); input.keyDown('KeyW'); input.keyDown('KeyQ');
+    let bindings = rebindKey({ ...DEFAULT_KEYBINDINGS }, 'moveUp', 'ArrowUp');
+    bindings = rebindKey(bindings, 'beam', 'KeyE'); input.setBindings(bindings);
+    expect(input.read(0, 0)).toMatchObject({ moveY: 0, beam: false });
+    input.keyDown('KeyW'); input.keyDown('ArrowUp'); input.keyDown('KeyE'); input.keyDown('KeyQ');
+    expect(input.read(0, 0)).toMatchObject({ moveY: -1, beam: true, command: true });
+  });
+  it('preserves the right-Shift focus alias unless that physical key was assigned to another action', () => {
+    const input = new InputState(); input.keyDown('ShiftRight'); expect(input.read(0, 0).focus).toBe(true);
+    input.setBindings(rebindKey({ ...DEFAULT_KEYBINDINGS }, 'beam', 'ShiftRight'));
+    input.keyDown('ShiftRight'); expect(input.read(0, 0)).toMatchObject({ focus: false, beam: true });
+    input.keyDown('ShiftLeft'); expect(input.read(0, 0).focus).toBe(true);
+  });
+});
+
+class PointerHost extends EventTarget {
+  captures = new Set<number>();
+  released: number[] = [];
+  closest() { return null; }
+  getBoundingClientRect() { return { left: 100, top: 50, width: 800, height: 450 }; }
+  setPointerCapture(id: number) { this.captures.add(id); }
+  hasPointerCapture(id: number) { return this.captures.has(id); }
+  releasePointerCapture(id: number) { this.captures.delete(id); this.released.push(id); }
+}
+function dispatch(target: EventTarget, type: string, fields: Record<string, unknown> = {}) {
+  target.dispatchEvent(Object.assign(new Event(type, { cancelable: true }), fields));
+}
+describe('browser input lifecycle at the DOM boundary', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  function setup() {
+    const host = new PointerHost(), win = new EventTarget(), doc = Object.assign(new EventTarget(), { hidden: false });
+    vi.stubGlobal('HTMLElement', PointerHost); vi.stubGlobal('window', win); vi.stubGlobal('document', doc);
+    const pause = vi.fn(), toggle = vi.fn(), input = new InputController(host as unknown as HTMLElement, () => true, pause, toggle);
+    return { host, win, doc, pause, toggle, input };
+  }
+  it('captures held fire across the canvas edge and releases it on a global pointerup without losing movement', () => {
+    const { host, win, input } = setup();
+    dispatch(win, 'keydown', { code: 'KeyW', repeat: false });
+    dispatch(host, 'pointerdown', { pointerId: 7, button: 0, clientX: 500, clientY: 275 });
+    expect(host.captures.has(7)).toBe(true);
+    dispatch(host, 'pointerleave');
+    expect(input.read(10, 20)).toMatchObject({ shoot: true, moveY: -1, aimX: 810, aimY: 470 });
+    dispatch(win, 'pointerup', { pointerId: 7, button: 0 });
+    expect(input.read(0, 0)).toMatchObject({ shoot: false, moveY: -1 }); expect(host.released).toEqual([7]);
+    input.destroy();
+  });
+  it.each(['blur', 'hidden', 'escape', 'clear', 'destroy'])('releases capture and pending Q/E on %s', reason => {
+    const { host, win, doc, pause, toggle, input } = setup();
+    dispatch(host, 'pointerdown', { pointerId: 8, button: 0, clientX: 400, clientY: 200 });
+    dispatch(win, 'keydown', { code: 'KeyQ', repeat: false }); dispatch(win, 'keydown', { code: 'KeyE', repeat: false });
+    if (reason === 'blur') dispatch(win, 'blur');
+    else if (reason === 'hidden') { doc.hidden = true; dispatch(doc, 'visibilitychange'); }
+    else if (reason === 'escape') dispatch(win, 'keydown', { code: 'Escape', repeat: false });
+    else if (reason === 'clear') input.clear();
+    else input.destroy();
+    expect(input.read(0, 0)).toMatchObject({ shoot: false, beam: false, command: false }); expect(host.captures.size).toBe(0);
+    if (reason === 'blur' || reason === 'hidden') expect(pause).toHaveBeenCalledOnce();
+    if (reason === 'escape') expect(toggle).toHaveBeenCalledOnce();
+    input.destroy();
+    dispatch(win, 'keydown', { code: 'KeyQ', repeat: false });
+    expect(input.read(0, 0).beam).toBe(false);
+  });
+  it('drops held fire when the browser cancels pointer capture', () => {
+    const { host, input } = setup();
+    dispatch(host, 'pointerdown', { pointerId: 9, button: 0, clientX: 400, clientY: 200 });
+    dispatch(host, 'lostpointercapture', { pointerId: 9 }); expect(input.read(0, 0).shoot).toBe(false);
+    input.destroy();
   });
 });
 describe('fixed clock', () => {

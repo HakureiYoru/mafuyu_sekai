@@ -175,7 +175,7 @@ describe('mid-wave miniboss integration', () => {
     expect(sim.state.enemies).toContain(ordinary); expect(sim.state.enemies).toContain(shooter);
     expect(sim.state.bullets).toContain(bullet);
     const rewards = Object.fromEntries(sim.state.pickups.map(p => [p.type, p.value]));
-    expect(rewards).toEqual({ xp: difficulty === 'hard' ? 360 : 260, hp: difficulty === 'hard' ? 2 : 1, ammo: 1, coolant: 1, support: 1 });
+    expect(rewards).toEqual({ xp: difficulty === 'hard' ? 360 : 260, hp: difficulty === 'hard' ? 2 : 1, supply: 1, coolant: 1, support: 1 });
     const before = structuredClone(sim.state.pickups);
     sim.damageEnemy(mini, 9999); expect(sim.state.pickups).toEqual(before); expect(sim.state.kills).toBe(1);
     const events = sim.step(idle());

@@ -47,6 +47,8 @@ try {
           button: 0, buttons: 1, pointerType: 'mouse', pointerId: 1, bubbles: true };
         canvas.dispatchEvent(new window.PointerEvent('pointermove', pointer)); canvas.dispatchEvent(new window.PointerEvent('pointerdown', pointer));
         if (p.dashCooldown <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyR' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyR' })); }
+        if (p.perfectWindow > 0 && p.dashTime <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyQ' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyQ' })); }
+        if (p.commandCooldown <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyE' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyE' })); }
       }).catch(e => report.errors.push(e.message));
     }, 100);
     await page.waitForTimeout(3000);

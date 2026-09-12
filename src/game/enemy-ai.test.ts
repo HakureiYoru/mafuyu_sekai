@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMIES, STEP } from './config';
-import { ENEMY_ATTACKS, enemyAttacks, updateEnemyAi } from './enemy-ai';
+import { ENEMY_ATTACKS, cancelEnemyAttack, enemyAttacks, interruptEnemy, refreshWeakpoint, updateEnemyAi } from './enemy-ai';
 import { FixedClock } from './clock';
 import type { EnemyAiContext } from './enemy-ai';
-import type { CombatEvent, Difficulty, Enemy, EnemyType, Player } from './types';
+import type { CombatEvent, Difficulty, Enemy, EnemyShotOptions, EnemyType, Player } from './types';
 
 function player(extra: Partial<Player> = {}): Player {
   return { x: 2600, y: 2000, prevX: 2600, prevY: 2000, vx: 0, vy: 0, radius: 18,
-    hp: 5, maxHp: 5, bombs: 3, level: 1, xp: 0, ammo: 120, heat: 0, angle: 0,
+    hp: 5, maxHp: 5, bombs: 3, level: 1, xp: 0, heat: 0, angle: 0, commandTargetId: null, commandTime: 0, commandCooldown: 0,
     invincible: 0, dashTime: 0, dashCooldown: 0, dashVx: 0, dashVy: 0,
     perfectWindow: 0, shotCooldown: 0, specialCooldown: 0, idleTime: 0, heatLock: 0,
     overheated: false, focus: false, ...extra };
@@ -22,12 +22,12 @@ function enemy(type: EnemyType, extra: Partial<Enemy> = {}): Enemy {
 
 function harness(type: EnemyType, options: { enemy?: Partial<Enemy>; player?: Partial<Player>; allowed?: boolean; commit?: boolean; difficulty?: Difficulty } = {}) {
   const e = enemy(type, options.enemy), p = player(options.player);
-  const shots: { angle: number; speed: number; radius: number; color: number; time: number }[] = [];
+  const shots: { angle: number; speed: number; radius: number; color: number; time: number; options?: EnemyShotOptions }[] = [];
   const mines: { x: number; y: number; time: number }[] = [], events: CombatEvent[] = [];
   let requests = 0;
   const ctx: EnemyAiContext = { player: p, elapsed: 0, wave: 4, difficulty: options.difficulty, allowAttack: options.allowed ?? true,
     canCommit: () => { requests++; return options.commit ?? true; },
-    shoot: (_enemy, angle, speed, radius, color) => shots.push({ angle, speed, radius, color, time: ctx.elapsed }),
+    shoot: (_enemy, angle, speed, radius, color, options) => shots.push({ angle, speed, radius, color, time: ctx.elapsed, options }),
     plantMine: (x, y) => mines.push({ x, y, time: ctx.elapsed }), emit: event => events.push(event) };
   function tick(decide = true, integrate = false): void {
     ctx.elapsed += STEP; e.cooldown -= STEP;
@@ -42,6 +42,44 @@ function harness(type: EnemyType, options: { enemy?: Partial<Enemy>; player?: Pa
   }
   return { e, p, ctx, shots, mines, events, tick, ticks, until, requests: () => requests };
 }
+
+describe('interruptible commitments and baitable heavy shots', () => {
+  it.each(['normal', 'hard'] as const)('%s marks exactly the final sniper projectile for finite enemy friendly damage', difficulty => {
+    const h = harness('sniper', { difficulty }); h.tick(); h.until(() => h.e.state === 'recover');
+    expect(h.shots).toHaveLength(enemyAttacks(difficulty).sniper.shots);
+    expect(h.shots.slice(0, -1).every(shot => shot.options?.friendlyDamage === undefined)).toBe(true);
+    expect(h.shots.at(-1)!.options).toMatchObject({ friendlyDamage: 8, friendlyHits: 3, shape: 'kunai' });
+    expect(h.shots.every(shot => shot.angle === h.e.angle)).toBe(true);
+  });
+  it.each(['normal', 'hard'] as const)('%s weakpoints keep partial damage while aiming, then cancel the complete volley once', difficulty => {
+    for (const type of ['sniper', 'sprayer'] as const) {
+      const h = harness(type, { difficulty }); h.tick();
+      const hp = difficulty === 'hard' ? 6 : 4;
+      expect(h.e.weakpoint).toMatchObject({ hp, maxHp: hp, radius: 24 });
+      expect(interruptEnemy(h.e, 2, h.ctx.elapsed, h.ctx.emit)).toBe(false);
+      h.p.y += 60; h.tick();
+      expect(h.e.weakpoint!.hp).toBe(hp - 2);
+      h.e.x += 25; refreshWeakpoint(h.e);
+      expect(h.e.weakpoint!.x).toBeCloseTo(h.e.x + Math.cos(h.e.angle) * (h.e.radius + 8));
+      expect(interruptEnemy(h.e, hp, h.ctx.elapsed, h.ctx.emit)).toBe(true);
+      expect(h.e.weakpoint).toBeUndefined(); expect(h.e.state).toBe('recover'); expect(h.e.timer).toBe(0.7);
+      expect(h.e.cooldown).toBeCloseTo(enemyAttacks(difficulty)[type].cooldown + 0.7);
+      expect(interruptEnemy(h.e, hp, h.ctx.elapsed, h.ctx.emit)).toBe(false);
+      h.ctx.allowAttack = false; h.ticks(180);
+      expect(h.shots).toHaveLength(0); expect(h.events.filter(e => e.type === 'interrupt')).toHaveLength(1);
+    }
+  });
+  it('does not cancel released shots or expose weakpoints on dashers and minelayers', () => {
+    const h = harness('sniper'); h.tick(); h.until(() => h.e.state === 'volley');
+    expect(h.e.weakpoint).toBeUndefined(); expect(cancelEnemyAttack(h.e)).toBe(false);
+    h.until(() => h.e.state === 'recover'); expect(h.shots).toHaveLength(2);
+    for (const type of ['dasher', 'minelayer'] as const) {
+      const other = harness(type, { player: { x: type === 'dasher' ? 2300 : 2500 } }); other.tick();
+      expect(other.e.weakpoint).toBeUndefined();
+      expect(interruptEnemy(other.e, 999, 0)).toBe(false);
+    }
+  });
+});
 
 describe('observable enemy tactics', () => {
   it('gives basic enemies direct, bounded interception and flank roles without a speed buff', () => {

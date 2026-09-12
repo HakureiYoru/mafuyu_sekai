@@ -1,6 +1,8 @@
 import { clamp } from './math';
 import { BALANCE } from './config';
-import type { CombatEvent, Difficulty, Enemy, EnemyTactics, Player } from './types';
+import { difficultyConfig } from './difficulty';
+import type { CombatEvent, Difficulty, Enemy, EnemyShotOptions, EnemyTactics, Player } from './types';
+import type { AttackIntent } from './threat-director';
 
 /** Telegraphs, simulation timing and renderer progress indicators share these values. */
 export const ENEMY_ATTACKS = {
@@ -38,14 +40,77 @@ export interface EnemyAiContext {
   wave: number;
   difficulty?: Difficulty;
   allowAttack: boolean;
-  canCommit(): boolean;
-  shoot(enemy: Enemy, angle: number, speed: number, radius: number, color: number): void;
+  canCommit(intent?: AttackIntent): boolean;
+  shoot(enemy: Enemy, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void;
   emit(event: CombatEvent): void;
   plantMine(x: number, y: number): void;
 }
 
 const EPSILON = 1e-8;
 type StrongType = 'dasher' | 'sniper' | 'sprayer' | 'minelayer';
+
+export const WEAKPOINT = { radius: 24, normalHp: 4, hardHp: 6, recovery: 0.7 } as const;
+const weakpointCooldowns = new WeakMap<NonNullable<Enemy['weakpoint']>, number>();
+
+/** One visible weakpoint per windup; moving/rotating its source never restores spent HP. */
+export function exposeWeakpoint(enemy: Enemy, difficulty: Difficulty = 'normal', cooldown?: number): void {
+  if (!['sniper', 'sprayer', 'weaver', 'repairer'].includes(enemy.type)) return;
+  const hp = difficulty === 'hard' ? WEAKPOINT.hardHp : WEAKPOINT.normalHp;
+  if (!enemy.weakpoint) {
+    enemy.weakpoint = { x: enemy.x, y: enemy.y, radius: WEAKPOINT.radius, hp, maxHp: hp };
+    const original = cooldown ?? (enemy.type === 'sniper' || enemy.type === 'sprayer' ? enemyAttacks(difficulty)[enemy.type].cooldown : 0.6);
+    weakpointCooldowns.set(enemy.weakpoint, original);
+  }
+  refreshWeakpoint(enemy);
+}
+
+export function refreshWeakpoint(enemy: Enemy): void {
+  const point = enemy.weakpoint;
+  if (!point) return;
+  if (enemy.hp <= 0 || !['aim', 'charge'].includes(enemy.state)) { enemy.weakpoint = undefined; return; }
+  point.x = enemy.x + Math.cos(enemy.angle) * (enemy.radius + 8);
+  point.y = enemy.y + Math.sin(enemy.angle) * (enemy.radius + 8);
+}
+
+/** Only cancels a not-yet-fired commitment. Already released projectiles remain owned by simulation. */
+export function cancelEnemyAttack(enemy: Enemy): boolean {
+  if (enemy.hp <= 0 || !['chase', 'aim', 'charge', 'lay'].includes(enemy.state)) return false;
+  enemy.weakpoint = undefined; enemy.state = 'recover'; enemy.timer = WEAKPOINT.recovery;
+  enemy.cooldown = Math.max(enemy.cooldown, 0.6); enemy.vx = enemy.vy = 0;
+  if (enemy.tactics) { enemy.tactics.shotsLeft = 0; enemy.tactics.shotTimer = 0; enemy.tactics.locked = false; }
+  if (enemy.season2) {
+    enemy.season2.shotsLeft = 0; enemy.season2.auxTimer = 0;
+    enemy.season2.targetId = null; enemy.season2.points.length = 0;
+  }
+  return true;
+}
+
+/** The caller resolves swept weakpoint geometry. True means this hit broke it exactly once. */
+export function interruptEnemy(enemy: Enemy, damage: number, _elapsed: number, emit?: (event: CombatEvent) => void): boolean {
+  if (enemy.hp <= 0 || !enemy.weakpoint || !['aim', 'charge'].includes(enemy.state) || !Number.isFinite(damage) || damage <= 0) return false;
+  enemy.weakpoint.hp = Math.max(0, enemy.weakpoint.hp - damage);
+  if (enemy.weakpoint.hp > 0) return false;
+  const point = { x: enemy.weakpoint.x, y: enemy.weakpoint.y };
+  const cooldown = weakpointCooldowns.get(enemy.weakpoint) ?? 0.6;
+  cancelEnemyAttack(enemy);
+  enemy.cooldown = cooldown + WEAKPOINT.recovery;
+  emit?.({ type: 'interrupt', ...point, enemyType: enemy.type, targetId: enemy.id, hitResult: 'weakpoint' });
+  return true;
+}
+
+export function enemyAttackIntent(enemy: Enemy, context: Pick<EnemyAiContext, 'player' | 'difficulty'>): AttackIntent {
+  const type = enemy.type as StrongType, cfg = enemyAttacks(context.difficulty)[type];
+  const angle = bearing(enemy, context.player, type === 'sniper' ? enemyAttacks(context.difficulty).sniper.prediction : 0);
+  const base: AttackIntent = { sourceId: enemy.id, x: enemy.x, y: enemy.y, angle,
+    kind: 'line', range: 1600, width: 40, warning: cfg.warning, duration: 0.8 };
+  if (type === 'dasher') return { ...base, kind: 'dash', range: enemyAttacks(context.difficulty).dasher.speed * enemyAttacks(context.difficulty).dasher.duration, width: enemy.radius * 2, duration: enemyAttacks(context.difficulty).dasher.duration };
+  if (type === 'sprayer') return { ...base, kind: 'fan', spread: enemyAttacks(context.difficulty).sprayer.sector, range: 1050, width: enemyAttacks(context.difficulty).sprayer.radius * 2,
+    speed: enemyAttacks(context.difficulty).sprayer.speed * difficultyConfig(context.difficulty).bulletSpeed,
+    releaseDuration: (enemyAttacks(context.difficulty).sprayer.shots - 1) * enemyAttacks(context.difficulty).sprayer.shotGap, duration: 4 };
+  if (type === 'minelayer') return { ...base, kind: 'sample', points: [{ x: enemy.x, y: enemy.y }], width: 200, range: 0, warning: cfg.warning + enemyAttacks(context.difficulty).mine.arming, duration: 4 };
+  return { ...base, width: enemyAttacks(context.difficulty).sniper.radius * 2, speed: enemyAttacks(context.difficulty).sniper.speed * difficultyConfig(context.difficulty).bulletSpeed,
+    releaseDuration: (enemyAttacks(context.difficulty).sniper.shots - 1) * enemyAttacks(context.difficulty).sniper.shotGap, duration: 3 };
+}
 
 function memory(enemy: Enemy): EnemyTactics {
   return enemy.tactics ??= { shotsLeft: 0, shotTimer: 0, sweepStart: 0, sweepIndex: 0, locked: false };
@@ -69,6 +134,7 @@ function cue(enemy: Enemy, context: EnemyAiContext, text: 'windup' | 'release'):
 }
 
 function recover(enemy: Enemy, type: StrongType, context: EnemyAiContext): void {
+  enemy.weakpoint = undefined;
   enemy.state = 'recover'; enemy.timer = enemyAttacks(context.difficulty)[type].recovery;
   const tactics = memory(enemy);
   tactics.shotsLeft = 0; tactics.shotTimer = 0;
@@ -79,6 +145,7 @@ function begin(enemy: Enemy, state: 'charge' | 'aim', warning: number, angle: nu
   enemy.state = state; enemy.timer = warning; enemy.angle = angle;
   const tactics = memory(enemy);
   tactics.locked = locked; tactics.shotsLeft = 0; tactics.shotTimer = 0; tactics.sweepIndex = 0;
+  exposeWeakpoint(enemy, context.difficulty);
   stop(enemy); cue(enemy, context, 'windup');
 }
 
@@ -157,6 +224,7 @@ function recovery(enemy: Enemy, type: StrongType, dt: number, decide: boolean, c
 }
 
 function releaseVolley(enemy: Enemy, type: 'sniper' | 'sprayer' | 'minelayer', context: EnemyAiContext): void {
+  enemy.weakpoint = undefined;
   const profile = enemyAttacks(context.difficulty), tactics = memory(enemy), cfg = profile[type];
   tactics.shotsLeft = cfg.shots; tactics.shotTimer = 0; tactics.sweepIndex = 0; tactics.locked = true;
   const side = enemy.id % 2 === 0 ? -1 : 1;
@@ -183,7 +251,8 @@ function volley(enemy: Enemy, type: 'sniper' | 'sprayer' | 'minelayer', dt: numb
       if (!hard || Math.hypot(x - context.player.x, y - context.player.y) >= BALANCE.ai.mineSafeDistance) context.plantMine(x, y);
     } else if (type === 'sniper') {
       const sniper = profile.sniper;
-      context.shoot(enemy, enemy.angle, sniper.speed, sniper.radius, 0xff925f);
+      context.shoot(enemy, enemy.angle, sniper.speed, sniper.radius, tactics.shotsLeft === 1 ? 0xffce87 : 0xff925f,
+        tactics.shotsLeft === 1 ? { shape: 'kunai', friendlyDamage: 8, friendlyHits: 3 } : undefined);
     } else {
       const sprayer = profile.sprayer, side = enemy.id % 2 === 0 ? -1 : 1;
       // Hard alternates the two advertised edges, converging inward without retargeting the cone.
@@ -225,7 +294,7 @@ function updateDasher(enemy: Enemy, dt: number, decide: boolean, context: EnemyA
     steer(enemy, Math.cos(toward + flank), Math.sin(toward + flank), dt);
     enemy.angle = toward;
   }
-  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit()) {
+  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit(enemyAttackIntent(enemy, context))) {
     begin(enemy, 'charge', cfg.warning, bearing(enemy, context.player), false, context);
   }
 }
@@ -240,12 +309,13 @@ function updateSniper(enemy: Enemy, dt: number, decide: boolean, context: EnemyA
       enemy.angle = bearing(enemy, context.player, prediction);
     }
     enemy.timer = Math.max(0, enemy.timer - dt); tactics.locked = enemy.timer <= cfg.lockWindow + EPSILON;
+    exposeWeakpoint(enemy, context.difficulty);
     if (enemy.timer <= EPSILON) releaseVolley(enemy, 'sniper', context);
     return;
   }
   if (enemy.state === 'volley') { volley(enemy, 'sniper', dt, context); return; }
   if (decide) keepRange(enemy, dt, context, distance, cfg.minRange, cfg.maxRange, 0.35);
-  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit()) {
+  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit(enemyAttackIntent(enemy, context))) {
     begin(enemy, 'aim', cfg.warning, bearing(enemy, context.player, prediction), false, context);
   }
 }
@@ -259,7 +329,7 @@ function updateSprayer(enemy: Enemy, dt: number, decide: boolean, context: Enemy
   }
   if (enemy.state === 'volley') { volley(enemy, 'sprayer', dt, context); return; }
   if (decide) keepRange(enemy, dt, context, distance, cfg.minRange, cfg.maxRange);
-  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit()) {
+  if (context.allowAttack && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit(enemyAttackIntent(enemy, context))) {
     // The entire cone is committed before its difficulty-specific telegraph begins.
     begin(enemy, 'aim', cfg.warning, bearing(enemy, context.player), true, context);
   }
@@ -281,7 +351,7 @@ function updateMinelayer(enemy: Enemy, dt: number, decide: boolean, context: Ene
       Math.sin(toward) * radial + Math.cos(toward) * side * lateral, dt);
     enemy.angle = toward;
   }
-  if (context.allowAttack && distance >= cfg.retreatDistance && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit()) {
+  if (context.allowAttack && distance >= cfg.retreatDistance && distance <= cfg.commitRange && enemy.cooldown <= EPSILON && context.canCommit(enemyAttackIntent(enemy, context))) {
     begin(enemy, 'charge', cfg.warning, bearing(enemy, context.player), true, context);
   }
 }
