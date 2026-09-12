@@ -1,0 +1,113 @@
+{
+  "version": "4.1.0",
+  "sha": "8f4d8bc342f4f96293ef1ca7907e93c6175dea35",
+  "url": "https://mafuyu-sekai.vercel.app",
+  "checkedAt": "2026-09-12T12:30:50.590Z",
+  "fixture": "Fresh browser profile. Stage timers accelerated with debug.advanceStage; ECHO and all six cards individually defeated through the real damage/completion path. This validates deployment, persistence and menus, not human play balance.",
+  "errors": [],
+  "cards": [
+    {
+      "name": "零响针雨",
+      "hp": 700,
+      "card": 0
+    },
+    {
+      "name": "交错织幕",
+      "hp": 750,
+      "card": 1
+    },
+    {
+      "name": "逆相花庭",
+      "hp": 800,
+      "card": 2
+    },
+    {
+      "name": "镜面折光",
+      "hp": 850,
+      "card": 3
+    },
+    {
+      "name": "无声刻印",
+      "hp": 900,
+      "card": 4
+    },
+    {
+      "name": "空白终曲",
+      "hp": 1000,
+      "card": 5
+    }
+  ],
+  "saved": {
+    "version": 1,
+    "revision": 1,
+    "clears": {
+      "s1:6a7dc726-3666-4b05-93c3-3f3c5c4a5f47": {
+        "runId": "6a7dc726-3666-4b05-93c3-3f3c5c4a5f47",
+        "season": "s1",
+        "difficulty": "normal",
+        "encounterId": "s1:mafuyu",
+        "score": 62000,
+        "source": "gameplay",
+        "completedAt": 1789216265336,
+        "carryover": {
+          "level": 3,
+          "xp": 40,
+          "companions": 3
+        }
+      }
+    },
+    "carryover": {
+      "level": 3,
+      "xp": 40,
+      "companions": 3
+    },
+    "bestScores": {
+      "s1": {
+        "normal": 62000,
+        "hard": 0
+      },
+      "s2": {
+        "normal": 0,
+        "hard": 0
+      }
+    }
+  },
+  "entry": {
+    "season": "s2",
+    "difficulty": "hard",
+    "level": 3,
+    "xp": 40,
+    "companions": 3,
+    "bombs": 3,
+    "phase": "upgrade",
+    "choices": 3,
+    "raf": false
+  },
+  "movement": {
+    "from": {
+      "x": 2000,
+      "y": 2000
+    },
+    "to": {
+      "x": 2055,
+      "y": 2000
+    }
+  },
+  "catchup": {
+    "level": 5,
+    "companions": 3,
+    "announcement": "追赶补给 · 武装保底 Lv5"
+  },
+  "controlsFixture": "Arsenal practice after the persistence check; durable stationary targets and a heat lock isolate DOM Q/E input. Practice must not alter the campaign save.",
+  "beam": {
+    "storedSeconds": 0,
+    "beams": 1,
+    "overheated": true
+  },
+  "command": {
+    "targetId": 1,
+    "seconds": 4,
+    "cooldown": 8
+  },
+  "result": "passed"
+}
