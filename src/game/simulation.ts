@@ -13,7 +13,7 @@ import { CampaignDirector, CAMPAIGN_STAGES, ENEMY_INTRODUCTIONS, ENCOUNTERS, typ
 import { createBuild, offerModules, chooseModule, buildDamageMultiplier, addResonanceXp, RESONANCE, moduleRank, rankValue, highRankFactor, resolveBuildStats, hasEvolution, enqueueUpgrade, rerollModules, MODULES, MODULE_VALUES, EVOLUTION_VALUES, type ResolvedBuildStats } from './upgrades';
 import { createSpellBrain, spellCardDefinition, advanceSpellCard, updateSpellBoss } from './spellcards';
 import { createSeason2Brain, updateSeason2Ai, shieldDamageMultiplier, breakShield, onSeason2Death, type Season2AiContext } from './season2-ai';
-import type { AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyShotOptions, EnemyType, InputAction, ModuleId, ModuleState, Pickup, PickupType, Player, ProjectileMotionPhase, RunStartOptions, WorldState, UpgradeChoiceId, EvolutionId } from './types';
+import type { ArenaRect, AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyShotOptions, EnemyType, InputAction, ModuleId, ModuleState, Pickup, PickupType, Player, ProjectileMotionPhase, RunStartOptions, WorldState, UpgradeChoiceId, EvolutionId } from './types';
 
 const EPSILON = 1e-8;
 const PICKUP_COLORS: Record<PickupType, number> = { xp: 0x73f7eb, hp: 0xa6f1aa, bomb: 0xffcb69, supply: 0x69ffc0, coolant: 0x69caff, miniBomb: 0xffbb55, blackHole: 0xbb88ff, support: 0x9ceaff };
@@ -44,6 +44,7 @@ export class GameSimulation {
   private readonly returnBladeHits = new Map<number, Set<number>>();
   private readonly returningVolley = new Set<number>();
   private dashBuffered = 0;
+  private dashBufferedDirection: { x: number; y: number } | null = null;
   private nextEnemyCommit = 0;
   private specialWindup = 0;
   private specialTarget: number | null = null;
@@ -109,6 +110,7 @@ export class GameSimulation {
     this.ricochetTimer = this.rearTimer = this.bloomTimer = this.returnWingTimer = this.brakeTimer = this.echoTimer = 0;
     this.introducedTypes = new Set(['basic']); this.pendingEncounterCleanup = false; this.returnBladeHits.clear(); this.returningVolley.clear();
     this.dashBuffered = 0;
+    this.dashBufferedDirection = null;
     this.nextEnemyCommit = 0;
     this.specialWindup = 0;
     this.specialTarget = null;
@@ -139,7 +141,7 @@ export class GameSimulation {
   }
 
   /** Edge history is reset on pause/blur so a new physical press resumes cleanly. */
-  clearInput(): void { this.previousDash = this.previousBomb = false; this.dashBuffered = 0; this.state.player.focus = false; this.focusTime = 0; }
+  clearInput(): void { this.previousDash = this.previousBomb = false; this.dashBuffered = 0; this.dashBufferedDirection = null; this.state.player.focus = false; this.focusTime = 0; }
 
   continueEndless(): void {
     if (this.state.status !== 'complete') return;
@@ -226,6 +228,7 @@ export class GameSimulation {
     p.focus = !!input.focus;
     this.focusTime = p.focus ? this.focusTime + dt : 0;
     this.dashBuffered = Math.max(0, this.dashBuffered - dt);
+    if (this.dashBuffered <= 0) this.dashBufferedDirection = null;
     p.invincible = Math.max(0, p.invincible - dt);
     p.shotCooldown = Math.max(0, p.shotCooldown - dt);
     p.specialCooldown = Math.max(0, p.specialCooldown - dt);
@@ -241,12 +244,18 @@ export class GameSimulation {
     const aimX = input.aimX - p.x, aimY = input.aimY - p.y;
     if (Math.hypot(aimX, aimY) > EPSILON) p.angle = Math.atan2(aimY, aimX);
     const direction = normalize(input.moveX, input.moveY);
+    const moveAmount = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const charged = this.has('doubleDash') ? this.dashStock > 0 : p.dashCooldown <= EPSILON;
-    if (input.dash && !this.previousDash && (charged || p.dashCooldown <= BALANCE.dash.inputBuffer + EPSILON)) this.dashBuffered = BALANCE.dash.inputBuffer;
+    if (input.dash && !this.previousDash && (charged || p.dashCooldown <= BALANCE.dash.inputBuffer + EPSILON)) {
+      this.dashBuffered = BALANCE.dash.inputBuffer;
+      this.dashBufferedDirection = input.dashDirection ? normalize(input.dashDirection.x, input.dashDirection.y) : null;
+    }
     if (this.dashBuffered > 0 && charged && p.dashTime <= EPSILON) {
+      const override = this.dashBufferedDirection ?? { x: 0, y: 0 };
       this.dashBuffered = 0;
+      this.dashBufferedDirection = null;
       this.dashStart = { x: p.x, y: p.y }; p.perfectWindow = 0;
-      const dash = direction.x || direction.y ? direction : { x: Math.cos(p.angle), y: Math.sin(p.angle) };
+      const dash = direction.x || direction.y ? direction : override.x || override.y ? override : { x: Math.cos(p.angle), y: Math.sin(p.angle) };
       p.dashVx = dash.x * BALANCE.dash.speed; p.dashVy = dash.y * BALANCE.dash.speed;
       p.dashTime = BALANCE.dash.duration;
       if (this.has('doubleDash')) { this.dashStock--; if (p.dashCooldown <= EPSILON) { p.dashCooldown = this.dashRecharge; this.grazeRefund = 0; } }
@@ -264,7 +273,7 @@ export class GameSimulation {
         if (this.has('vent') && this.ventTimer <= EPSILON) { p.heat = Math.max(0, p.heat - this.value('vent', MODULE_VALUES.vent.heat)); this.ventTimer = this.scalar('vent', 'cooldown', MODULE_VALUES.vent.cooldown); this.moduleEvent('vent'); }
       }
     }
-    const moveSpeed = p.focus ? BALANCE.player.focusSpeed : Math.min(400, this.modules.moveSpeed(BALANCE.player.speed, this.moduleContext()));
+    const moveSpeed = (p.focus ? BALANCE.player.focusSpeed : Math.min(400, this.modules.moveSpeed(BALANCE.player.speed, this.moduleContext()))) * moveAmount;
     p.vx = dashDelta > 0 ? p.dashVx : direction.x * moveSpeed;
     p.vy = dashDelta > 0 ? p.dashVy : direction.y * moveSpeed;
     const arena = this.state.arena ?? { x: 0, y: 0, width: WORLD.width, height: WORLD.height };
@@ -1120,6 +1129,13 @@ export class GameSimulation {
       },
       collect: pickup => { const index = this.state.pickups.indexOf(pickup); if (index < 0 || !this.collectPickup(pickup)) return false; this.state.pickups.splice(index, 1); return true; },
       emit: event => this.emit(event) };
+  }
+
+  /** Touch acquisition is infrequent, but must see newly spawned targets before the next simulation step. */
+  queryTouchTargets(rect: ArenaRect, output: Enemy[]): Enemy[] {
+    this.rebuildGrid();
+    const radius = this.maxEnemyRadius;
+    return this.grid.query(rect.x - radius, rect.y - radius, rect.x + rect.width + radius, rect.y + rect.height + radius, output);
   }
 
   private rebuildGrid(): void {

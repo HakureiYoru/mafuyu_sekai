@@ -10,25 +10,33 @@ export class GameAudio {
   private limiter: DynamicsCompressorNode | null = null;
   private music: AudioBufferSourceNode | null = null;
   private musicWanted = false;
+  private playing = false;
   private buffers = new Map<string, AudioBuffer>();
   private encoded = new Map<string, ArrayBuffer>();
   private voices = new Set<Voice>();
   private last = new Map<string, { time: number; priority: number }>();
   private abort = new AbortController();
-  private preparing: Promise<void> | null = null;
+  private preloading: Promise<void> | null = null;
+  private decoding = new Map<string, Promise<void>>();
   private disposed = false;
-  constructor(private settings: GameSettings) {}
-  async preload() {
-    await Promise.allSettled([['shot', 'sound/shot.wav'], ['music', 'assets/music/bg.mp3']].map(async ([key, path]) => {
+  constructor(private settings: GameSettings, private readonly onInterrupted?: () => void) {}
+  preload(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    this.preloading ??= Promise.allSettled([['shot', 'sound/shot.wav'], ['music', 'assets/music/bg.mp3']].map(async ([key, path]) => {
       const result = await fetch(`${import.meta.env.BASE_URL}${path}`, { signal: this.abort.signal });
       if (!result.ok) throw new Error(`Audio ${key}: ${result.status}`);
-      this.encoded.set(key, await result.arrayBuffer());
-    }));
+      const bytes = await result.arrayBuffer();
+      if (this.disposed) return;
+      this.encoded.set(key, bytes);
+      // Each asset joins an already unlocked session independently; a slow music fetch cannot gate shots.
+      await this.decodeAsset(key);
+    })).then(() => undefined);
+    return this.preloading;
   }
   /** Invoked synchronously from a user gesture, including the first ctx.resume(). */
   play() {
-    this.musicWanted = true;
     if (this.disposed) return;
+    this.musicWanted = this.playing = true;
     try {
       if (!this.context) {
         this.context = new AudioContext();
@@ -37,18 +45,38 @@ export class GameAudio {
         this.limiter.threshold.value = -8; this.limiter.ratio.value = 8;
         this.musicBus.connect(this.musicDuck); this.musicDuck.connect(this.master); this.sfxBus.connect(this.master);
         this.master.connect(this.limiter); this.limiter.connect(this.context.destination);
+        this.context.onstatechange = () => {
+          if (!this.playing) return;
+          // Safari exposes "interrupted" for system audio focus loss without necessarily hiding the page.
+          if ((this.context?.state as string) === 'interrupted') { this.onInterrupted?.(); return; }
+          this.startMusic();
+        };
         this.synthesise(); this.setSettings(this.settings);
       }
-      void this.context.resume().catch(() => {});
-      this.preparing ??= this.decode();
-      void this.preparing.then(() => { if (!this.disposed && this.musicWanted) this.startMusic(); });
+      const context = this.context;
+      // Retry on every user gesture, including Safari's interrupted/suspended states. Never await first.
+      void context.resume().then(() => {
+        if (this.disposed) return;
+        if (!this.playing) { void context.suspend().catch(() => {}); return; }
+        this.startMusic();
+      }).catch(() => {});
+      for (const key of this.encoded.keys()) void this.decodeAsset(key);
+      this.startMusic();
     } catch { /* Audio unavailable: the complete game remains playable silently. */ }
   }
-  private async decode() {
-    const context = this.context;
-    if (!context) return;
-    await Promise.allSettled([...this.encoded].map(async ([key, bytes]) => { this.buffers.set(key, await context.decodeAudioData(bytes.slice(0))); }));
-    this.encoded.clear();
+  private decodeAsset(key: string): Promise<void> {
+    const pending = this.decoding.get(key);
+    if (pending) return pending;
+    const context = this.context, bytes = this.encoded.get(key);
+    if (this.disposed || !context || !bytes || this.buffers.has(key)) return Promise.resolve();
+    // Catch both synchronous decode failures and asynchronous rejection. A failed asset can retry later.
+    const task = Promise.resolve().then(() => context.decodeAudioData(bytes.slice(0))).then(buffer => {
+      if (this.disposed || this.context !== context) return;
+      this.buffers.set(key, buffer); this.encoded.delete(key);
+      this.startMusic();
+    }).catch(() => {}).finally(() => { if (this.decoding.get(key) === task) this.decoding.delete(key); });
+    this.decoding.set(key, task);
+    return task;
   }
   private synthesise() {
     if (!this.context) return;
@@ -84,13 +112,13 @@ export class GameAudio {
   }
   private startMusic() {
     const buffer = this.buffers.get('music');
-    if (this.music || !this.context || !this.musicBus || !buffer) return;
+    if (this.disposed || !this.playing || !this.musicWanted || this.music || !this.context || this.context.state !== 'running' || !this.musicBus || !buffer) return;
     const source = this.context.createBufferSource(); source.buffer = buffer; source.loop = true;
     source.connect(this.musicBus); source.start(); this.music = source;
   }
   private sound(name: string, volume: number, priority: number, minGap: number, group = name): boolean {
     const context = this.context, buffer = this.buffers.get(name);
-    if (!context || context.state !== 'running' || !this.sfxBus || !buffer) return false;
+    if (this.disposed || !this.playing || !context || context.state !== 'running' || !this.sfxBus || !buffer) return false;
     const previous = this.last.get(group);
     if (previous && context.currentTime - previous.time < minGap && previous.priority >= priority) return false;
     if (this.voices.size >= 24) {
@@ -161,17 +189,23 @@ export class GameAudio {
     this.sfxBus?.gain.setTargetAtTime(settings.sfxVolume, now, 0.035);
   }
   private stopVoice(voice: Voice) { voice.source.onended = null; try { voice.source.stop(); } catch { /* already ended */ } voice.source.disconnect(); voice.gain.disconnect(); this.voices.delete(voice); }
-  pause() { for (const voice of [...this.voices]) this.stopVoice(voice); this.clearDuck(); this.last.clear(); void this.context?.suspend().catch(() => {}); }
+  pause() { this.playing = false; for (const voice of [...this.voices]) this.stopVoice(voice); this.clearDuck(); this.last.clear(); void this.context?.suspend().catch(() => {}); }
   finish() {
     this.musicWanted = false;
     if (this.music) { try { this.music.stop(); } catch { /* already stopped */ } this.music.disconnect(); this.music = null; }
   }
   stop() {
+    this.playing = false;
     this.finish();
     for (const voice of [...this.voices]) this.stopVoice(voice);
     this.last.clear();
     this.clearDuck();
   }
   get voiceCount() { return this.voices.size; }
-  destroy() { this.disposed = true; this.abort.abort(); this.stop(); void this.context?.close().catch(() => {}); this.buffers.clear(); this.encoded.clear(); }
+  destroy() {
+    if (this.disposed) return;
+    this.disposed = true; this.abort.abort(); this.stop();
+    if (this.context) { this.context.onstatechange = null; void this.context.close().catch(() => {}); }
+    this.buffers.clear(); this.encoded.clear(); this.decoding.clear();
+  }
 }

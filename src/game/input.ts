@@ -58,9 +58,9 @@ export class InputController extends InputState {
       this.keyDown(event.code, event.repeat);
     }, options);
     window.addEventListener('keyup', event => this.keyUp(event.code), options);
-    host.addEventListener('pointermove', event => this.updatePointer(event), options);
+    host.addEventListener('pointermove', event => { if (event.pointerType !== 'touch' && this.active()) this.updatePointer(event); }, options);
     host.addEventListener('pointerdown', event => {
-      if (!this.active()) return;
+      if (!this.active() || event.pointerType === 'touch') return;
       event.preventDefault();
       this.updatePointer(event);
       if (event.button === 0) {
@@ -71,12 +71,12 @@ export class InputController extends InputState {
       }
       if (event.button === 2) this.requestDash();
     }, options);
-    window.addEventListener('pointerup', event => { if (event.button === 0) { this.shoot = false; this.releasePointer(); } }, options);
+    window.addEventListener('pointerup', event => { if (event.pointerType !== 'touch' && event.button === 0 && (this.capturedPointer === null || event.pointerId === this.capturedPointer)) { this.shoot = false; this.releasePointer(); } }, options);
     host.addEventListener('pointerleave', () => { if (this.capturedPointer === null) this.shoot = false; }, options);
     host.addEventListener('lostpointercapture', event => {
       if (event.pointerId === this.capturedPointer) { this.capturedPointer = null; this.shoot = false; }
     }, options);
-    host.addEventListener('pointercancel', () => this.clear(), options);
+    host.addEventListener('pointercancel', event => { if (event.pointerType !== 'touch') this.clear(); }, options);
     host.addEventListener('contextmenu', event => event.preventDefault(), options);
     window.addEventListener('blur', () => { this.clear(); pause(); }, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { this.clear(); pause(); } }, options);

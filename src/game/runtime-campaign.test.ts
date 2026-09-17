@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameRuntime } from './runtime';
 import { SaveRepository, PROFILE_KEY } from './profile';
-import type { CombatEvent, GamePhase } from './types';
+import type { ArenaRect, CombatEvent, Enemy, GamePhase, TouchAction, WorldState } from './types';
 import type { GameSimulation } from './simulation';
 import { enqueueUpgrade } from './upgrades';
 
@@ -11,11 +11,25 @@ vi.mock('./audio', () => ({ GameAudio: class {
 } }));
 vi.mock('./renderer', () => ({ GameRenderer: class {
   init = vi.fn(async () => {}); render = vi.fn(); resize = vi.fn(); resetEffects = vi.fn(); handleEvents = vi.fn();
-  setSettings = vi.fn(); destroy = vi.fn(); getStats = () => ({ textures: 5, particles: 0 });
+  setSettings = vi.fn(); setControlMode = vi.fn(); setTouchAim = vi.fn(); destroy = vi.fn(); getStats = () => ({ textures: 5, particles: 0 });
 } }));
 vi.mock('./input', async () => {
   const { InputState } = await vi.importActual<typeof import('./input')>('./input');
   return { InputController: class extends InputState { destroy() { this.clear(); } } };
+});
+vi.mock('./touch-input', async () => {
+  const { TouchInputState } = await vi.importActual<typeof import('./touch-input')>('./touch-input');
+  return { TouchInputController: class {
+    state = new TouchInputState();
+    constructor(_shell: unknown, _host: unknown, private callbacks: { world(): WorldState; query(rect: ArenaRect, out: Enemy[]): Enemy[] }) {}
+    read(dt: number) { return this.state.read(this.callbacks.world(), dt, this.callbacks.query); }
+    command(action: TouchAction) { this.state.command(action); }
+    clear() { this.state.clear(); }
+    reset() { this.state.reset(); }
+    destroy() { this.clear(); }
+    get hud() { return this.state.hud; }
+    get aim() { return this.state.aim; }
+  } };
 });
 class MemoryStorage {
   items = new Map<string, string>(); fail = false;
@@ -29,11 +43,11 @@ interface Internals {
   input: { keyDown(code: string): void; shoot: boolean; keys: Set<string> };
   processEvents(events: CombatEvent[]): void; publish(): void;
 }
-let storage: MemoryStorage, browser: EventTarget, raf: Map<number, FrameRequestCallback>, sequence: number;
+let storage: MemoryStorage, browser: EventTarget, raf: Map<number, FrameRequestCallback>, sequence: number, coarse: boolean;
 const runtimes: GameRuntime[] = [];
 beforeEach(() => {
-  storage = new MemoryStorage(); browser = new EventTarget(); raf = new Map(); sequence = 0;
-  Object.assign(browser, { location: { search: '' }, matchMedia: () => ({ matches: false }) });
+  storage = new MemoryStorage(); browser = new EventTarget(); raf = new Map(); sequence = 0; coarse = false;
+  Object.assign(browser, { innerWidth: 1280, innerHeight: 720, location: { search: '' }, matchMedia: (query: string) => ({ matches: (query.includes('coarse') || query.includes('hover: none')) && coarse }) });
   vi.stubGlobal('localStorage', storage); vi.stubGlobal('window', browser); vi.stubGlobal('document', { activeElement: null });
   vi.stubGlobal('HTMLElement', ElementStub);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -134,5 +148,48 @@ describe('runtime continuous campaign persistence and scheduling', () => {
     const profile = new SaveRepository(storage).getProfile();
     expect(profile.bestScores.v6.normal).toEqual({ story: 1200, endless: 4500 });
     expect(Object.values(profile.clears)).toHaveLength(1); expect(Object.values(profile.clears)[0].score).toBe(1200);
+  });
+  it('blocks portrait starts and stays paused after rotation back, without retaining touch actions', async () => {
+    coarse = true; Object.assign(browser, { innerWidth: 390, innerHeight: 844 });
+    const game = await runtime();
+    expect(game.getSnapshot()).toMatchObject({ controlMode: 'touch', orientationBlocked: true, settings: { quality: 'low' } });
+    game.start(); expect(game.getSnapshot().phase).toBe('menu'); expect(raf.size).toBe(0);
+    Object.assign(browser, { innerWidth: 844, innerHeight: 390 }); browser.dispatchEvent(new Event('resize'));
+    game.start(); game.touchAction({ type: 'move', x: 1, y: 0 }); game.touchAction({ type: 'focus' }); game.touchAction({ type: 'fire' }); game.touchAction({ type: 'bomb' });
+    Object.assign(browser, { innerWidth: 390, innerHeight: 844 }); browser.dispatchEvent(new Event('resize'));
+    expect(game.getSnapshot()).toMatchObject({ phase: 'paused', orientationBlocked: true, touch: { focus: false, autoFireEnabled: false } });
+    game.resume(); expect(raf.size).toBe(0);
+    Object.assign(browser, { innerWidth: 844, innerHeight: 390 }); browser.dispatchEvent(new Event('resize'));
+    expect(game.getSnapshot().phase).toBe('paused'); expect(raf.size).toBe(0);
+    game.resume(); const state = (game as unknown as Internals).simulation.state, x = state.player.x;
+    advance(10); advance(30); expect(state.player.x).toBe(x); expect(state.player.bombs).toBe(3);
+    game.restart(); expect(game.getSnapshot().touch.autoFireEnabled).toBe(true); expect(raf.size).toBe(1);
+  });
+  it('allows portrait choices but cannot resume simulation through the final selection', async () => {
+    coarse = true; const game = await runtime(); game.start();
+    const internal = game as unknown as Internals, state = internal.simulation.state;
+    state.spawnTimer = 3600; state.pickups.push({ id: 980001, type: 'xp', value: 100, x: state.player.x, y: state.player.y, age: 0 });
+    advance(10); advance(30); expect(game.getSnapshot().phase).toBe('upgrade');
+    Object.assign(browser, { innerWidth: 390, innerHeight: 844 }); browser.dispatchEvent(new Event('resize'));
+    const choice = game.getSnapshot(); game.chooseUpgrade(choice.upgradeChoices[0], choice.upgradeOfferId!);
+    expect(game.getSnapshot().phase).toBe('paused'); expect(raf.size).toBe(0);
+    const tick = state.tick; advance(5000); expect(state.tick).toBe(tick);
+  });
+  it('fixes auto mode at run start, changes it only while paused, and preserves existing quality', async () => {
+    storage.setItem('mafuyu-sekai:settings:v3', JSON.stringify({ quality: 'high', masterVolume: 0.27 }));
+    coarse = true; const game = await runtime(); game.start();
+    expect(game.getSnapshot()).toMatchObject({ controlMode: 'touch', settings: { quality: 'high', masterVolume: 0.27 } });
+    coarse = false; browser.dispatchEvent(new Event('resize'));
+    expect(game.getSnapshot().controlMode).toBe('touch');
+    game.setSettings({ controlMode: 'keyboardMouse' }); expect(game.getSnapshot().controlMode).toBe('touch');
+    game.pause(); game.setSettings({ controlMode: 'keyboardMouse' });
+    expect(game.getSnapshot().controlMode).toBe('keyboardMouse'); game.resume(); expect(raf.size).toBe(1);
+  });
+  it('reports 30 rendered frames separately from the unchanged 60 simulation steps', async () => {
+    coarse = true; const game = await runtime(); game.setSettings({ touchFrameRate: 30 }); game.start();
+    const state = (game as unknown as Internals).simulation.state; state.spawnTimer = 3600;
+    for (let frame = 0; frame <= 144 * 3; frame++) advance(10 + frame * 1000 / 144);
+    expect(state.tick).toBe(180); expect(game.getSnapshot().stats.renderFps).toBeCloseTo(30, 0);
+    expect(game.getSnapshot().stats.simulationHz).toBeCloseTo(60, 0);
   });
 });

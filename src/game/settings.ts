@@ -15,6 +15,7 @@ export const DEFAULT_KEYBINDINGS: Readonly<KeyBindings> = Object.freeze({
 export const DEFAULT_GAME_SETTINGS: Readonly<GameSettings> = Object.freeze({
   quality: 'medium', masterVolume: 0.7, musicVolume: 0.45, sfxVolume: 0.65, screenShake: 0.45,
   reducedMotion: false, damageNumbers: 'all', keybindings: DEFAULT_KEYBINDINGS,
+  controlMode: 'auto', touchFrameRate: 60,
 });
 const actions = Object.keys(DEFAULT_KEYBINDINGS) as BindingAction[];
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -58,6 +59,8 @@ export function normalizeSettings(value: unknown, base: GameSettings = DEFAULT_G
     reducedMotion: typeof source.reducedMotion === 'boolean' ? source.reducedMotion : base.reducedMotion,
     damageNumbers: source.damageNumbers === 'all' || source.damageNumbers === 'important' || source.damageNumbers === 'off' ? source.damageNumbers : base.damageNumbers,
     keybindings: normalizeKeybindings(source.keybindings, base.keybindings),
+    controlMode: source.controlMode === 'auto' || source.controlMode === 'keyboardMouse' || source.controlMode === 'touch' ? source.controlMode : base.controlMode,
+    touchFrameRate: source.touchFrameRate === 30 || source.touchFrameRate === 60 ? source.touchFrameRate : base.touchFrameRate,
   };
 }
 

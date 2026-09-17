@@ -5,14 +5,19 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const url = process.env.MAFUYU_DEPLOYMENT_URL ?? 'https://mafuyu-sekai.vercel.app';
+const touch = process.env.MAFUYU_DEPLOYMENT_TOUCH === '1';
+const suffix = touch ? '-touch' : '';
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const proxy = process.env.MAFUYU_BROWSER_PROXY;
 const browser = await chromium.launch({ headless: true, channel: 'chromium', args: process.platform === 'win32' ? ['--use-angle=d3d11'] : [],
   ...(proxy ? { proxy: { server: proxy, bypass: '127.0.0.1,localhost' } } : {}) });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const page = await browser.newPage(touch ? { viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 } : { viewport: { width: 1280, height: 720 } });
 const report = { version, sha, url, checkedAt: new Date().toISOString(), fixture: 'Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five gate elites, five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.', errors: [], elites: [], encounters: [], choices: [] };
 page.on('pageerror', error => report.errors.push(error.message));
+report.controlMode = touch ? 'touch' : 'keyboardMouse';
+if (touch) report.fixture = report.fixture.replace('DOM keys', 'DOM touch taps');
+async function activate(locator) { if (touch) await locator.tap(); else await locator.click(); }
 async function choosePending() {
   for (let i = 0; i < 64; i++) {
     const choice = await page.evaluate(() => {
@@ -21,7 +26,7 @@ async function choosePending() {
     });
     if (choice.phase !== 'upgrade') return;
     report.choices.push(choice);
-    await page.keyboard.press('1');
+    if (touch) await page.locator('.upgrade-card').first().tap(); else await page.keyboard.press('1');
     await page.waitForFunction(previous => {
       const d = window.__MAFUYU_DEBUG__; return d.snapshot().phase !== 'upgrade' || d.state().build.offerId !== previous;
     }, choice.offer);
@@ -61,7 +66,8 @@ try {
   assert.equal(report.artifact.deployedSha256, report.artifact.localSha256, 'The live game entry does not match the tested local production artifact.');
   await page.getByRole('button', { name: 'v' + version + ' · 更新日志', exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await page.getByRole('button', { name: /第二季/ }).count(), 0);
-  await page.getByRole('button', { name: '开始游戏', exact: true }).click();
+  await activate(page.getByRole('button', { name: '开始游戏', exact: true }));
+  assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().controlMode), report.controlMode);
   const fresh = await page.evaluate(() => {
     const s = window.__MAFUYU_DEBUG__.state(); s.player.invincible = 3600;
     return { level: s.player.level, xp: s.player.xp, companions: s.companions.length, modules: s.build.modules.length };
@@ -91,11 +97,11 @@ try {
       current: s.comms, previous: s.commsPrevious,
       images: [...document.querySelectorAll('.comms-sprite')].map(image => ({ src: image.getAttribute('src'), width: image.naturalWidth, fallback: image.getAttribute('data-fallback') })) };
   });
-  assert.equal(report.comms.layout, 'sides');
+  assert.equal(report.comms.layout, touch ? 'compact' : 'sides');
   assert.equal(report.comms.images.length, 2);
-  assert.ok(report.comms.images.every(image => image.width === 512 && image.fallback === 'false'));
+  assert.ok(report.comms.images.every(image => touch ? image.width > 0 && image.fallback === 'true' : image.width === 512 && image.fallback === 'false'));
   await mkdir('.tmp', { recursive: true });
-  await page.screenshot({ path: `.tmp/deployment-comms-v${version}.png`, style: '[aria-label="性能信息"] { visibility: hidden !important; }' });
+  await page.screenshot({ path: `.tmp/deployment-comms-v${version}${suffix}.png`, style: '[aria-label="性能信息"] { visibility: hidden !important; }' });
   const encounters = ['s1:echo', 's2:palisade', 's1:mafuyu', 's2:reprise', 's2:final'];
   for (const [index, id] of encounters.entries()) {
     await choosePending();
@@ -141,27 +147,44 @@ try {
   await page.reload();
   await page.getByRole('button', { name: '开始游戏', exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v3')), savedText);
-  await page.getByRole('button', { name: '开始游戏', exact: true }).click();
+  await activate(page.getByRole('button', { name: '开始游戏', exact: true }));
   report.restarted = await page.evaluate(() => {
     const d = window.__MAFUYU_DEBUG__, s = d.state();
     return { level: s.player.level, xp: s.player.xp, companions: s.companions.length, modules: s.build.modules.length, bombs: s.player.bombs, hp: s.player.hp, canvases: document.querySelectorAll('#game-host canvas').length, raf: d.lifecycle().rafActive };
   });
   assert.deepEqual(report.restarted, { level: 1, xp: 0, companions: 0, modules: 0, bombs: 3, hp: 5, canvases: 1, raf: true });
   const origin = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.x);
-  await page.keyboard.down('KeyD');
-  await page.waitForFunction(x => window.__MAFUYU_DEBUG__.state().player.x > x + 50, origin);
-  await page.keyboard.up('KeyD');
-  await page.keyboard.press('Escape');
+  if (touch) {
+    const cdp = await page.context().newCDPSession(page), box = await page.locator('[data-touch-control="stick"]').boundingBox();
+    const point = { id: 1, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, x: point.x + 48 }] });
+    await page.waitForFunction(x => window.__MAFUYU_DEBUG__.state().player.x > x + 50, origin);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+    await page.getByRole('button', { name: '暂停游戏', exact: true }).tap();
+    await page.getByRole('button', { name: '继续游戏', exact: true }).tap();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('dialog', { name: '请横屏游玩', exact: true }).waitFor();
+    const tick = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick);
+    await page.setViewportSize({ width: 844, height: 390 });
+    assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase), 'paused');
+    assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick), tick);
+    report.touchFlow = { realJoystick: true, tapRewards: true, pauseResume: true, rotationKeepsPaused: true, savedAndRefreshed: true };
+  } else {
+    await page.keyboard.down('KeyD');
+    await page.waitForFunction(x => window.__MAFUYU_DEBUG__.state().player.x > x + 50, origin);
+    await page.keyboard.up('KeyD'); await page.keyboard.press('Escape');
+  }
   await page.getByRole('heading', { name: '先别喊了。', exact: true }).waitFor();
   await page.locator('[aria-label="性能信息"]').evaluate(element => { element.style.visibility = 'hidden'; });
   await mkdir('.tmp', { recursive: true });
-  await page.screenshot({ path: '.tmp/deployed-v' + version + '.png', animations: 'disabled' });
+  await page.screenshot({ path: '.tmp/deployed-v' + version + suffix + '.png', animations: 'disabled' });
   assert.equal(report.errors.length, 0);
   report.result = 'passed';
   console.log(JSON.stringify({ version, sha, url, result: report.result, encounters: report.encounters.map(e => e.id), choices: report.choices.length, errors: report.errors }, null, 2));
 } catch (error) { report.result = 'failed'; report.error = error.stack ?? error.message; throw error; }
 finally {
   await mkdir('.tmp', { recursive: true });
-  await writeFile('.tmp/deployment-v' + version + '.json', JSON.stringify(report, null, 2) + '\n');
+  await writeFile('.tmp/deployment-v' + version + suffix + '.json', JSON.stringify(report, null, 2) + '\n');
   await browser.close();
 }

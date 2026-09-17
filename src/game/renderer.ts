@@ -258,6 +258,8 @@ export class GameRenderer {
   private cameraX = WORLD.width / 2;
   private cameraY = WORLD.height / 2;
   private pointer = { x: VIEW.width / 2, y: VIEW.height / 2, inside: false };
+  private controlMode: 'keyboardMouse' | 'touch' = 'keyboardMouse';
+  private touchAim: { x: number; y: number; radius: number; manual: boolean } | null = null;
   private stars = Array.from({ length: 100 }, (_, index) => ({ x: ((index * 761 + 43) % 1600), y: ((index * 331 + 89) % 900), phase: index * 1.47 }));
 
   constructor(private readonly host: HTMLElement, private settings: GameSettings) {}
@@ -337,7 +339,7 @@ export class GameRenderer {
     const canvas = this.app.canvas;
     canvas.setAttribute('aria-label', '凤小梦大战朝比奈真冬 战斗画面');
     canvas.style.display = 'block'; canvas.style.width = '100%'; canvas.style.height = '100%';
-    canvas.style.cursor = 'none';
+    canvas.style.cursor = this.controlMode === 'touch' ? 'default' : 'none';
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerleave', this.onPointerLeave);
     this.host.appendChild(canvas);
@@ -396,13 +398,30 @@ export class GameRenderer {
     this.resize();
   }
 
+  setControlMode(mode: 'keyboardMouse' | 'touch') {
+    if (this.controlMode === mode) return;
+    this.controlMode = mode;
+    this.pointer.inside = false;
+    this.touchAim = null;
+    if (this.appReady) this.app.canvas.style.cursor = mode === 'touch' ? 'default' : 'none';
+    this.resize();
+  }
+
+  /** World coordinates share the camera transform used by enemies and danger geometry. */
+  setTouchAim(aim: { x: number; y: number; radius: number; manual: boolean } | null) {
+    this.touchAim = aim;
+  }
+
   resize() {
     if (!this.initialized) return;
     const rect = this.host.getBoundingClientRect();
     const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
     const factor = QUALITY[this.settings.quality].scale;
-    const scale = Math.min(width / VIEW.width, height / VIEW.height) * Math.min(window.devicePixelRatio || 1, 2);
-    const resolution = Math.max(0.25, Math.min(scale, Math.sqrt(1920 * 1080 / (VIEW.width * VIEW.height)) * factor));
+    const touch = this.controlMode === 'touch';
+    const scale = Math.min(width / VIEW.width, height / VIEW.height) * Math.min(window.devicePixelRatio || 1, touch ? 1.5 : 2);
+    const mobileBudget = { low: 960 * 540, medium: 1280 * 720, high: 1600 * 900 }[this.settings.quality];
+    const limit = touch ? Math.sqrt(mobileBudget / (VIEW.width * VIEW.height)) : Math.sqrt(1920 * 1080 / (VIEW.width * VIEW.height)) * factor;
+    const resolution = Math.max(0.25, Math.min(scale, limit));
     this.app.renderer.resize(VIEW.width, VIEW.height, resolution);
     this.app.canvas.style.width = '100%'; this.app.canvas.style.height = '100%';
   }
@@ -1241,7 +1260,21 @@ export class GameRenderer {
     this.warningEdge.alpha = warning * 0.24;
     this.flashEdge.alpha = this.flash * (this.settings.reducedMotion ? 0.15 : 0.3);
     this.damageEdge.visible = this.damage > 0; this.warningEdge.visible = warning > 0; this.flashEdge.visible = this.flash > 0;
-    if (this.pointer.inside && state.status === 'playing') {
+    if (this.controlMode === 'touch' && this.touchAim && state.status === 'playing') {
+      const target = this.touchAim;
+      const x = target.x + this.world.x, y = target.y + this.world.y;
+      const radius = Math.max(24, target.radius + 9);
+      const color = target.manual ? 0xc0fff3 : 0x8ed9e5;
+      // Cold corner brackets distinguish a chosen target from warm enemy warnings.
+      for (let i = 0; i < 4; i++) {
+        const angle = Math.PI / 4 + i * TAU / 4;
+        const arc = target.manual ? .28 : .19;
+        graph.arc(x, y, radius, angle - arc, angle + arc).stroke({ color: 0x061621, width: 6, alpha: .8 });
+        graph.arc(x, y, radius, angle - arc, angle + arc).stroke({ color, width: target.manual ? 2.5 : 1.8, alpha: target.manual ? .95 : .6 });
+      }
+      if (target.manual) graph.circle(x, y - radius - 6, 2.5).fill({ color, alpha: .95 });
+    }
+    if (this.controlMode === 'keyboardMouse' && this.pointer.inside && state.status === 'playing') {
       const x = this.pointer.x + this.world.x - (VIEW.width / 2 - this.cameraX);
       const y = this.pointer.y + this.world.y - (VIEW.height / 2 - this.cameraY);
       const ready = state.player.perfectWindow > 0;
@@ -1276,6 +1309,7 @@ export class GameRenderer {
   }
 
   resetEffects() {
+    this.touchAim = null;
     if (!this.initialized) return;
     this.effects.reset();
     this.shake = 0; this.damage = 0; this.flash = 0; this.warning = 0; this.trailClock = 0; this.recoil = 0; this.recoilAngle = 0;

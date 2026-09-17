@@ -33,7 +33,9 @@ class Source {
 class Context {
   static current: Context;
   currentTime = 10;
-  state = 'running';
+  state = 'suspended';
+  onstatechange: (() => void) | null = null;
+  decodeCount = 0;
   sampleRate = 8000;
   destination = {};
   gains: Gain[] = [];
@@ -42,7 +44,7 @@ class Context {
   createGain() { const gain = new Gain(); this.gains.push(gain); return gain; }
   createDynamicsCompressor() { return { threshold: new Param(), ratio: new Param(), connect() {} }; }
   createBuffer(_channels: number, length: number) { return { getChannelData: () => new Float32Array(length) }; }
-  async decodeAudioData() { return this.createBuffer(1, 16); }
+  async decodeAudioData(_bytes: ArrayBuffer) { this.decodeCount++; return this.createBuffer(1, 16); }
   createBufferSource() { const source = new Source(); this.sources.push(source); return source; }
   async resume() { this.state = 'running'; }
   async suspend() { this.state = 'suspended'; }
@@ -114,5 +116,118 @@ describe('event mixing and bounded Web Audio lifecycle', () => {
     const sources = Context.current.sources.filter(source => !source.loop && source.started);
     expect(sources).toHaveLength(3);
     expect(new Set(sources.map(source => source.buffer)).size).toBe(3);
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void, reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+const response = (length = 8) => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(length) }) as Response;
+function delayedAssets() {
+  audio.destroy();
+  const shot = deferred<Response>(), music = deferred<Response>();
+  const fetcher = vi.fn((url: string) => url.endsWith('shot.wav') ? shot.promise : music.promise);
+  vi.stubGlobal('fetch', fetcher); audio = new GameAudio(DEFAULT_GAME_SETTINGS);
+  return { shot, music, fetcher };
+}
+
+describe('mobile unlock with independent late audio assets', () => {
+  it('reports a system interruption while active, without treating ordinary pause suspension as another interruption', async () => {
+    audio.destroy();
+    const interrupted = vi.fn(() => audio.pause());
+    audio = new GameAudio(DEFAULT_GAME_SETTINGS, interrupted);
+    await audio.preload(); audio.play();
+    const context = Context.current;
+    await vi.waitFor(() => expect(context.sources.some(source => source.loop)).toBe(true));
+    context.state = 'interrupted'; context.onstatechange?.();
+    expect(interrupted).toHaveBeenCalledTimes(1); expect(context.state).toBe('suspended');
+    context.onstatechange?.(); expect(interrupted).toHaveBeenCalledTimes(1);
+    audio.play(); await Promise.resolve();
+    expect(context.state).toBe('running'); expect(context.sources.filter(source => source.loop)).toHaveLength(1);
+    audio.pause(); context.onstatechange?.(); expect(interrupted).toHaveBeenCalledTimes(1);
+  });
+  it('unlocks immediately and decodes late shots without waiting for music, exactly once per asset', async () => {
+    const assets = delayedAssets(), loading = audio.preload(); audio.play();
+    const context = Context.current; expect(context.state).toBe('running'); expect(context.sources).toHaveLength(0);
+    expect(audio.preload()).toBe(loading); expect(assets.fetcher).toHaveBeenCalledTimes(2);
+    assets.shot.resolve(response());
+    await vi.waitFor(() => { audio.handle([{ type: 'shot', x: 0, y: 0 }]); expect(audio.voiceCount).toBe(1); });
+    expect(context.sources.some(source => source.loop)).toBe(false); expect(context.decodeCount).toBe(1);
+    assets.music.resolve(response(16)); await loading;
+    expect(context.sources.filter(source => source.loop)).toHaveLength(1); expect(context.decodeCount).toBe(2);
+    audio.play(); audio.play(); await audio.preload();
+    expect(context.decodeCount).toBe(2); expect(context.sources.filter(source => source.loop)).toHaveLength(1);
+  });
+
+  it('does not start late music or effects during pause and resumes the cached assets on the next gesture', async () => {
+    const assets = delayedAssets(), loading = audio.preload(); audio.play(); audio.pause();
+    const context = Context.current;
+    assets.music.resolve(response(16)); assets.shot.resolve(response()); await loading;
+    audio.handle([{ type: 'shot', x: 0, y: 0 }, { type: 'damage', x: 0, y: 0 }]);
+    expect(context.sources).toHaveLength(0); expect(audio.voiceCount).toBe(0);
+    audio.play(); await Promise.resolve();
+    expect(context.sources.filter(source => source.loop)).toHaveLength(1); expect(context.decodeCount).toBe(2);
+  });
+
+  it('retries interrupted or rejected resume calls without creating a second music loop', async () => {
+    const context = Context.current;
+    context.state = 'interrupted';
+    const resume = vi.spyOn(context, 'resume').mockRejectedValueOnce(new Error('user gesture required'));
+    audio.play(); await Promise.resolve();
+    audio.handle([{ type: 'shot', x: 0, y: 0 }]); expect(audio.voiceCount).toBe(0);
+    audio.play(); await Promise.resolve();
+    expect(resume).toHaveBeenCalledTimes(2); expect(context.state).toBe('running');
+    audio.handle([{ type: 'shot', x: 0, y: 0 }]); expect(audio.voiceCount).toBe(1);
+    expect(context.sources.filter(source => source.loop)).toHaveLength(1);
+  });
+
+  it('does not let an in-flight resume override a later pause', async () => {
+    const context = Context.current, resumed = deferred<void>();
+    vi.spyOn(context, 'resume').mockImplementationOnce(async () => { await resumed.promise; context.state = 'running'; });
+    audio.play(); audio.pause(); resumed.resolve();
+    await vi.waitFor(() => expect(context.state).toBe('suspended'));
+    await Promise.resolve(); await Promise.resolve();
+    expect(context.state).toBe('suspended'); expect(context.sources.filter(source => source.loop)).toHaveLength(1);
+    audio.handle([{ type: 'damage', x: 0, y: 0 }]); expect(audio.voiceCount).toBe(0);
+  });
+
+  it('deduplicates an in-flight decode across repeated play gestures and ignores its completion after destroy', async () => {
+    const assets = delayedAssets(), decoded = deferred<ReturnType<Context['createBuffer']>>();
+    const loading = audio.preload(); audio.play(); const context = Context.current;
+    const decode = vi.spyOn(context, 'decodeAudioData').mockImplementation(() => decoded.promise);
+    assets.music.resolve(response(16));
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
+    audio.play(); audio.play(); expect(decode).toHaveBeenCalledTimes(1);
+    audio.destroy(); decoded.resolve(context.createBuffer(1, 16)); assets.shot.resolve(response()); await loading;
+    audio.play(); audio.handle([{ type: 'damage', x: 0, y: 0 }]);
+    expect(context.state).toBe('closed'); expect(context.sources).toHaveLength(0); expect(context.onstatechange).toBeNull();
+    expect(audio.voiceCount).toBe(0);
+  });
+
+  it('settles aborted or failed asset loading without an unhandled rejection or a blocked usable asset', async () => {
+    const assets = delayedAssets(), loading = audio.preload(); audio.play();
+    assets.shot.reject(new DOMException('Aborted', 'AbortError')); assets.music.resolve(response(16));
+    await expect(loading).resolves.toBeUndefined();
+    expect(Context.current.sources.filter(source => source.loop)).toHaveLength(1);
+    const again = delayedAssets(), pending = audio.preload(); audio.destroy();
+    again.shot.reject(new DOMException('Aborted', 'AbortError')); again.music.reject(new Error('offline'));
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('retries a rejected asset decode on a later user gesture without decoding the successful asset twice', async () => {
+    const assets = delayedAssets(), loading = audio.preload(); audio.play();
+    const context = Context.current;
+    const decode = vi.spyOn(context, 'decodeAudioData').mockRejectedValueOnce(new Error('temporary decoder failure'));
+    assets.shot.resolve(response());
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
+    assets.music.resolve(response(16)); await loading;
+    expect(context.sources.filter(source => source.loop)).toHaveLength(1);
+    audio.play();
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(3));
+    audio.handle([{ type: 'shot', x: 0, y: 0 }]); expect(audio.voiceCount).toBe(1);
+    audio.play(); expect(decode).toHaveBeenCalledTimes(3);
+    expect(context.sources.filter(source => source.loop)).toHaveLength(1);
   });
 });

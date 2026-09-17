@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_GAME_SETTINGS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, normalizeKeybindings, normalizeSettings, rebindKey } from './settings';
 
 describe('settings migration and physical-key bindings', () => {
+  it('adds mobile preferences without replacing legacy graphics, audio or physical keys', () => {
+    const old = normalizeSettings({ quality: 'high', musicVolume: 0.2, keybindings: { dash: 'KeyB' } });
+    expect(old).toMatchObject({ quality: 'high', musicVolume: 0.2, controlMode: 'auto', touchFrameRate: 60 });
+    const touch = normalizeSettings({ controlMode: 'touch', touchFrameRate: 30 }, old);
+    expect(touch).toMatchObject({ quality: 'high', musicVolume: 0.2, controlMode: 'touch', touchFrameRate: 30 });
+    expect(touch.keybindings.dash).toBe('KeyB');
+    expect(normalizeSettings({ controlMode: 'phone', touchFrameRate: 120 }, touch)).toEqual(touch);
+  });
   it('preserves legacy preferences and supplies only the newly introduced defaults', () => {
     const legacy = { quality: 'low', masterVolume: 0.2, musicVolume: 0, sfxVolume: 0.4, screenShake: 0, reducedMotion: true };
     const settings = normalizeSettings(legacy);

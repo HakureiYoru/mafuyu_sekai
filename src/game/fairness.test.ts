@@ -235,7 +235,7 @@ describe('complete committed spellcard routes in the fixed arena', () => {
         expect(outcome.dashes).toBeLessThanOrEqual(Math.ceil(24 / BALANCE.dash.cooldown));
         expect(outcome.distance).toBeGreaterThan(100);
       }
-    });
+    }, 15000); // Full-route searches may exceed five seconds while browser checks share the host.
   it.each((['s1', 's2'] as const).flatMap(season => Array.from({ length: 6 }, (_, card) => ({ season, card }))))(
     '$season card $card damages a stationary control under the same real simulation', ({ season, card }) => {
       const outcome = runRoute(season, 'normal', card, STARTS[0], false, 20);

@@ -105,9 +105,9 @@ export function BattleComms({ snapshot: s, placement, portalHost, collapsed }: {
     const update = () => setSystemReduced(preference.matches);
     preference.addEventListener('change', update);
     // Decorative resources never delay the main game loading pipeline.
-    const images = POSES.map(pose => { const image = new window.Image(); image.decoding = 'async'; image.fetchPriority = 'low'; image.src = spriteUrl(pose); return image; });
+    const images = (s.controlMode === 'touch' ? [] : POSES).map(pose => { const image = new window.Image(); image.decoding = 'async'; image.fetchPriority = 'low'; image.src = spriteUrl(pose); return image; });
     return () => { preference.removeEventListener('change', update); images.forEach(image => { image.onload = null; image.onerror = null; }); };
-  }, []);
+  }, [s.controlMode]);
   // Do not replay a shout that happened while the communications were hidden.
   useEffect(() => { if (collapsed && s.comms) played.current.set(s.comms.speaker as Speaker, s.comms.id); }, [collapsed, s.comms?.id, s.comms]);
   if (collapsed) return null;
@@ -115,8 +115,9 @@ export function BattleComms({ snapshot: s, placement, portalHost, collapsed }: {
   const current = s.comms;
   const previous = current?.conversationId && s.commsPrevious?.conversationId === current.conversationId && s.commsPrevious.speaker !== current.speaker ? s.commsPrevious : null;
   const frozen = s.phase !== 'playing';
-  const shared = { 'data-testid': 'comms-root', 'data-layout': placement.layout, 'data-frozen': frozen, 'data-quality': s.settings.quality, 'data-reduced': reduced } as const;
-  if (placement.layout === 'compact' || !portalHost.current) return <aside {...shared} className="bubble-comms bubble-comms-compact" aria-label="双人战斗通讯">
+  const layout = s.controlMode === 'touch' ? 'compact' : placement.layout;
+  const shared = { 'data-testid': 'comms-root', 'data-layout': layout, 'data-frozen': frozen, 'data-quality': s.settings.quality, 'data-reduced': reduced } as const;
+  if (layout === 'compact' || !portalHost.current) return <aside {...shared} className="bubble-comms bubble-comms-compact" aria-label="双人战斗通讯">
     <div className="comms-avatar-pair">{SPEAKERS.map(speaker => <div key={speaker} className={current?.speaker === speaker ? 'is-speaking' : ''} data-testid={`comms-${speaker.toLowerCase()}`} data-expression={current?.speaker === speaker ? current.mood : speaker === 'EMU' ? 'happy' : 'cold'}><Sprite speaker={speaker} mood={speaker === 'EMU' ? 'happy' : 'cold'} compact /></div>)}</div>
     {current && <Bubble message={current} reduced={reduced} />}
   </aside>;

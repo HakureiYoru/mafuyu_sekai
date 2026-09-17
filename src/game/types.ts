@@ -32,7 +32,12 @@ export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'upgrade' | 
 export type Quality = 'low' | 'medium' | 'high';
 export interface Vec2 { x: number; y: number }
 export interface MovingBody extends Vec2 { prevX: number; prevY: number; vx: number; vy: number; radius: number }
-export interface InputAction { moveX: number; moveY: number; aimX: number; aimY: number; shoot: boolean; dash: boolean; bomb: boolean; focus?: boolean }
+export interface InputAction { moveX: number; moveY: number; aimX: number; aimY: number; shoot: boolean; dash: boolean; bomb: boolean; focus?: boolean; dashDirection?: Vec2 }
+export type ControlMode = 'auto' | 'keyboardMouse' | 'touch';
+export type ResolvedControlMode = Exclude<ControlMode, 'auto'>;
+export type TouchAction = { type: 'move'; x: number; y: number } | { type: 'dash' | 'bomb' | 'focus' | 'fire' | 'clear' } | { type: 'lock'; x: number; y: number; radius: number };
+export interface TouchHud { autoFireEnabled: boolean; cooling: boolean; focus: boolean; lockedTargetId: number | null }
+export interface TouchAim extends Vec2 { radius: number; manual: boolean }
 export interface Player extends MovingBody {
   hp: number; maxHp: number; hpReserve: number; bombs: number; level: number; xp: number; heat: number;
   commandTargetId: number | null; commandTime: number; commandCooldown: number;
@@ -115,15 +120,16 @@ export interface CombatEvent extends Vec2 {
   seasonId?: SeasonId; encounterId?: string;
 }
 export interface ModuleState { id: ModuleId; status: 'ready' | 'active' | 'cooldown' | 'consumed'; remaining: number }
-export interface GameSettings { quality: Quality; masterVolume: number; musicVolume: number; sfxVolume: number; screenShake: number; reducedMotion: boolean; damageNumbers: 'all' | 'important' | 'off'; keybindings: KeyBindings }
+export interface GameSettings { quality: Quality; masterVolume: number; musicVolume: number; sfxVolume: number; screenShake: number; reducedMotion: boolean; damageNumbers: 'all' | 'important' | 'off'; keybindings: KeyBindings; controlMode: ControlMode; touchFrameRate: 30 | 60 }
 export type CommsMood = 'happy' | 'cheer' | 'surprised' | 'hurt' | 'cold' | 'annoyed' | 'shadow' | 'rage';
 export type CommsGesture = 'none' | 'hop' | 'flinch' | 'tilt' | 'tremble';
 export interface CommsMessage {
   id: number; conversationId: string | null; speaker: string; text: string; fullText: string;
   color: string; avatar: 'player' | 'enemy'; mood: CommsMood; gesture: CommsGesture;
 }
-export interface PerformanceStats { fps: number; frameP95: number; frameP99: number; updateMs: number; renderMs: number; enemies: number; bullets: number; particles: number; pickups: number; voices: number; textures: number }
+export interface PerformanceStats { fps: number; renderFps: number; simulationHz: number; frameP95: number; frameP99: number; updateMs: number; renderMs: number; enemies: number; bullets: number; particles: number; pickups: number; voices: number; textures: number }
 export interface HudSnapshot {
+  controlMode: ResolvedControlMode; orientationBlocked: boolean; touch: TouchHud;
   phase: GamePhase; loading: number; error: string | null; mode: 'story' | 'endless'; score: number; bestScore: number;
   wave: number; waveProgress: number; elapsed: number; kills: number; hp: number; maxHp: number; hpReserve: number;
   bombs: number; level: number; xp: number; xpNeeded: number; heat: number;
@@ -141,6 +147,7 @@ export interface HudSnapshot {
   eliteName?: string; eliteHp?: number; eliteMaxHp?: number;
 }
 export interface RuntimeControls {
+  touchAction(action: TouchAction): void; requestFullscreen(): Promise<void>;
   start(options?: Partial<RunStartOptions>): void; pause(): void; resume(): void; restart(): void; continueEndless(): void; returnToMenu(): void;
   setSettings(settings: Partial<GameSettings>): void; subscribe(listener: () => void): () => void; getSnapshot(): HudSnapshot;
   setDifficulty(difficulty: Difficulty): void;

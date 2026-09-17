@@ -19,3 +19,18 @@ export class FixedClock {
   }
   reset() { this.previous = null; this.accumulator = 0; }
 }
+
+/** Limits presentation only; FixedClock must still receive every host animation frame. */
+export class RenderGate {
+  private next: number | null = null;
+  private rate: number | null = null;
+  ready(timestamp: number, rate: number | null): boolean {
+    if (rate === null) { this.reset(); return true; }
+    if (this.next === null || rate !== this.rate) { this.rate = rate; this.next = timestamp + 1000 / rate; return true; }
+    if (timestamp + 1e-6 < this.next) return false;
+    const period = 1000 / rate;
+    this.next += Math.max(1, Math.floor((timestamp - this.next + 1e-6) / period) + 1) * period;
+    return true;
+  }
+  reset(): void { this.next = this.rate = null; }
+}

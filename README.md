@@ -1,10 +1,10 @@
 # 凤小梦大战朝比奈真冬
 
-**v6.0.0 · 无限构筑与动作首领**
+**v6.1.0 · 移动端横屏支持**
 
 以 Project Sekai 的凤笑梦与朝比奈真冬为主题的整蛊向同人弹幕游戏。笑梦只想大喊 Wonderhoy，阴暗的真冬只想让她闭嘴。笑梦越喊越开心，真冬从压抑、冷漠走向狂躁，用弹幕把声音压回去。台词和道具采用原创黑化整蛊演绎；操作与伤害说明保持直白。
 
-面向 PC 键鼠。每局从 Lv1 出发，在连续战役中面对十一种混合敌人、五只波内轻精英和五位主首领。36 种模块可以无限叠层，18 种进化形成不同打法。普通难度设计目标为 10–15 分钟，选卡时间不计入战斗时间。
+支持 PC 键鼠及手机横屏触控，直接打开同一网址游玩。每局从 Lv1 出发，在连续战役中面对十一种混合敌人、五只波内轻精英和五位主首领。36 种模块可以无限叠层，18 种进化形成不同打法。普通难度设计目标为 10–15 分钟，选卡时间不计入战斗时间。
 
 笑梦与真冬以全身 Q 版小人在战场两侧接话：八张独立姿态、27 组短对话，保留上一句和表情动作。侧边空间不足时自动切换底部双头像；暂停、选强化和减弱动态均生效。人物素材合计约 477 KiB，不覆盖战场、也不改变五张原始贴图。
 
@@ -29,6 +29,12 @@ npm run preview
 Vercel 由 `vercel.json` 固定使用 Vite、`npm ci --include=dev`、`npm run build` 和输出目录 `dist`。Root Directory 为仓库根目录。发布时核对同一提交的构建状态与线上流程。
 
 ## 操作
+
+手机竖屏可浏览菜单、设置和强化选择；战斗需要横屏。左侧浮动摇杆移动，默认自动瞄准并射击，点敌人或部件可锁定，点空白取消。右侧点击冲刺、炸弹、慢移和停火；静止冲刺沿本局最后移动方向。有目标时冲刺后自动接贯穿炮。摇杆保留幅度，慢移开关仍能触发对应模块。
+
+自动射击在 85 热量时停火，降至 35 后恢复；贯穿炮优先释放。转屏、切后台、暂停和选卡清空手势、慢移及锁定；停火偏好在本局保留。战斗中转竖屏会暂停，回到横屏需点击继续。全屏是可选增强，不依赖浏览器支持锁向。
+
+设置可选择自动／键鼠／触屏。新触屏设备默认轻量画质，已有画质选择优先；支持 60／30 FPS 渲染，模拟始终 60Hz。低／中／高画质的移动端像素预算为 960×540／1280×720／1600×900，DPR 上限 1.5。以下为 PC 默认按键：
 
 | 操作 | 按键 |
 | --- | --- |
@@ -91,6 +97,9 @@ Vite + TypeScript + React + PixiJS 8／WebGL，唯一主循环使用 60Hz 固定
 npm run check
 npx playwright install chromium
 npm run test:e2e
+npx playwright install webkit
+npm run test:mobile
+npm run test:mobile-soak
 npm run benchmark
 node scripts/validate-danmaku.mjs
 node scripts/balance-v5.mjs
@@ -99,16 +108,18 @@ node scripts/benchmark-v6.mjs
 npm run test:soak
 ```
 
+移动端设计与验证见 [v6.1 设计](docs/design-v6.1.md) 和 [v6.1 验证](docs/validation/v6.1.md)。桌面 Chromium 触屏仿真与桌面 WebKit 不等于 iPhone／安卓真机；本轮没有可接入的手机，触感、系统音频中断、持续发热和手机 60 FPS 尚待真机验证。不包含安装包、离线、云存档或手柄。
+
 `check` 包含类型、lint、模拟测试、原始资源哈希及生产构建。浏览器流程覆盖菜单、原地选卡、首领流程、存档、暂停恢复、窗口适配和连续重开。
 
 `benchmark` 保留 180 敌人＋70 地雷＋1200 子弹＋900 粒子的固定压力场景；弹幕脚本另测密集符卡与构筑连锁。`test:soak` 默认普通难度真实 30 分钟无尽，可用 `MAFUYU_SOAK_DIFFICULTY` 与 `MAFUYU_SOAK_SECONDS` 切换。无人值守无敌测试只验证稳定性。
 
-平衡脚本将正常生命与无敌输出诊断分开，记录实际候选、首领入口等级、耗时、伤害来源及资源消耗。自动控制不等同于真人体验。`node scripts/verify-deployment.mjs` 验证线上版本、新战役完成保存和刷新后的 Lv1 开局；`MAFUYU_DEPLOYMENT_URL` 可指定部署地址。
+平衡脚本将正常生命与无敌输出诊断分开，记录实际候选、首领入口等级、耗时、伤害来源及资源消耗。自动控制不等同于真人体验。`node scripts/verify-deployment.mjs` 验证线上版本、新战役完成保存和刷新后的 Lv1 开局；`MAFUYU_DEPLOYMENT_URL` 可指定部署地址，`MAFUYU_DEPLOYMENT_TOUCH=1` 改用触屏开局、摇杆、选卡和转屏流程。
 
-详见 [v6.0 战役设计](docs/design-v6.0.md)、[v5.1 通讯设计](docs/design-v5.1.md)、[当前文案规范](docs/copy-v5.0.2.md)、[小人素材与生成记录](docs/asset-sources-v5.1.md) 和 [本次验证](docs/validation/v6.0.0.md)。RTX 3060 Laptop 数据单列，核显目标仍需对应设备实测。
+详见 [v6.0 战役设计](docs/design-v6.0.md)、[v5.1 通讯设计](docs/design-v5.1.md)、[当前文案规范](docs/copy-v5.0.2.md)、[小人素材与生成记录](docs/asset-sources-v5.1.md) 和 [v6.0 历史验证](docs/validation/v6.0.0.md)。RTX 3060 Laptop 数据单列，核显目标仍需对应设备实测。
 
 ## 资源与日志
 
 角色、背景、子弹、血包五张原始 PNG 及路径不变，SHA-256 基准见 `docs/baseline/assets.sha256.json`。其他既有道具许可见 [素材记录](docs/asset-sources-v3.1.md)。v5.0.2 按黑化真冬与简单直白的笑梦重新调整台词，保留事件分组和占位符；新增动效使用程序图形。
 
-唯一日志来源为 `public/data/changelog.json`，最新版本在前，每次包含版本、日期、标题和 1–5 条重点。浏览器版本不包含 Electron 与触屏操作。
+唯一日志来源为 `public/data/changelog.json`，最新版本在前，每次包含版本、日期、标题和 1–5 条重点。浏览器版本不包含 Electron 打包。
