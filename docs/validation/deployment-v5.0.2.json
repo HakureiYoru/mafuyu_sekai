@@ -1,0 +1,228 @@
+{
+  "version": "5.0.2",
+  "sha": "7fa85d7251ad58ea06cd936a0bc87bde7e82cdbb",
+  "url": "https://mafuyu-sekai.vercel.app",
+  "checkedAt": "2026-09-17T09:59:20.715Z",
+  "fixture": "Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.",
+  "errors": [],
+  "encounters": [
+    {
+      "id": "s1:echo",
+      "cards": [
+        {
+          "hp": 1200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:palisade",
+      "cards": [
+        {
+          "hp": 2000,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s1:mafuyu",
+      "cards": [
+        {
+          "hp": 697,
+          "card": 0,
+          "name": "冷光·噤声针雨"
+        },
+        {
+          "hp": 750,
+          "card": 1,
+          "name": "封锁·交错绝域"
+        },
+        {
+          "hp": 800,
+          "card": 2,
+          "name": "逆相·笑容崩裂"
+        },
+        {
+          "hp": 850,
+          "card": 3,
+          "name": "折光·拒绝回声"
+        },
+        {
+          "hp": 900,
+          "card": 4,
+          "name": "刻印·旧影埋葬"
+        },
+        {
+          "hp": 1000,
+          "card": 5,
+          "name": "空白·把声音抹掉"
+        }
+      ]
+    },
+    {
+      "id": "s2:reprise",
+      "cards": [
+        {
+          "hp": 3200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:final",
+      "cards": [
+        {
+          "hp": 1500,
+          "card": 0,
+          "name": "断层·噤声切片"
+        },
+        {
+          "hp": 1700,
+          "card": 1,
+          "name": "斜织·破碎囚笼"
+        },
+        {
+          "hp": 1800,
+          "card": 2,
+          "name": "冷核·无声凝视"
+        },
+        {
+          "hp": 1900,
+          "card": 3,
+          "name": "逆流·回声噩梦"
+        },
+        {
+          "hp": 2100,
+          "card": 4,
+          "name": "深渊·内外坍缩"
+        },
+        {
+          "hp": 2200,
+          "card": 5,
+          "name": "25时·全域崩坏"
+        }
+      ]
+    }
+  ],
+  "choices": [
+    {
+      "phase": "upgrade",
+      "offer": "level:2:0",
+      "choices": [
+        "crossOrbit",
+        "slow",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:echo:0",
+      "choices": [
+        "returnWing",
+        "wingShots",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:3:0",
+      "choices": [
+        "returnWing",
+        "precision",
+        "graze"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:palisade:0",
+      "choices": [
+        "graze",
+        "precision",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:4:0",
+      "choices": [
+        "piercing",
+        "graze",
+        "rearSpark"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:mafuyu:0",
+      "choices": [
+        "precision",
+        "graze",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:5:0",
+      "choices": [
+        "brakeField",
+        "wingShots",
+        "precision"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:reprise:0",
+      "choices": [
+        "precision",
+        "crossOrbit",
+        "brakeField"
+      ]
+    }
+  ],
+  "artifact": {
+    "entry": "./assets/index-AG_JJRlb.js",
+    "deployedSha256": "09493a4a106740f04dddb607c45ac73adc540c3eb62190219c625cfaf2222d89",
+    "localEntry": "assets/index-AG_JJRlb.js",
+    "localSha256": "09493a4a106740f04dddb607c45ac73adc540c3eb62190219c625cfaf2222d89"
+  },
+  "saved": {
+    "version": 2,
+    "revision": 1,
+    "clears": {
+      "v5:992bf39e-701f-4eee-a1bf-4131b70977de": {
+        "runId": "992bf39e-701f-4eee-a1bf-4131b70977de",
+        "ruleset": "v5",
+        "difficulty": "normal",
+        "encounterId": "s2:final",
+        "score": 226000,
+        "source": "gameplay",
+        "completedAt": 1789639185434
+      }
+    },
+    "bestScores": {
+      "v5": {
+        "normal": {
+          "story": 226000,
+          "endless": 0
+        },
+        "hard": {
+          "story": 0,
+          "endless": 0
+        }
+      }
+    }
+  },
+  "restarted": {
+    "level": 1,
+    "xp": 0,
+    "companions": 0,
+    "modules": 0,
+    "bombs": 3,
+    "hp": 5,
+    "canvases": 1,
+    "raf": true
+  },
+  "result": "passed"
+}
