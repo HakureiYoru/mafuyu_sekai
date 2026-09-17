@@ -1,0 +1,202 @@
+{
+  "artifact": "assets/index--GSm3RKQ.js",
+  "scenarios": [
+    {
+      "size": {
+        "width": 568,
+        "height": 320
+      },
+      "geometry": {
+        "field": {
+          "x": 84,
+          "y": 55.375,
+          "width": 372,
+          "height": 209.25,
+          "bottom": 264.625,
+          "right": 456
+        },
+        "parts": [
+          {
+            "name": "touch-comms ",
+            "x": 462,
+            "y": 46,
+            "width": 100,
+            "height": 52.28125,
+            "bottom": 98.28125,
+            "right": 562
+          },
+          {
+            "name": "stick",
+            "x": 0,
+            "y": 44,
+            "width": 84,
+            "height": 232,
+            "bottom": 276,
+            "right": 84
+          },
+          {
+            "name": "touch-action-zone",
+            "x": 458,
+            "y": 154,
+            "width": 108,
+            "height": 116,
+            "bottom": 270,
+            "right": 566
+          },
+          {
+            "name": "dash",
+            "x": 458,
+            "y": 154,
+            "width": 60,
+            "height": 66,
+            "bottom": 220,
+            "right": 518
+          },
+          {
+            "name": "bomb",
+            "x": 522,
+            "y": 154,
+            "width": 44,
+            "height": 66,
+            "bottom": 220,
+            "right": 566
+          },
+          {
+            "name": "focus",
+            "x": 458,
+            "y": 226,
+            "width": 51,
+            "height": 44,
+            "bottom": 270,
+            "right": 509
+          },
+          {
+            "name": "fire",
+            "x": 515,
+            "y": 226,
+            "width": 51,
+            "height": 44,
+            "bottom": 270,
+            "right": 566
+          }
+        ],
+        "bubbles": [
+          {
+            "text": "学姐！Wonderhoy！！",
+            "client": 25,
+            "scroll": 26,
+            "x": 468,
+            "y": 69,
+            "width": 88,
+            "height": 25.28125,
+            "bottom": 94.28125,
+            "right": 556
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "size": {
+        "width": 844,
+        "height": 390
+      },
+      "geometry": {
+        "field": {
+          "x": 135.59375,
+          "y": 44.0078125,
+          "width": 536.875,
+          "height": 301.984375,
+          "bottom": 345.9921875,
+          "right": 672.46875
+        },
+        "parts": [
+          {
+            "name": "touch-comms ",
+            "x": 698.09375,
+            "y": 46,
+            "width": 139.90625,
+            "height": 37,
+            "bottom": 83,
+            "right": 838
+          },
+          {
+            "name": "stick",
+            "x": 0,
+            "y": 44,
+            "width": 116,
+            "height": 302,
+            "bottom": 346,
+            "right": 116
+          },
+          {
+            "name": "touch-action-zone",
+            "x": 694.09375,
+            "y": 220,
+            "width": 147.90625,
+            "height": 118,
+            "bottom": 338,
+            "right": 842
+          },
+          {
+            "name": "dash",
+            "x": 694.09375,
+            "y": 220,
+            "width": 75.375,
+            "height": 66,
+            "bottom": 286,
+            "right": 769.46875
+          },
+          {
+            "name": "bomb",
+            "x": 773.46875,
+            "y": 220,
+            "width": 68.53125,
+            "height": 66,
+            "bottom": 286,
+            "right": 842
+          },
+          {
+            "name": "focus",
+            "x": 694.09375,
+            "y": 294,
+            "width": 70.953125,
+            "height": 44,
+            "bottom": 338,
+            "right": 765.046875
+          },
+          {
+            "name": "fire",
+            "x": 771.046875,
+            "y": 294,
+            "width": 70.953125,
+            "height": 44,
+            "bottom": 338,
+            "right": 842
+          }
+        ],
+        "bubbles": [
+          {
+            "text": "学姐！Wonderhoy！！",
+            "client": 26,
+            "scroll": 27,
+            "x": 725.09375,
+            "y": 51,
+            "width": 106.90625,
+            "height": 26.375,
+            "bottom": 77.375,
+            "right": 832
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": []
+    }
+  ]
+}

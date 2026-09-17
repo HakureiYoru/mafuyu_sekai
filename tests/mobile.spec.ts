@@ -197,7 +197,11 @@ for (const [width, height] of [[568, 320], [667, 375], [844, 390], [932, 430], [
   test(`touch layout ${width}×${height}, safe areas, and corresponding portrait`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height }); await start(page);
     // CSS env(safe-area-inset-*) is zero on desktop emulators; injected variables test layout only.
-    await page.locator('#game-shell').evaluate(shell => { (shell as HTMLElement).style.setProperty('--safe-left', '18px'); (shell as HTMLElement).style.setProperty('--safe-right', '18px'); });
+    await page.locator('#game-shell').evaluate(shell => {
+      const style = (shell as HTMLElement).style;
+      style.setProperty('--safe-left', '18px'); style.setProperty('--safe-right', '18px');
+      style.setProperty('--safe-top', '10px'); style.setProperty('--safe-bottom', '12px');
+    });
     const geometry = await page.evaluate(() => {
       const field = document.querySelector('#game-host canvas')!.getBoundingClientRect();
       const controls = [...document.querySelectorAll('.touch-stick-zone,.touch-action-zone,.touch-comms,.touch-hud-top,.touch-hud-bottom')];

@@ -1,0 +1,382 @@
+{
+  "version": "6.1.0",
+  "measuredAt": "2026-09-17T17:31:04.584Z",
+  "status": "passed",
+  "command": "npm run build; npx playwright test --config playwright.mobile.config.ts",
+  "artifact": {
+    "entry": "assets/index-CgvKEerw.js",
+    "sha256": "75beb2bb8a6a389149c0d6df9d2feabf1fc7a38917eaaa856a979d25ca4e9392",
+    "unchangedFromPreRun": true
+  },
+  "environment": "Windows desktop Chromium and WebKit with hasTouch/isMobile emulation; Chromium CDP real touch event dispatch for multitouch and scrolling. Not physical iPhone/Android performance testing.",
+  "totals": {
+    "startTime": "2026-09-17T17:29:48.384Z",
+    "duration": 52825.195,
+    "expected": 24,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "expectedSkips": "WebKit lacks Chromium CDP; simultaneous three-finger input and native stepped scrolling are validated in the Chromium project only.",
+  "errors": [],
+  "tests": [
+    {
+      "project": "mobile-chromium",
+      "title": "touch start does not wait for audio downloads and auto-fire produces a real first shot",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1603,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "tapping a visible boss arm locks the part, and its defeat releases the lock",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1402,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch heat control cools automatically and a dash still releases the empowered beam",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3713,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "three real touch points have independent releases; cancellation pauses and clears all held input",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1960,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "a final upgrade selected in portrait cannot resume the simulation through the orientation gate",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1690,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch settings and saved run score survive refresh without adding starting power",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2963,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "scrolling a reward card does not choose it; a separate tap commits exactly once",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1665,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "twenty touch restarts retain one canvas and one loop without old movement or target state",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2720,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch layout 568×320, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1372,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch layout 667×375, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1368,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch layout 844×390, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1362,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch layout 932×430, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1469,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-chromium",
+      "title": "touch layout 1024×768, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1563,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch start does not wait for audio downloads and auto-fire produces a real first shot",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1483,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "tapping a visible boss arm locks the part, and its defeat releases the lock",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1112,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch heat control cools automatically and a dash still releases the empowered beam",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4004,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "three real touch points have independent releases; cancellation pauses and clears all held input",
+      "status": "skipped",
+      "results": [
+        {
+          "status": "skipped",
+          "durationMs": 203,
+          "errors": []
+        }
+      ],
+      "annotations": [
+        {
+          "type": "skip",
+          "description": "Chromium CDP covers genuine simultaneous touch points; WebKit exercises single-touch flows separately.",
+          "location": {
+            "file": "E:\\学业\\mafuyu_sekai\\tests\\mobile.spec.ts",
+            "line": 99,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "a final upgrade selected in portrait cannot resume the simulation through the orientation gate",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2126,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch settings and saved run score survive refresh without adding starting power",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3536,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "scrolling a reward card does not choose it; a separate tap commits exactly once",
+      "status": "skipped",
+      "results": [
+        {
+          "status": "skipped",
+          "durationMs": 183,
+          "errors": []
+        }
+      ],
+      "annotations": [
+        {
+          "type": "skip",
+          "description": "Native multi-step touch scrolling is driven through Chromium CDP.",
+          "location": {
+            "file": "E:\\学业\\mafuyu_sekai\\tests\\mobile.spec.ts",
+            "line": 162,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "twenty touch restarts retain one canvas and one loop without old movement or target state",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4629,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch layout 568×320, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1517,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch layout 667×375, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1503,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch layout 844×390, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1527,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch layout 932×430, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1543,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "project": "mobile-webkit",
+      "title": "touch layout 1024×768, safe areas, and corresponding portrait",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1569,
+          "errors": []
+        }
+      ],
+      "annotations": []
+    }
+  ]
+}
