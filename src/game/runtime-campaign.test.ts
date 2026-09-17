@@ -43,7 +43,7 @@ beforeEach(() => {
 afterEach(() => { for (const runtime of runtimes.splice(0)) runtime.destroy(); vi.unstubAllGlobals(); });
 async function runtime() { const result = new GameRuntime(new ElementStub() as unknown as HTMLElement); runtimes.push(result); await result.init(); return result; }
 function grantClear() {
-  return new SaveRepository(storage).recordCompletion({ runId: 'earned-v5-clear', difficulty: 'hard', encounterId: 's2:final', score: 4200, source: 'gameplay' });
+  return new SaveRepository(storage).recordCompletion({ runId: 'earned-v6-clear', difficulty: 'hard', encounterId: 's2:final', score: 4200, source: 'gameplay' });
 }
 function advance(time: number) { const entries = [...raf]; raf.clear(); for (const [, callback] of entries) callback(time); }
 
@@ -64,7 +64,7 @@ describe('runtime continuous campaign persistence and scheduling', () => {
     expect(new SaveRepository(storage).getProfile().clears).toEqual({});
     const event: CombatEvent = { type: 'complete', x: 0, y: 0, encounterId: 's2:final' };
     internal.processEvents([event, event]); internal.publish();
-    expect(Object.keys(new SaveRepository(storage).getProfile().clears)).toEqual(['v5:' + firstId]);
+    expect(Object.keys(new SaveRepository(storage).getProfile().clears)).toEqual(['v6:' + firstId]);
     for (let i = 0; i < 20; i++) {
       internal.input.keyDown('KeyR'); internal.input.shoot = true;
       internal.simulation.state.build.resonance = 4; internal.simulation.state.player.level = 9;
@@ -132,7 +132,7 @@ describe('runtime continuous campaign persistence and scheduling', () => {
     internal.processEvents([{ type: 'complete', encounterId: 's2:final', x: 0, y: 0 }]);
     game.returnToMenu();
     const profile = new SaveRepository(storage).getProfile();
-    expect(profile.bestScores.v5.normal).toEqual({ story: 1200, endless: 4500 });
+    expect(profile.bestScores.v6.normal).toEqual({ story: 1200, endless: 4500 });
     expect(Object.values(profile.clears)).toHaveLength(1); expect(Object.values(profile.clears)[0].score).toBe(1200);
   });
 });

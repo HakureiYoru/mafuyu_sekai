@@ -1,0 +1,2229 @@
+{
+  "version": "6.0.0",
+  "status": "complete",
+  "measuredAt": "2026-09-17T12:19:00.922Z",
+  "finishedAt": "2026-09-17T12:29:35.237Z",
+  "archive": "balance-v6.0.0.json.gz",
+  "sourceHashes": {
+    "src/game/simulation.ts": "b6a8c785ad503e9f59ffcabbfdf5de293c9e3495338244d16f7a044596dac090",
+    "src/game/config.ts": "4ab368798c2049c73f05dfda695e156990c44aa5e829b88726b20bccf056da49",
+    "src/game/settings.ts": "08bf787029169b72b549c654cbe0bef0690a9e3e435a69d4fd04f6d9299f3a37",
+    "src/game/difficulty.ts": "2ca910ecf2d33b56fc903ff5887b7179e02831b8d23445eabea8f6f5d7525bdd",
+    "src/game/miniboss-ai.ts": "15ead87e732ea8408ef2e315aabb08e3acffa7d9bd61cb29d31ad2ac5ddbe501",
+    "src/game/math.ts": "8333f8273e05c0ca7c4e2e9a102e104650178ab1187a3802ce298799090e1bef",
+    "src/game/boss-actions.ts": "04b82788fb267e5a6ee5ace62da9c1e2a8427290a7e43ace6ca0a4ca3d525926",
+    "src/game/pool.ts": "235f0b9fbf484d4bac3352af0dd815e36eed1770855c42c20ff7c73b36a46b0c",
+    "src/game/attack-budget.ts": "6e79f288209561c7c7cd4b4a4f034f95b728b81681e64e42912e33c2918652d8",
+    "src/game/module-combat.ts": "9fe036117a3aa92b41dff8a242851b42e6a2726b0992fc3a0894849d3ee5e72f",
+    "src/game/upgrades.ts": "b964b8d3da3ef6a23ed3c85576a486256fd3359222295af88a74055e8300a972",
+    "src/game/elite-ai.ts": "5d2074770656dd73fe40c3b7f5a29ab6629c6f69429a3ba7854983f7b87607aa",
+    "src/game/season2-ai.ts": "59fe858313ef6c09bff246e89a6ab4eb1e4c3f06092c17cfd7c39a3a47833d8b",
+    "src/game/enemy-ai.ts": "495e785d28e1e5d81d289c1f7644d82ff45f48e7dd50475e3cde64a968f943b4",
+    "src/game/threat-director.ts": "9ccd9416466a700de9d796289e96bba12eeab9a78610c5f8f1991c49798087ce",
+    "src/game/projectile-motion.ts": "0d74aba247cd13cb8c9ae746ee461223702c23eb59b1c93a1158a9f442e42aa6",
+    "src/game/campaign.ts": "7c882c0d4d8a433c976dada87e6f33cb0e1686cc307b4e626c242f8165906d19",
+    "src/game/spellcards.ts": "cdb4d62c9b3aa2a6e95860ee839c00aeafc1ec089184ac45853a7e955608aaba",
+    "src/game/fairness.test.ts": "51d889319a89f1a6dd83a713cda0ea2701eab1a8eb211343c400ded6e7659211",
+    "scripts/balance-v6.mjs": "304b19b320302c239b9c84ff7b581b26418d91700e9ff742547e54695db9a1c8",
+    "scripts/simulation-loader.mjs": "7f4d9a8b5a7e7bcc2c4ecedac4a84960e8a518061881a1944d6a90e83e5b762a"
+  },
+  "method": "Real 60Hz fresh-Lv1 simulation, real offers and drops; no forced modules or enemy stats. Controls every 100ms. Visible committed body paths and spell cues are recognized after 200ms. Eight projectile samples are 150ms apart, matching route samples. Core damage is counted only on hit events with enemyType, excluding auxiliary weakpoint damage notifications. Only labelled DPS cases receive invulnerability.",
+  "limitations": [
+    "Synthetic precise aiming and prediction are not human playtesting.",
+    "Ordinary attack cancellation retries are counted separately from actual deferred cancellation.",
+    "Removal-based ordinary TTK may include encounter cleanup, and is explicitly labelled.",
+    "Core hits are naturally aimed body-center hits during exposed windows; controller does not plan every weakpoint mechanic.",
+    "Collection policies pursue real useful drops within 180/500/850 world units for low/medium/high; these are controlled collection strategies, not measured player skill groups. Settlement still collects existing drops.",
+    "CPU simulation timings are not browser frame timings."
+  ],
+  "metricDefinitions": {
+    "firstAttack": "Observed projectile creation, active hazard, dash/laser phase or contact reach before damage death. Basic/carrier contact pressure counts; repair-only support does not. This conservative metric does not claim every mine placement was observed.",
+    "firstRelease": "Attack release cue or observed first attack. A minelayer release is an attempted volley; individual mines can still be blocked by spacing/capacity. Successful repairs are reported separately.",
+    "ordinaryPopulation": "Only role=mob entities actually killed by damage. Encounter cleanup and spawned mines/cores/parts are excluded. Role is read after spawn assignment.",
+    "admissionTimeout": "Actual ThreatDirector onDeferredCancel callbacks divided by accepted admissions plus timeout callbacks, separately from per-tick false retry counts.",
+    "reservationCancellation": "Remaining AttackBudget promises explicitly canceled divided by completed, canceled and expired promise lifetimes in that 10-second window. Alive-source and dead/missing-source cancellation are separate. Reset cleanup and expired payloads are reported, not silently treated as successful attacks.",
+    "rejectedPromisedEmission": "A reserved bullet/hazard release for which AttackBudget.take returned false. This is distinct from normal admission rejection or player-caused interruption.",
+    "collectedXp": "Redeemed XP pickup value only; boss/direct awards, converted support/bombs and choice XP are not silently included. Entry level and current XP reflect all production rewards.",
+    "damage": "Actual clamped HP loss from production hit events, split by new moduleId or legacy damageSource. Overkill and auxiliary weakpoint-only hit notifications are excluded."
+  },
+  "normal": {
+    "cases": 40,
+    "results": {
+      "complete": 40
+    },
+    "completionSeconds": {
+      "count": 40,
+      "min": 707.483,
+      "p25": 771.917,
+      "median": 799.95,
+      "p75": 811.183,
+      "p90": 832.183,
+      "max": 866.667
+    },
+    "choices": {
+      "count": 40,
+      "min": 21,
+      "p25": 23,
+      "median": 23,
+      "p75": 24,
+      "p90": 24,
+      "max": 25
+    },
+    "choiceGoal": {
+      "lower": 24,
+      "upper": 30,
+      "below": 27,
+      "within": 13,
+      "above": 0,
+      "atLeast24Share": 0.325
+    },
+    "lowChoiceRuns": [
+      {
+        "seed": 60001,
+        "profile": "mobility",
+        "seconds": 833.55,
+        "choices": 22,
+        "xpPickups": 5440,
+        "ordinaryKills": 544,
+        "injuries": 3,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 51
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 84.217
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 92.817
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 73.283
+          },
+          {
+            "id": "s2:final",
+            "seconds": 163.533
+          }
+        ]
+      },
+      {
+        "seed": 60002,
+        "profile": "main",
+        "seconds": 820.417,
+        "choices": 22,
+        "xpPickups": 5130,
+        "ordinaryKills": 513,
+        "injuries": 4,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 45.6
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 79.783
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 92.717
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 63.25
+          },
+          {
+            "id": "s2:final",
+            "seconds": 163.25
+          }
+        ]
+      },
+      {
+        "seed": 60002,
+        "profile": "balanced",
+        "seconds": 787.583,
+        "choices": 22,
+        "xpPickups": 5640,
+        "ordinaryKills": 564,
+        "injuries": 3,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 38.883
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 70.617
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 86.983
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 64.417
+          },
+          {
+            "id": "s2:final",
+            "seconds": 157.967
+          }
+        ]
+      },
+      {
+        "seed": 60004,
+        "profile": "mobility",
+        "seconds": 819.55,
+        "choices": 22,
+        "xpPickups": 5160,
+        "ordinaryKills": 516,
+        "injuries": 9,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 46.1
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 76.283
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 91.817
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 69.467
+          },
+          {
+            "id": "s2:final",
+            "seconds": 167.167
+          }
+        ]
+      },
+      {
+        "seed": 60005,
+        "profile": "mobility",
+        "seconds": 866.667,
+        "choices": 22,
+        "xpPickups": 5240,
+        "ordinaryKills": 524,
+        "injuries": 5,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 47.367
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 77.767
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 111.867
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 80.417
+          },
+          {
+            "id": "s2:final",
+            "seconds": 169.8
+          }
+        ]
+      },
+      {
+        "seed": 60006,
+        "profile": "mobility",
+        "seconds": 832.183,
+        "choices": 22,
+        "xpPickups": 5440,
+        "ordinaryKills": 544,
+        "injuries": 3,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 47.85
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 82.433
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 94.833
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 75.2
+          },
+          {
+            "id": "s2:final",
+            "seconds": 157.017
+          }
+        ]
+      },
+      {
+        "seed": 60007,
+        "profile": "balanced",
+        "seconds": 798.817,
+        "choices": 21,
+        "xpPickups": 5180,
+        "ordinaryKills": 518,
+        "injuries": 7,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 3
+        },
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 49.55
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 62.467
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 94.25
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 74.583
+          },
+          {
+            "id": "s2:final",
+            "seconds": 149.267
+          }
+        ]
+      }
+    ],
+    "injuryEvents": {
+      "count": 40,
+      "min": 0,
+      "p25": 1,
+      "median": 2,
+      "p75": 3,
+      "p90": 5,
+      "max": 9
+    },
+    "bombsUsed": {
+      "count": 40,
+      "min": 0,
+      "p25": 0,
+      "median": 0,
+      "p75": 0,
+      "p90": 0,
+      "max": 0
+    },
+    "finalHp": {
+      "count": 40,
+      "min": 5,
+      "p25": 5,
+      "median": 5,
+      "p75": 5,
+      "p90": 5,
+      "max": 5
+    },
+    "finalBombs": {
+      "count": 40,
+      "min": 5,
+      "p25": 5,
+      "median": 5,
+      "p75": 5,
+      "p90": 5,
+      "max": 5
+    },
+    "coreHits": {
+      "count": 40,
+      "min": 1653,
+      "p25": 2254,
+      "median": 2381,
+      "p75": 2613,
+      "p90": 2768,
+      "max": 2877
+    },
+    "xpPickups": {
+      "count": 40,
+      "min": 5130,
+      "p25": 5570,
+      "median": 5820,
+      "p75": 6050,
+      "p90": 6140,
+      "max": 6370
+    },
+    "reservations": {
+      "completed": 14804,
+      "canceled": 2060,
+      "canceledWhileAlive": 785,
+      "canceledOnDeath": 1275,
+      "resetCleanup": 112,
+      "expiredWithPayload": 5054,
+      "rejectedPromisedEmission": 0,
+      "canceledBullets": 19281,
+      "canceledHazards": 32
+    },
+    "early": {
+      "from": 0,
+      "until": 90,
+      "sampleCount": 320,
+      "includes": "Routine combat and light elites; excludes timestamps inside the five major boss lifetimes.",
+      "enemyBullets": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 2,
+        "p90": 7,
+        "max": 14
+      },
+      "ordinaryAlive": {
+        "count": 320,
+        "min": 0,
+        "p25": 1,
+        "median": 2,
+        "p75": 3,
+        "p90": 5,
+        "max": 11
+      },
+      "ordinaryKilled": 2198,
+      "exactWindowKilled": 2198,
+      "observedAttack": 209,
+      "firstAttackRatio": 0.095,
+      "released": 211,
+      "releaseRatio": 0.096,
+      "visibleTtkWindowMedians": {
+        "count": 315,
+        "min": 0.033,
+        "p25": 0.633,
+        "median": 0.967,
+        "p75": 1.633,
+        "p90": 3.133,
+        "max": 10.1
+      },
+      "admissionTimeoutWindowRate": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 0,
+        "p90": 0,
+        "max": 0.833
+      },
+      "reservationCancelWindowRate": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 0,
+        "p90": 0.6,
+        "max": 1
+      }
+    },
+    "late": {
+      "from": 300,
+      "until": 360,
+      "sampleCount": 246,
+      "includes": "Routine combat and light elites; excludes timestamps inside the five major boss lifetimes.",
+      "enemyBullets": {
+        "count": 246,
+        "min": 0,
+        "p25": 4,
+        "median": 10,
+        "p75": 21,
+        "p90": 43,
+        "max": 92
+      },
+      "ordinaryAlive": {
+        "count": 246,
+        "min": 0,
+        "p25": 18,
+        "median": 21,
+        "p75": 27,
+        "p90": 37,
+        "max": 55
+      },
+      "ordinaryKilled": 5970,
+      "exactWindowKilled": 5970,
+      "observedAttack": 1046,
+      "firstAttackRatio": 0.175,
+      "released": 1117,
+      "releaseRatio": 0.187,
+      "visibleTtkWindowMedians": {
+        "count": 246,
+        "min": 0.033,
+        "p25": 2.183,
+        "median": 3.767,
+        "p75": 5.133,
+        "p90": 6.75,
+        "max": 15.1
+      },
+      "admissionTimeoutWindowRate": {
+        "count": 246,
+        "min": 0,
+        "p25": 0.056,
+        "median": 0.25,
+        "p75": 0.519,
+        "p90": 0.657,
+        "max": 0.855
+      },
+      "reservationCancelWindowRate": {
+        "count": 246,
+        "min": 0,
+        "p25": 0.05,
+        "median": 0.111,
+        "p75": 0.19,
+        "p90": 0.333,
+        "max": 0.625
+      }
+    },
+    "bosses": [
+      {
+        "id": "s1:echo",
+        "name": "ECHO",
+        "ttk": {
+          "count": 40,
+          "min": 34.067,
+          "p25": 38.633,
+          "median": 41.5,
+          "p75": 46.1,
+          "p90": 50.967,
+          "max": 56.933
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 4,
+          "p25": 4,
+          "median": 4,
+          "p75": 4,
+          "p90": 4,
+          "max": 4
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 4,
+          "p25": 4,
+          "median": 4,
+          "p75": 4,
+          "p90": 4,
+          "max": 4
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 28.103,
+          "p25": 34.335,
+          "median": 38.462,
+          "p75": 41.149,
+          "p90": 42.553,
+          "max": 46.966
+        },
+        "longest": [
+          {
+            "seed": 60010,
+            "profile": "main",
+            "seconds": 56.933,
+            "level": 4,
+            "totalRanks": 4,
+            "moduleKinds": 1,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 1600,
+            "dps": 28.103
+          },
+          {
+            "seed": 60010,
+            "profile": "balanced",
+            "seconds": 56.267,
+            "level": 4,
+            "totalRanks": 4,
+            "moduleKinds": 1,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 1600,
+            "dps": 28.436
+          },
+          {
+            "seed": 60004,
+            "profile": "balanced",
+            "seconds": 51.05,
+            "level": 4,
+            "totalRanks": 4,
+            "moduleKinds": 4,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 1600,
+            "dps": 31.342
+          }
+        ]
+      },
+      {
+        "id": "s2:palisade",
+        "name": "PALISADE",
+        "ttk": {
+          "count": 40,
+          "min": 50.483,
+          "p25": 62.683,
+          "median": 65.7,
+          "p75": 76.283,
+          "p90": 82.433,
+          "max": 90.05
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 6,
+          "p25": 7,
+          "median": 7,
+          "p75": 7,
+          "p90": 7,
+          "max": 8
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 7,
+          "p25": 8,
+          "median": 9,
+          "p75": 9,
+          "p90": 9,
+          "max": 10
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 39.978,
+          "p25": 46.292,
+          "median": 54,
+          "p75": 57.279,
+          "p90": 60.708,
+          "max": 71.311
+        },
+        "longest": [
+          {
+            "seed": 60008,
+            "profile": "mobility",
+            "seconds": 90.05,
+            "level": 7,
+            "totalRanks": 9,
+            "moduleKinds": 2,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 3600,
+            "dps": 39.978
+          },
+          {
+            "seed": 60001,
+            "profile": "mobility",
+            "seconds": 84.217,
+            "level": 7,
+            "totalRanks": 9,
+            "moduleKinds": 2,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 3600,
+            "dps": 42.747
+          },
+          {
+            "seed": 60001,
+            "profile": "balanced",
+            "seconds": 84.133,
+            "level": 7,
+            "totalRanks": 8,
+            "moduleKinds": 4,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 3600,
+            "dps": 42.789
+          }
+        ]
+      },
+      {
+        "id": "s1:mafuyu",
+        "name": "MAFUYU",
+        "ttk": {
+          "count": 40,
+          "min": 73.25,
+          "p25": 84.7,
+          "median": 89.283,
+          "p75": 91.533,
+          "p90": 94.833,
+          "max": 111.867
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 8,
+          "p25": 9,
+          "median": 9,
+          "p75": 9,
+          "p90": 9,
+          "max": 9
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 11,
+          "p25": 12,
+          "median": 12,
+          "p75": 13,
+          "p90": 13,
+          "max": 13
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 80.453,
+          "p25": 98.021,
+          "median": 100.803,
+          "p75": 104.733,
+          "p90": 114.286,
+          "max": 122.867
+        },
+        "longest": [
+          {
+            "seed": 60005,
+            "profile": "mobility",
+            "seconds": 111.867,
+            "level": 8,
+            "totalRanks": 11,
+            "moduleKinds": 4,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 9000,
+            "dps": 80.453
+          },
+          {
+            "seed": 60007,
+            "profile": "drone",
+            "seconds": 98.95,
+            "level": 9,
+            "totalRanks": 12,
+            "moduleKinds": 3,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 9000,
+            "dps": 90.955
+          },
+          {
+            "seed": 60008,
+            "profile": "mobility",
+            "seconds": 97.783,
+            "level": 9,
+            "totalRanks": 13,
+            "moduleKinds": 2,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 9000,
+            "dps": 92.041
+          }
+        ]
+      },
+      {
+        "id": "s2:reprise",
+        "name": "REPRISE",
+        "ttk": {
+          "count": 40,
+          "min": 55.617,
+          "p25": 64.417,
+          "median": 70.117,
+          "p75": 71.517,
+          "p90": 75.2,
+          "max": 80.417
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 9,
+          "p25": 10,
+          "median": 10,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 14,
+          "p25": 15,
+          "median": 16,
+          "p75": 16,
+          "p90": 17,
+          "max": 17
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 80.829,
+          "p25": 90.529,
+          "median": 92.527,
+          "p75": 100.749,
+          "p90": 102.767,
+          "max": 116.871
+        },
+        "longest": [
+          {
+            "seed": 60005,
+            "profile": "mobility",
+            "seconds": 80.417,
+            "level": 10,
+            "totalRanks": 15,
+            "moduleKinds": 4,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 6500,
+            "dps": 80.829
+          },
+          {
+            "seed": 60008,
+            "profile": "balanced",
+            "seconds": 77.6,
+            "level": 10,
+            "totalRanks": 15,
+            "moduleKinds": 4,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 6500,
+            "dps": 83.763
+          },
+          {
+            "seed": 60006,
+            "profile": "balanced",
+            "seconds": 77.133,
+            "level": 10,
+            "totalRanks": 16,
+            "moduleKinds": 9,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 6500,
+            "dps": 84.27
+          }
+        ]
+      },
+      {
+        "id": "s2:final",
+        "name": "LACUNA",
+        "ttk": {
+          "count": 40,
+          "min": 122.6,
+          "p25": 142.017,
+          "median": 156.067,
+          "p75": 163.25,
+          "p90": 166.733,
+          "max": 175.817
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 10,
+          "p25": 10,
+          "median": 10,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 20,
+          "p25": 21,
+          "median": 22,
+          "p75": 22,
+          "p90": 23,
+          "max": 24
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 113.755,
+          "p25": 122.299,
+          "median": 127.877,
+          "p75": 140.187,
+          "p90": 152.439,
+          "max": 163.132
+        },
+        "longest": [
+          {
+            "seed": 60001,
+            "profile": "drone",
+            "seconds": 175.817,
+            "level": 10,
+            "totalRanks": 22,
+            "moduleKinds": 5,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 20000,
+            "dps": 113.755
+          },
+          {
+            "seed": 60005,
+            "profile": "mobility",
+            "seconds": 169.8,
+            "level": 10,
+            "totalRanks": 20,
+            "moduleKinds": 6,
+            "evolutions": 2,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 20000,
+            "dps": 117.786
+          },
+          {
+            "seed": 60007,
+            "profile": "drone",
+            "seconds": 167.467,
+            "level": 10,
+            "totalRanks": 22,
+            "moduleKinds": 5,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 20000,
+            "dps": 119.427
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "source": "normal",
+        "damage": 1834513.514,
+        "share": 0.616
+      },
+      {
+        "source": "beam",
+        "damage": 493049.04,
+        "share": 0.165
+      },
+      {
+        "source": "drone",
+        "damage": 363047.669,
+        "share": 0.122
+      },
+      {
+        "source": "special",
+        "damage": 49811.148,
+        "share": 0.017
+      },
+      {
+        "source": "module",
+        "damage": 45270.753,
+        "share": 0.015
+      },
+      {
+        "source": "burst",
+        "damage": 40963.125,
+        "share": 0.014
+      },
+      {
+        "source": "device",
+        "damage": 36024.024,
+        "share": 0.012
+      },
+      {
+        "source": "droneSpotlight",
+        "damage": 23893.787,
+        "share": 0.008
+      },
+      {
+        "source": "anchorStars",
+        "damage": 21537.951,
+        "share": 0.007
+      },
+      {
+        "source": "blade",
+        "damage": 17193.315,
+        "share": 0.006
+      },
+      {
+        "source": "pulseChamber",
+        "damage": 13446.453,
+        "share": 0.005
+      },
+      {
+        "source": "prism",
+        "damage": 10912.396,
+        "share": 0.004
+      },
+      {
+        "source": "beamCircuit",
+        "damage": 9435.429,
+        "share": 0.003
+      },
+      {
+        "source": "heavy",
+        "damage": 5739.534,
+        "share": 0.002
+      },
+      {
+        "source": "crescentMagazine",
+        "damage": 5265.881,
+        "share": 0.002
+      },
+      {
+        "source": "droneNotes",
+        "damage": 4138.399,
+        "share": 0.001
+      },
+      {
+        "source": "dronePlectrum",
+        "damage": 2450.94,
+        "share": 0.001
+      },
+      {
+        "source": "droneConduit",
+        "damage": 1161.256,
+        "share": 0
+      },
+      {
+        "source": "huntingReturn",
+        "damage": 1134.14,
+        "share": 0
+      },
+      {
+        "source": "chain",
+        "damage": 830.547,
+        "share": 0
+      },
+      {
+        "source": "trail",
+        "damage": 390.4,
+        "share": 0
+      },
+      {
+        "source": "echo",
+        "damage": 213.7,
+        "share": 0
+      },
+      {
+        "source": "dashLane",
+        "damage": 46.8,
+        "share": 0
+      }
+    ],
+    "profiles": [
+      {
+        "profile": "main",
+        "seconds": {
+          "count": 10,
+          "min": 707.483,
+          "p25": 748.183,
+          "median": 761.783,
+          "p75": 771.917,
+          "p90": 808.183,
+          "max": 820.417
+        },
+        "choices": {
+          "count": 10,
+          "min": 22,
+          "p25": 23,
+          "median": 24,
+          "p75": 24,
+          "p90": 24,
+          "max": 25
+        }
+      },
+      {
+        "profile": "drone",
+        "seconds": {
+          "count": 10,
+          "min": 772.567,
+          "p25": 793.667,
+          "median": 799.95,
+          "p75": 809.433,
+          "p90": 829.183,
+          "max": 834.5
+        },
+        "choices": {
+          "count": 10,
+          "min": 23,
+          "p25": 23,
+          "median": 23,
+          "p75": 24,
+          "p90": 24,
+          "max": 24
+        }
+      },
+      {
+        "profile": "mobility",
+        "seconds": {
+          "count": 10,
+          "min": 801.183,
+          "p25": 803.517,
+          "median": 817.183,
+          "p75": 832.183,
+          "p90": 855.767,
+          "max": 866.667
+        },
+        "choices": {
+          "count": 10,
+          "min": 22,
+          "p25": 22,
+          "median": 23,
+          "p75": 23,
+          "p90": 23,
+          "max": 23
+        }
+      },
+      {
+        "profile": "balanced",
+        "seconds": {
+          "count": 10,
+          "min": 762.15,
+          "p25": 766.183,
+          "median": 784.5,
+          "p75": 798.817,
+          "p90": 811.183,
+          "max": 829.183
+        },
+        "choices": {
+          "count": 10,
+          "min": 21,
+          "p25": 23,
+          "median": 23,
+          "p75": 23,
+          "p90": 24,
+          "max": 24
+        }
+      }
+    ]
+  },
+  "hard": {
+    "cases": 40,
+    "results": {
+      "complete": 40
+    },
+    "completionSeconds": {
+      "count": 40,
+      "min": 812.7,
+      "p25": 970.217,
+      "median": 1004.883,
+      "p75": 1065.85,
+      "p90": 1081.25,
+      "max": 1149.567
+    },
+    "choices": {
+      "count": 40,
+      "min": 24,
+      "p25": 26,
+      "median": 27,
+      "p75": 28,
+      "p90": 29,
+      "max": 33
+    },
+    "choiceGoal": {
+      "lower": 24,
+      "upper": 30,
+      "below": 0,
+      "within": 39,
+      "above": 1,
+      "atLeast24Share": 1
+    },
+    "lowChoiceRuns": [],
+    "injuryEvents": {
+      "count": 40,
+      "min": 1,
+      "p25": 3,
+      "median": 4,
+      "p75": 5,
+      "p90": 6,
+      "max": 8
+    },
+    "bombsUsed": {
+      "count": 40,
+      "min": 0,
+      "p25": 0,
+      "median": 0,
+      "p75": 0,
+      "p90": 0,
+      "max": 0
+    },
+    "finalHp": {
+      "count": 40,
+      "min": 5,
+      "p25": 5,
+      "median": 5,
+      "p75": 5,
+      "p90": 5,
+      "max": 5
+    },
+    "finalBombs": {
+      "count": 40,
+      "min": 5,
+      "p25": 5,
+      "median": 5,
+      "p75": 5,
+      "p90": 5,
+      "max": 5
+    },
+    "coreHits": {
+      "count": 40,
+      "min": 2071,
+      "p25": 2637,
+      "median": 2879,
+      "p75": 3116,
+      "p90": 3292,
+      "max": 3511
+    },
+    "xpPickups": {
+      "count": 40,
+      "min": 6290,
+      "p25": 7490,
+      "median": 8260,
+      "p75": 8810,
+      "p90": 9350,
+      "max": 10950
+    },
+    "reservations": {
+      "completed": 30461,
+      "canceled": 2011,
+      "canceledWhileAlive": 784,
+      "canceledOnDeath": 1227,
+      "resetCleanup": 165,
+      "expiredWithPayload": 7618,
+      "rejectedPromisedEmission": 0,
+      "canceledBullets": 24600,
+      "canceledHazards": 61
+    },
+    "early": {
+      "from": 0,
+      "until": 90,
+      "sampleCount": 320,
+      "includes": "Routine combat and light elites; excludes timestamps inside the five major boss lifetimes.",
+      "enemyBullets": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 5,
+        "p90": 11,
+        "max": 22
+      },
+      "ordinaryAlive": {
+        "count": 320,
+        "min": 0,
+        "p25": 3,
+        "median": 4,
+        "p75": 7,
+        "p90": 10,
+        "max": 17
+      },
+      "ordinaryKilled": 2617,
+      "exactWindowKilled": 2617,
+      "observedAttack": 512,
+      "firstAttackRatio": 0.196,
+      "released": 517,
+      "releaseRatio": 0.198,
+      "visibleTtkWindowMedians": {
+        "count": 316,
+        "min": 0.133,
+        "p25": 1.183,
+        "median": 2,
+        "p75": 4.633,
+        "p90": 7.383,
+        "max": 16.067
+      },
+      "admissionTimeoutWindowRate": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 0,
+        "p90": 0.4,
+        "max": 0.75
+      },
+      "reservationCancelWindowRate": {
+        "count": 320,
+        "min": 0,
+        "p25": 0,
+        "median": 0,
+        "p75": 0,
+        "p90": 0.333,
+        "max": 1
+      }
+    },
+    "late": {
+      "from": 300,
+      "until": 360,
+      "sampleCount": 327,
+      "includes": "Routine combat and light elites; excludes timestamps inside the five major boss lifetimes.",
+      "enemyBullets": {
+        "count": 327,
+        "min": 0,
+        "p25": 7,
+        "median": 14,
+        "p75": 28,
+        "p90": 44,
+        "max": 76
+      },
+      "ordinaryAlive": {
+        "count": 327,
+        "min": 0,
+        "p25": 26,
+        "median": 29,
+        "p75": 32,
+        "p90": 59,
+        "max": 100
+      },
+      "ordinaryKilled": 7555,
+      "exactWindowKilled": 7555,
+      "observedAttack": 1639,
+      "firstAttackRatio": 0.217,
+      "released": 1679,
+      "releaseRatio": 0.222,
+      "visibleTtkWindowMedians": {
+        "count": 327,
+        "min": 0.483,
+        "p25": 3.6,
+        "median": 5.167,
+        "p75": 6.717,
+        "p90": 9.283,
+        "max": 35.333
+      },
+      "admissionTimeoutWindowRate": {
+        "count": 327,
+        "min": 0,
+        "p25": 0.238,
+        "median": 0.476,
+        "p75": 0.647,
+        "p90": 0.769,
+        "max": 0.92
+      },
+      "reservationCancelWindowRate": {
+        "count": 327,
+        "min": 0,
+        "p25": 0,
+        "median": 0.045,
+        "p75": 0.111,
+        "p90": 0.182,
+        "max": 0.571
+      }
+    },
+    "bosses": [
+      {
+        "id": "s1:echo",
+        "name": "ECHO",
+        "ttk": {
+          "count": 40,
+          "min": 52.867,
+          "p25": 60.583,
+          "median": 67.5,
+          "p75": 71.933,
+          "p90": 74.533,
+          "max": 80.933
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 4,
+          "p25": 4,
+          "median": 4,
+          "p75": 5,
+          "p90": 5,
+          "max": 5
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 4,
+          "p25": 4,
+          "median": 4,
+          "p75": 5,
+          "p90": 5,
+          "max": 5
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 26.689,
+          "p25": 29.569,
+          "median": 31.695,
+          "p75": 35.614,
+          "p90": 37.917,
+          "max": 40.857
+        },
+        "longest": [
+          {
+            "seed": 60007,
+            "profile": "balanced",
+            "seconds": 80.933,
+            "level": 4,
+            "totalRanks": 4,
+            "moduleKinds": 1,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 4,
+            "actualBossDamage": 2160,
+            "dps": 26.689
+          },
+          {
+            "seed": 60008,
+            "profile": "mobility",
+            "seconds": 80.3,
+            "level": 5,
+            "totalRanks": 5,
+            "moduleKinds": 2,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 2160,
+            "dps": 26.899
+          },
+          {
+            "seed": 60005,
+            "profile": "mobility",
+            "seconds": 79.1,
+            "level": 5,
+            "totalRanks": 5,
+            "moduleKinds": 1,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 2160,
+            "dps": 27.307
+          }
+        ]
+      },
+      {
+        "id": "s2:palisade",
+        "name": "PALISADE",
+        "ttk": {
+          "count": 40,
+          "min": 54.95,
+          "p25": 77.783,
+          "median": 90.817,
+          "p75": 98.233,
+          "p90": 104.783,
+          "max": 118.867
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 6,
+          "p25": 7,
+          "median": 8,
+          "p75": 8,
+          "p90": 8,
+          "max": 8
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 7,
+          "p25": 9,
+          "median": 9,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 40.886,
+          "p25": 49.432,
+          "median": 53.455,
+          "p75": 62.162,
+          "p90": 67.453,
+          "max": 88.444
+        },
+        "longest": [
+          {
+            "seed": 60010,
+            "profile": "mobility",
+            "seconds": 118.867,
+            "level": 7,
+            "totalRanks": 9,
+            "moduleKinds": 3,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 4860,
+            "dps": 40.886
+          },
+          {
+            "seed": 60001,
+            "profile": "drone",
+            "seconds": 117.933,
+            "level": 7,
+            "totalRanks": 8,
+            "moduleKinds": 3,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 4860,
+            "dps": 41.21
+          },
+          {
+            "seed": 60006,
+            "profile": "mobility",
+            "seconds": 112.083,
+            "level": 7,
+            "totalRanks": 9,
+            "moduleKinds": 1,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 4860,
+            "dps": 43.361
+          }
+        ]
+      },
+      {
+        "id": "s1:mafuyu",
+        "name": "MAFUYU",
+        "ttk": {
+          "count": 40,
+          "min": 93,
+          "p25": 107.117,
+          "median": 117.6,
+          "p75": 122.367,
+          "p90": 128.017,
+          "max": 129.933
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 9,
+          "p25": 9,
+          "median": 10,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 11,
+          "p25": 12,
+          "median": 13,
+          "p75": 14,
+          "p90": 14,
+          "max": 16
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 93.51,
+          "p25": 98.58,
+          "median": 102.937,
+          "p75": 113.34,
+          "p90": 117.733,
+          "max": 130.645
+        },
+        "longest": [
+          {
+            "seed": 60003,
+            "profile": "mobility",
+            "seconds": 129.933,
+            "level": 9,
+            "totalRanks": 12,
+            "moduleKinds": 3,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 12150,
+            "dps": 93.51
+          },
+          {
+            "seed": 60005,
+            "profile": "mobility",
+            "seconds": 129.6,
+            "level": 10,
+            "totalRanks": 14,
+            "moduleKinds": 4,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 12150,
+            "dps": 93.75
+          },
+          {
+            "seed": 60008,
+            "profile": "mobility",
+            "seconds": 129.317,
+            "level": 9,
+            "totalRanks": 13,
+            "moduleKinds": 2,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 12150,
+            "dps": 93.955
+          }
+        ]
+      },
+      {
+        "id": "s2:reprise",
+        "name": "REPRISE",
+        "ttk": {
+          "count": 40,
+          "min": 64.55,
+          "p25": 86.883,
+          "median": 92.517,
+          "p75": 104.6,
+          "p90": 110.617,
+          "max": 113.4
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 10,
+          "p25": 10,
+          "median": 10,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 15,
+          "p25": 16,
+          "median": 17,
+          "p75": 18,
+          "p90": 19,
+          "max": 20
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 77.381,
+          "p25": 83.492,
+          "median": 93.269,
+          "p75": 99.679,
+          "p90": 107.077,
+          "max": 135.941
+        },
+        "longest": [
+          {
+            "seed": 60009,
+            "profile": "main",
+            "seconds": 113.4,
+            "level": 10,
+            "totalRanks": 16,
+            "moduleKinds": 3,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 8775,
+            "dps": 77.381
+          },
+          {
+            "seed": 60004,
+            "profile": "mobility",
+            "seconds": 110.933,
+            "level": 10,
+            "totalRanks": 18,
+            "moduleKinds": 6,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 8775,
+            "dps": 79.102
+          },
+          {
+            "seed": 60002,
+            "profile": "balanced",
+            "seconds": 110.8,
+            "level": 10,
+            "totalRanks": 16,
+            "moduleKinds": 3,
+            "evolutions": 0,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 8775,
+            "dps": 79.197
+          }
+        ]
+      },
+      {
+        "id": "s2:final",
+        "name": "LACUNA",
+        "ttk": {
+          "count": 40,
+          "min": 150.467,
+          "p25": 189,
+          "median": 196.567,
+          "p75": 215.083,
+          "p90": 229.417,
+          "max": 245.867
+        },
+        "entryLevel": {
+          "count": 40,
+          "min": 10,
+          "p25": 10,
+          "median": 10,
+          "p75": 10,
+          "p90": 10,
+          "max": 10
+        },
+        "entryTotalRanks": {
+          "count": 40,
+          "min": 23,
+          "p25": 25,
+          "median": 25,
+          "p75": 26,
+          "p90": 28,
+          "max": 30
+        },
+        "actualDps": {
+          "count": 40,
+          "min": 109.815,
+          "p25": 125.213,
+          "median": 136.032,
+          "p75": 142.13,
+          "p90": 158.746,
+          "max": 179.441
+        },
+        "longest": [
+          {
+            "seed": 60004,
+            "profile": "mobility",
+            "seconds": 245.867,
+            "level": 10,
+            "totalRanks": 26,
+            "moduleKinds": 7,
+            "evolutions": 2,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 27000,
+            "dps": 109.815
+          },
+          {
+            "seed": 60009,
+            "profile": "drone",
+            "seconds": 241.25,
+            "level": 10,
+            "totalRanks": 25,
+            "moduleKinds": 6,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 27000,
+            "dps": 111.917
+          },
+          {
+            "seed": 60007,
+            "profile": "drone",
+            "seconds": 231.533,
+            "level": 10,
+            "totalRanks": 28,
+            "moduleKinds": 7,
+            "evolutions": 1,
+            "hp": 5,
+            "bombs": 5,
+            "actualBossDamage": 27000,
+            "dps": 116.614
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "source": "normal",
+        "damage": 2955762.907,
+        "share": 0.607
+      },
+      {
+        "source": "beam",
+        "damage": 788999.046,
+        "share": 0.162
+      },
+      {
+        "source": "drone",
+        "damage": 516998.416,
+        "share": 0.106
+      },
+      {
+        "source": "device",
+        "damage": 127950.319,
+        "share": 0.026
+      },
+      {
+        "source": "module",
+        "damage": 90155.619,
+        "share": 0.019
+      },
+      {
+        "source": "special",
+        "damage": 81128.412,
+        "share": 0.017
+      },
+      {
+        "source": "burst",
+        "damage": 66787.988,
+        "share": 0.014
+      },
+      {
+        "source": "droneSpotlight",
+        "damage": 52048.999,
+        "share": 0.011
+      },
+      {
+        "source": "anchorStars",
+        "damage": 41044.762,
+        "share": 0.008
+      },
+      {
+        "source": "blade",
+        "damage": 35189.198,
+        "share": 0.007
+      },
+      {
+        "source": "pulseChamber",
+        "damage": 23626.438,
+        "share": 0.005
+      },
+      {
+        "source": "prism",
+        "damage": 23476.317,
+        "share": 0.005
+      },
+      {
+        "source": "heavy",
+        "damage": 22662.357,
+        "share": 0.005
+      },
+      {
+        "source": "beamCircuit",
+        "damage": 12168.469,
+        "share": 0.002
+      },
+      {
+        "source": "droneNotes",
+        "damage": 9298.616,
+        "share": 0.002
+      },
+      {
+        "source": "crescentMagazine",
+        "damage": 8589.57,
+        "share": 0.002
+      },
+      {
+        "source": "dronePlectrum",
+        "damage": 5070.905,
+        "share": 0.001
+      },
+      {
+        "source": "droneConduit",
+        "damage": 3901.211,
+        "share": 0.001
+      },
+      {
+        "source": "chain",
+        "damage": 2874.743,
+        "share": 0.001
+      },
+      {
+        "source": "huntingReturn",
+        "damage": 2854.575,
+        "share": 0.001
+      },
+      {
+        "source": "trail",
+        "damage": 1056.027,
+        "share": 0
+      },
+      {
+        "source": "echo",
+        "damage": 318.36,
+        "share": 0
+      },
+      {
+        "source": "dashLane",
+        "damage": 12.4,
+        "share": 0
+      }
+    ],
+    "profiles": [
+      {
+        "profile": "main",
+        "seconds": {
+          "count": 10,
+          "min": 812.7,
+          "p25": 911.75,
+          "median": 932.517,
+          "p75": 937.55,
+          "p90": 1041.083,
+          "max": 1041.183
+        },
+        "choices": {
+          "count": 10,
+          "min": 24,
+          "p25": 26,
+          "median": 27,
+          "p75": 28,
+          "p90": 29,
+          "max": 30
+        }
+      },
+      {
+        "profile": "drone",
+        "seconds": {
+          "count": 10,
+          "min": 977.183,
+          "p25": 1004.7,
+          "median": 1068.35,
+          "p75": 1076.55,
+          "p90": 1088.233,
+          "max": 1120.417
+        },
+        "choices": {
+          "count": 10,
+          "min": 25,
+          "p25": 28,
+          "median": 28,
+          "p75": 29,
+          "p90": 29,
+          "max": 33
+        }
+      },
+      {
+        "profile": "mobility",
+        "seconds": {
+          "count": 10,
+          "min": 973.7,
+          "p25": 1035.85,
+          "median": 1055.35,
+          "p75": 1067.683,
+          "p90": 1083.933,
+          "max": 1149.567
+        },
+        "choices": {
+          "count": 10,
+          "min": 24,
+          "p25": 25,
+          "median": 26,
+          "p75": 26,
+          "p90": 28,
+          "max": 28
+        }
+      },
+      {
+        "profile": "balanced",
+        "seconds": {
+          "count": 10,
+          "min": 959.183,
+          "p25": 970.217,
+          "median": 1002.15,
+          "p75": 1003.1,
+          "p90": 1013.183,
+          "max": 1044.933
+        },
+        "choices": {
+          "count": 10,
+          "min": 25,
+          "p25": 26,
+          "median": 27,
+          "p75": 28,
+          "p90": 29,
+          "max": 30
+        }
+      }
+    ]
+  },
+  "collection": [
+    {
+      "policy": "low",
+      "mode": "DPS",
+      "seed": 60001,
+      "seconds": 741.05,
+      "xpPickups": 5810,
+      "choices": 24,
+      "entryLevels": [
+        4,
+        7,
+        9,
+        10,
+        10
+      ],
+      "entryTotalRanks": [
+        4,
+        9,
+        13,
+        16,
+        23
+      ],
+      "moduleKinds": 9,
+      "evolutions": 1,
+      "archive": "balance-v6-collection-low-dps.json.gz"
+    },
+    {
+      "policy": "medium",
+      "mode": "DPS",
+      "seed": 60001,
+      "seconds": 746.883,
+      "xpPickups": 5930,
+      "choices": 24,
+      "entryLevels": [
+        4,
+        7,
+        9,
+        10,
+        10
+      ],
+      "entryTotalRanks": [
+        4,
+        8,
+        11,
+        15,
+        22
+      ],
+      "moduleKinds": 9,
+      "evolutions": 2,
+      "archive": "balance-v6-collection-medium-dps.json.gz"
+    },
+    {
+      "policy": "high",
+      "mode": "DPS",
+      "seed": 60001,
+      "seconds": 751.533,
+      "xpPickups": 6070,
+      "choices": 24,
+      "entryLevels": [
+        4,
+        7,
+        9,
+        10,
+        10
+      ],
+      "entryTotalRanks": [
+        4,
+        8,
+        11,
+        15,
+        22
+      ],
+      "moduleKinds": 9,
+      "evolutions": 2,
+      "archive": "balance-v6-collection-high-dps.json.gz"
+    }
+  ],
+  "xpAudit": {
+    "version": "6.0.0",
+    "method": "Unmodified frozen balance input and choice controller with additive wrappers around production gainXp and xpLoss events; normal HP, no forced equipment or XP.",
+    "balanceScriptSha256": "304b19b320302c239b9c84ff7b581b26418d91700e9ff742547e54695db9a1c8",
+    "auditScriptSha256": "4757a87db1dc11b1c32b320aedda0ef4ac1e61eb76a94e86d496ebd886ba14e3",
+    "cases": [
+      {
+        "seed": 60007,
+        "profile": "balanced",
+        "result": "complete",
+        "seconds": 798.817,
+        "choices": 21,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 3
+        },
+        "ordinaryKills": 518,
+        "injuries": 7,
+        "xpPickups": 5180,
+        "earnedXp": 6950,
+        "xpLost": 1054,
+        "unspentResonanceXp": 126,
+        "earnedResonanceRanks": 3,
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 49.55
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 62.467
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 94.25
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 74.583
+          },
+          {
+            "id": "s2:final",
+            "seconds": 149.267
+          }
+        ]
+      },
+      {
+        "seed": 60005,
+        "profile": "mobility",
+        "result": "complete",
+        "seconds": 866.667,
+        "choices": 22,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 4
+        },
+        "ordinaryKills": 524,
+        "injuries": 5,
+        "xpPickups": 5240,
+        "earnedXp": 6910,
+        "xpLost": 540,
+        "unspentResonanceXp": 0,
+        "earnedResonanceRanks": 4,
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 47.367
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 77.767
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 111.867
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 80.417
+          },
+          {
+            "id": "s2:final",
+            "seconds": 169.8
+          }
+        ]
+      },
+      {
+        "seed": 60001,
+        "profile": "main",
+        "result": "complete",
+        "seconds": 707.483,
+        "choices": 24,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 6
+        },
+        "ordinaryKills": 598,
+        "injuries": 1,
+        "xpPickups": 5980,
+        "earnedXp": 7780,
+        "xpLost": 100,
+        "unspentResonanceXp": 110,
+        "earnedResonanceRanks": 6,
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 34.067
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 50.483
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 73.25
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 58.367
+          },
+          {
+            "id": "s2:final",
+            "seconds": 122.6
+          }
+        ]
+      },
+      {
+        "seed": 60009,
+        "profile": "balanced",
+        "result": "complete",
+        "seconds": 766.183,
+        "choices": 24,
+        "choiceSources": {
+          "level": 9,
+          "elite": 5,
+          "boss": 4,
+          "resonance": 6
+        },
+        "ordinaryKills": 600,
+        "injuries": 2,
+        "xpPickups": 6000,
+        "earnedXp": 7700,
+        "xpLost": 77,
+        "unspentResonanceXp": 53,
+        "earnedResonanceRanks": 6,
+        "bossTtk": [
+          {
+            "id": "s1:echo",
+            "seconds": 41.35
+          },
+          {
+            "id": "s2:palisade",
+            "seconds": 66.667
+          },
+          {
+            "id": "s1:mafuyu",
+            "seconds": 82.933
+          },
+          {
+            "id": "s2:reprise",
+            "seconds": 65.517
+          },
+          {
+            "id": "s2:final",
+            "seconds": 141.033
+          }
+        ]
+      }
+    ],
+    "sourceHashes": {
+      "src/game/simulation.ts": "b6a8c785ad503e9f59ffcabbfdf5de293c9e3495338244d16f7a044596dac090",
+      "src/game/config.ts": "4ab368798c2049c73f05dfda695e156990c44aa5e829b88726b20bccf056da49",
+      "src/game/settings.ts": "08bf787029169b72b549c654cbe0bef0690a9e3e435a69d4fd04f6d9299f3a37",
+      "src/game/difficulty.ts": "2ca910ecf2d33b56fc903ff5887b7179e02831b8d23445eabea8f6f5d7525bdd",
+      "src/game/miniboss-ai.ts": "15ead87e732ea8408ef2e315aabb08e3acffa7d9bd61cb29d31ad2ac5ddbe501",
+      "src/game/math.ts": "8333f8273e05c0ca7c4e2e9a102e104650178ab1187a3802ce298799090e1bef",
+      "src/game/boss-actions.ts": "04b82788fb267e5a6ee5ace62da9c1e2a8427290a7e43ace6ca0a4ca3d525926",
+      "src/game/pool.ts": "235f0b9fbf484d4bac3352af0dd815e36eed1770855c42c20ff7c73b36a46b0c",
+      "src/game/attack-budget.ts": "6e79f288209561c7c7cd4b4a4f034f95b728b81681e64e42912e33c2918652d8",
+      "src/game/module-combat.ts": "9fe036117a3aa92b41dff8a242851b42e6a2726b0992fc3a0894849d3ee5e72f",
+      "src/game/upgrades.ts": "b964b8d3da3ef6a23ed3c85576a486256fd3359222295af88a74055e8300a972",
+      "src/game/elite-ai.ts": "5d2074770656dd73fe40c3b7f5a29ab6629c6f69429a3ba7854983f7b87607aa",
+      "src/game/season2-ai.ts": "59fe858313ef6c09bff246e89a6ab4eb1e4c3f06092c17cfd7c39a3a47833d8b",
+      "src/game/enemy-ai.ts": "495e785d28e1e5d81d289c1f7644d82ff45f48e7dd50475e3cde64a968f943b4",
+      "src/game/threat-director.ts": "9ccd9416466a700de9d796289e96bba12eeab9a78610c5f8f1991c49798087ce",
+      "src/game/projectile-motion.ts": "0d74aba247cd13cb8c9ae746ee461223702c23eb59b1c93a1158a9f442e42aa6",
+      "src/game/campaign.ts": "7c882c0d4d8a433c976dada87e6f33cb0e1686cc307b4e626c242f8165906d19",
+      "src/game/spellcards.ts": "cdb4d62c9b3aa2a6e95860ee839c00aeafc1ec089184ac45853a7e955608aaba",
+      "src/game/fairness.test.ts": "51d889319a89f1a6dd83a713cda0ea2701eab1a8eb211343c400ded6e7659211"
+    },
+    "changedSources": [],
+    "status": "complete"
+  }
+}

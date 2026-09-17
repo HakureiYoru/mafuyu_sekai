@@ -26,6 +26,7 @@ describe('v5 continuous run boundary regressions', () => {
   });
   it('clears live units before settling rewards, stores medicine, and preserves unused coolant', () => {
     const sim = quiet(), w = sim.state, p = w.player;
+    w.campaign.spawnedElites.push('elite:1:0'); w.campaign.defeatedElites.push('elite:1:0');
     w.waveTime = 90 - STEP; sim.step(idle);
     for (let i = 0; i < 96; i++) sim.step(idle);
     const boss = w.enemies.find(e => e.type === 'miniboss')!;

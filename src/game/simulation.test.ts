@@ -21,6 +21,11 @@ function finishChoices(sim: GameSimulation) {
     expect(sim.chooseUpgrade(choice, sim.state.build.offerId ?? undefined)).toBe(true);
   }
 }
+function defeatLightElite(sim: GameSimulation) {
+  for (let tick = 0; tick < 100 && !sim.state.enemies.some(enemy => enemy.role === 'elite'); tick++) sim.step(idle());
+  const elite = sim.state.enemies.find(enemy => enemy.role === 'elite');
+  expect(elite).toBeDefined(); sim.damageEnemy(elite!, 1e9); finishChoices(sim);
+}
 function quiet(seed = 12345): GameSimulation {
   const sim = new GameSimulation(seed);
   sim.state.spawnTimer = 1e9;
@@ -291,11 +296,12 @@ describe('progression, drops, and lifecycle', () => {
   });
   it('defers mini-bomb rewards at bullet capacity and eventually emits every stored burst', () => {
     const sim = quiet(), p = sim.state.player;
-    for (let i = 0; i < BALANCE.limits.bullets - 6; i++) sim.state.bullets.push(bullet({ id: 30000 + i, owner: 'enemy', x: 100, y: 100, vx: 0, speed: 0, life: Infinity }));
+    for (let i = 0; i < BALANCE.limits.playerBullets - 6; i++) sim.state.bullets.push(bullet({ id: 30000 + i, owner: 'player', x: 100, y: 100, vx: 0, speed: 0, life: Infinity }));
     sim.state.pickups.push({ id: 20005, type: 'miniBomb', value: 5, age: 0, x: p.x, y: p.y });
     expect(sim.step(idle()).filter(e => e.type === 'pickup')).toHaveLength(0);
     expect(sim.state.pickups[0].value).toBe(5);
-    sim.step(idle({ bomb: true }));
+    for (const bullet of sim.state.bullets) bullet.life = 0;
+    sim.step(idle());
     expect(sim.state.bullets.filter(b => b.kind === 'burst')).toHaveLength(100);
     expect(sim.state.pickups[0].value).toBe(1);
     sim.step(idle());
@@ -327,7 +333,7 @@ describe('progression, drops, and lifecycle', () => {
     const sim = quiet();
     for (let index = 0; index < CAMPAIGN_STAGES.length; index++) {
       sim.state.waveTime = CAMPAIGN_STAGES[index].duration - STEP;
-      sim.step(idle()); ticks(sim, 120);
+      sim.step(idle()); defeatLightElite(sim); ticks(sim, 120);
       const encounter = sim.state.enemies.find(e => e.role === 'miniboss' || e.role === 'boss')!;
       expect(encounter.encounterId).toBe(ENCOUNTERS[index]);
       if (encounter.type === 'boss') {
@@ -430,10 +436,11 @@ describe('progression, drops, and lifecycle', () => {
     const sim = quiet(); sim.reset('endless'); sim.state.player.invincible = 1e9;
     for (let index = 0; index < 5; index++) {
       sim.state.wave = (index + 1) * 10; sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-      sim.step(idle()); ticks(sim, 121);
+      sim.step(idle()); defeatLightElite(sim); ticks(sim, 121); finishChoices(sim);
       const enemy = sim.state.enemies.find(e => e.role === 'boss' || e.role === 'miniboss')!;
       expect(enemy.encounterId).toBe(ENCOUNTERS[index]);
       if (enemy.type === 'boss') defeatFinal(sim); else sim.damageEnemy(enemy, 1e9);
+      finishChoices(sim);
       expect(sim.state).toMatchObject({ wave: (index + 1) * 10 + 1, bossStage: false, pendingWave: 0, mode: 'endless', status: 'playing' });
     }
   });
@@ -664,6 +671,7 @@ describe('long-session stability', () => {
     let maxEnemies = 0, maxBullets = 0, maxPickups = 0, maxBeams = 0, maxHazards = 0, beamCasts = 0, droneShots = 0;
     let companionsStable = true, beamsStable = true, hazardsStable = true;
     for (let tick = 0; tick < 30 * 60 * 60; tick++) {
+      finishChoices(sim);
       const t = tick * STEP, boss = sim.state.enemies.find(e => e.type === 'boss'), target = boss ?? sim.state.enemies[0];
       // Engage the Boss inside its visible attack range; an endless world-size kite would never exercise hazards.
       const moveX = boss ? boss.x + Math.cos(t * 0.3) * 600 - p.x : Math.cos(t * 0.16);
@@ -689,7 +697,7 @@ describe('long-session stability', () => {
     expect(sim.state.enemies.every(e => Number.isFinite(e.x) && Number.isFinite(e.y) && e.hp > 0)).toBe(true);
     expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
     expect(companionsStable).toBe(true); expect(sim.state.companions).toHaveLength(3);
-    expect(beamsStable).toBe(true); expect(maxBeams).toBeLessThanOrEqual(1);
+    expect(beamsStable).toBe(true); expect(maxBeams).toBeLessThanOrEqual(64);
     expect(hazardsStable).toBe(true); expect(maxHazards).toBeLessThanOrEqual(BALANCE.ai.hazards); expect(maxHazards).toBeGreaterThan(0);
     expect(beamCasts).toBeGreaterThan(0); expect(droneShots).toBeGreaterThan(0);
   }, 120000);

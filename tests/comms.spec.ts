@@ -1,3 +1,4 @@
+import { defeatGateElite } from './campaign-helpers';
 import { expect, test, type Page } from '@playwright/test';
 import type { DebugControls } from '../src/game/runtime';
 
@@ -53,8 +54,8 @@ test('six viewport sizes keep both characters and bubbles outside the playable c
     expect(host.width / host.height).toBeCloseTo(16 / 9, 3);
     await expect(page.getByTestId('comms-emu')).toBeVisible();
     await expect(page.getByTestId('comms-mafuyu')).toBeVisible();
-    await expect(page.getByLabel('六个模块栏位')).toBeVisible();
-    const slots = (await page.getByLabel('六个模块栏位').boundingBox())!;
+    await expect(page.getByLabel('已装配模块')).toBeVisible();
+    const slots = (await page.getByLabel('已装配模块').boundingBox())!;
     expect(slots.y + slots.height).toBeLessThanOrEqual(height + 1);
     const parts = [page.getByTestId('comms-sprite-emu'), page.getByTestId('comms-sprite-mafuyu'), page.getByTestId('comms-current')];
     if (await root.getAttribute('data-layout') === 'sides') parts.push(page.getByTestId('comms-previous'));
@@ -175,7 +176,7 @@ test('collapsed comms leave module slots available and reduced motion keeps full
   expect(await page.locator('.comms-figure').evaluateAll(elements => elements.flatMap(element => element.getAnimations()).filter(animation => animation.playState === 'running').length)).toBe(0);
   await page.getByRole('button', { name: '收起战斗通讯', exact: true }).click();
   await expect(page.getByTestId('comms-root')).toHaveCount(0);
-  await expect(page.getByLabel('六个模块栏位')).toBeVisible();
+  await expect(page.getByLabel('已装配模块')).toBeVisible();
   await page.getByRole('button', { name: '展开战斗通讯', exact: true }).click();
   await expect(page.getByTestId('comms-root')).toBeVisible();
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('playing');
@@ -202,6 +203,7 @@ test('missing chibi assets fall back to existing portraits without a render erro
 test('a real boss arrival replaces the opening and a fatal hit immediately keeps the full result pair', async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('miniboss-arrival'));
+  await defeatGateElite(page);
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().comms?.text)).toContain('ECHO');
   await expect(page.getByTestId('comms-previous')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/v5.1-comms-boss.png' });

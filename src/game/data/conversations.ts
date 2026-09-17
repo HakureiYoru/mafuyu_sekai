@@ -4,12 +4,24 @@ export interface ConversationLine {
   speaker: 'EMU' | 'MAFUYU'; text: string; mood: CommsMood; gesture: CommsGesture;
 }
 export interface Conversation {
-  id: string; category: 'opening' | 'wonderhoy' | 'damage' | 'heal' | 'upgrade' | 'echo' | 'palisade' | 'mafuyu' | 'reprise' | 'lacuna' | 'failure' | 'complete' | 'endless';
+  id: string; category: 'opening' | 'wonderhoy' | 'damage' | 'heal' | 'upgrade' | 'echo' | 'palisade' | 'mafuyu' | 'reprise' | 'lacuna' | 'failure' | 'complete' | 'endless' | 'elite' | 'armBreak' | 'evolution';
   maxed?: boolean; lines: readonly ConversationLine[];
 }
 
 /** Original fan-game dialogue; the dark persona is this game's exaggerated interpretation. */
 export const CONVERSATIONS: readonly Conversation[] = [
+  { id: 'elite-1', category: 'elite', lines: [
+    { speaker: 'EMU', text: '哇！它冲过来啦！', mood: 'surprised', gesture: 'flinch' },
+    { speaker: 'MAFUYU', text: '躲过这一冲……再敢出声试试。', mood: 'shadow', gesture: 'none' },
+  ] },
+  { id: 'arm-break-1', category: 'armBreak', lines: [
+    { speaker: 'EMU', text: '拆掉啦！里面亮起来啦！', mood: 'cheer', gesture: 'hop' },
+    { speaker: 'MAFUYU', text: '……手臂没有了，也能碾碎你。', mood: 'rage', gesture: 'tremble' },
+  ] },
+  { id: 'evolution-1', category: 'evolution', lines: [
+    { speaker: 'EMU', text: '变厉害啦！Wonderhoy！！', mood: 'cheer', gesture: 'hop' },
+    { speaker: 'MAFUYU', text: '还不够吵吗……闭嘴！！', mood: 'rage', gesture: 'tremble' },
+  ] },
   { id: 'opening-1', category: 'opening', lines: [
     { speaker: 'EMU', text: '学姐！Wonderhoy！！', mood: 'cheer', gesture: 'hop' },
     { speaker: 'MAFUYU', text: '……这里不需要你的声音。', mood: 'shadow', gesture: 'none' },

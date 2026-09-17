@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FixedClock } from './clock';
-import { THREAT_PACING, ThreatDirector, hasSafeShortPath, isTacticalEnemy, pointInAttackIntent } from './threat-director';
+import { THREAT_PACING, ThreatDirector, hasSafeShortPath, isTacticalEnemy, pointInAttackIntent, threatProfile, spawnPacketSize } from './threat-director';
 import type { AttackIntent, ThreatContext } from './threat-director';
 import type { AreaHazard, Bullet, Enemy, EnemyType, Player } from './types';
 
@@ -43,13 +43,30 @@ describe('bounded pressure and tactical composition', () => {
     expect(d.selectSpawn(['weaver'], alive, 0.95, difficulty, 0, queued)).toBeNull();
     alive[0].hp = 0;
     expect(d.selectSpawn(['weaver'], alive, 0.95, difficulty, 0, queued)).toBe('weaver');
-    expect(d.selectSpawn(['basic', 'weaver'], [], 0.95, difficulty, THREAT_PACING[difficulty].pressure)).toBe('basic');
+    expect(d.selectSpawn(['basic', 'weaver'], [], 0.95, difficulty, threatProfile(difficulty, 360).pressure)).toBe('basic');
   });
   it.each(['normal', 'hard'] as const)('%s still allows limited commitments in a breather', difficulty => {
     const d = new ThreatDirector(), cfg = THREAT_PACING[difficulty];
     for (let i = 0; i < cfg.breatherSlots; i++) expect(d.canCommit(intent({ sourceId: i + 1, kind: 'repair', duration: 3 }),
       context({ difficulty, elapsed: cfg.pressure + i * 0.3 }))).toBe(true);
     expect(d.canCommit(intent({ sourceId: 9, kind: 'repair' }), context({ difficulty, elapsed: cfg.pressure + 0.6 }))).toBe(false);
+  });
+});
+
+describe('v6 fixed density curves', () => {
+  it.each([1, 2, 3])('keeps 25%% tactical members across squads of %i before encounter caps', size => {
+    const d = new ThreatDirector(), pool: EnemyType[] = ['basic', 'dasher', 'sniper', 'shield'];
+    const leaders = Array.from({ length: 120 }, (_, i) => d.selectSpawn(pool, [], (i + 0.5) / 120, 'normal', 0, [], 360, size)!);
+    expect(leaders.filter(isTacticalEnemy).length / (120 * size)).toBe(0.25);
+    expect(new Set(leaders)).toEqual(new Set(pool));
+  });
+  it('raises formation size and tactical slots without reading any player statistics', () => {
+    const progression = [0, 90, 180, 240, 300];
+    expect(progression.map(p => threatProfile('normal', p).tacticalCap)).toEqual([1, 2, 3, 4, 5]);
+    expect(progression.map(p => threatProfile('hard', p).slots)).toEqual([3, 4, 4, 5, 5]);
+    expect(progression.map(p => threatProfile('normal', p).interval)).toEqual([1.1, 0.95, 0.85, 0.75, 0.65]);
+    expect(Array.from({ length: 8 }, (_, index) => spawnPacketSize(300, index))).toEqual([2, 3, 3, 3, 2, 3, 3, 3]);
+    expect(threatProfile('hard', 360).interval).toBeCloseTo(0.65 * 0.78);
   });
 });
 

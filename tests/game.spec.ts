@@ -1,3 +1,4 @@
+import { defeatGateElite } from './campaign-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import type { DebugControls } from '../src/game/runtime';
 
@@ -207,7 +208,7 @@ test('difficulty persists, cannot change during a run, and keeps separate high s
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '结束本局，返回主菜单' }).click();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mafuyu-sekai:profile:v2')!).bestScores.v5.hard.story)).toBe(4242);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mafuyu-sekai:profile:v3')!).bestScores.v6.hard.story)).toBe(4242);
   expect(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:best:v3'))).toBeNull();
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('complete'));
   await page.getByRole('button', { name: /继续.*无尽|无尽.*继续|进入无尽/ }).click();
@@ -226,7 +227,7 @@ test('hard cards use their own HP and beam warning instead of old boss phase val
     const h = s.hazards.find(h => h.kind === 'beam')!;
     return { hp: boss.maxHp, width: h.width, duration: h.warningDuration, remaining: h.warning, difficulty: s.difficulty };
   });
-  expect(values).toMatchObject({ hp: 1148, width: 52, duration: 0.8, difficulty: 'hard' });
+  expect(values).toMatchObject({ hp: 2025, width: 52, duration: 0.8, difficulty: 'hard' });
   expect(values.remaining).toBeGreaterThan(0); expect(values.remaining).toBeLessThanOrEqual(0.8);
 });
 
@@ -235,12 +236,13 @@ test('ECHO freezes progression while limited reinforcements and locked lasers co
   await openGame(page);
   await page.getByRole('button', { name: '困难', exact: true }).click();
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('miniboss-arrival'));
+  await defeatGateElite(page);
   await expect(page.getByRole('progressbar', { name: '迷你首领生命' })).toBeVisible();
   const before = await page.evaluate(() => {
     const s = window.__MAFUYU_DEBUG__.state(); const e = s.enemies.find(e => e.type === 'miniboss')!;
     return { waveTime: s.waveTime, maxHp: e.maxHp, bossStage: s.bossStage };
   });
-  expect(before).toMatchObject({ maxHp: 1620, bossStage: false });
+  expect(before).toMatchObject({ maxHp: 2160, bossStage: false });
   await expect(page.getByLabel('迷你首领行动')).toContainText('激光锁定');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.type !== 'miniboss').length)).toBeGreaterThan(1);
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBe(before.waveTime);
@@ -258,6 +260,7 @@ for (const difficulty of ['普通', '困难']) {
       const d = window.__MAFUYU_DEBUG__; d.scenario('miniboss');
       d.advanceStage();
     });
+    await defeatGateElite(page);
     await expect(page.getByText(/击败首领后继续/)).toBeVisible();
     await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.some(enemy => enemy.type === 'miniboss'))).toBe(true);
     await page.waitForTimeout(800);

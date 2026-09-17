@@ -9,6 +9,30 @@ export const THREAT_PACING = {
   pressureShare: 0.75, maxDeferral: 1, routeSpeeds: [300, 180], routeStep: 0.1, routeHorizon: 0.9, retryInterval: 0.2,
 } as const;
 
+export const COMBAT_DENSITY = [
+  { until: 90, interval: 1.10, sizes: [1], tactical: 1, slots: 2, gap: 0.30 },
+  { until: 180, interval: 0.95, sizes: [1, 1, 2], tactical: 2, slots: 3, gap: 0.28 },
+  { until: 240, interval: 0.85, sizes: [1, 2, 2, 2], tactical: 3, slots: 3, gap: 0.25 },
+  { until: 300, interval: 0.75, sizes: [2, 2, 2, 3], tactical: 4, slots: 4, gap: 0.22 },
+  { until: Infinity, interval: 0.65, sizes: [2, 3, 3, 3], tactical: 5, slots: 4, gap: 0.20 },
+] as const;
+
+/** Fixed campaign pressure, never derived from the player's equipment or current damage. */
+export function threatProfile(difficulty: Difficulty = 'normal', progression = 0) {
+  const index = Math.max(0, COMBAT_DENSITY.findIndex(stage => progression < stage.until));
+  const stage = COMBAT_DENSITY[index], hard = difficulty === 'hard';
+  return { index, interval: stage.interval * (hard ? 0.78 : 1), sizes: stage.sizes,
+    tacticalCap: stage.tactical + Number(hard), slots: stage.slots + Number(hard),
+    gap: hard ? [0.22, 0.20, 0.18, 0.16, 0.15][index] : stage.gap,
+    pressure: hard ? (index < 2 ? 12 : index === 2 ? 13 : 14) : (index < 2 ? 10 : index === 2 ? 11 : 12),
+    breather: hard ? (index < 2 ? 3 : index === 2 ? 2.5 : 2) : (index < 2 ? 4 : index === 2 ? 3 : 2.5),
+    breatherSlots: hard ? 2 : 1 };
+}
+export function spawnPacketSize(progression: number, packetIndex: number): number {
+  const sizes = threatProfile('normal', progression).sizes;
+  return sizes[Math.max(0, Math.floor(packetIndex)) % sizes.length];
+}
+
 export interface AttackIntent extends Vec2 {
   sourceId: number; kind: 'dash' | 'line' | 'fan' | 'wall' | 'sample' | 'repair';
   angle: number; range: number; width: number; spread?: number; warning: number; duration: number;
@@ -21,6 +45,7 @@ export interface ThreatContext {
   elapsed: number; difficulty: Difficulty; player: Player; enemies?: readonly Enemy[];
   hazards?: readonly AreaHazard[]; bullets?: readonly Bullet[]; arena?: ArenaRect | null;
   onDeferredCancel?(sourceId: number): void;
+  progression?: number;
 }
 
 const PRESSURE = new Set<EnemyType>(['basic', 'dasher', 'returner', 'carrier']);
@@ -168,11 +193,11 @@ export class ThreatDirector {
     this.deferred.delete(sourceId);
     this.retryAt.delete(sourceId);
   }
-  pace(elapsed: number, difficulty: Difficulty = 'normal'): 'pressure' | 'breather' {
-    const cfg = THREAT_PACING[difficulty], age = Math.max(0, elapsed) % (cfg.pressure + cfg.breather);
+  pace(elapsed: number, difficulty: Difficulty = 'normal', progression = 0): 'pressure' | 'breather' {
+    const cfg = threatProfile(difficulty, progression), age = Math.max(0, elapsed) % (cfg.pressure + cfg.breather);
     return age + 1e-8 < cfg.pressure ? 'pressure' : 'breather';
   }
-  tacticalCap(difficulty: Difficulty = 'normal', progression = 360): number { return THREAT_PACING[difficulty].tacticalCap - Number(progression < 90); }
+  tacticalCap(difficulty: Difficulty = 'normal', progression = 360): number { return threatProfile(difficulty, progression).tacticalCap; }
   /** Call once each simulation tick even when no actor requests a new attack. */
   update(elapsed: number, enemies?: readonly Enemy[]): void {
     for (let i = this.active.length - 1; i >= 0; i--) {
@@ -182,24 +207,26 @@ export class ThreatDirector {
     for (const id of this.deferred.keys()) if (enemies && !enemies.some(e => e.id === id && e.hp > 0)) { this.deferred.delete(id); this.retryAt.delete(id); }
   }
   selectSpawn(pool: readonly EnemyType[], enemies: readonly Pick<Enemy, 'type' | 'hp'>[], roll: number,
-    difficulty: Difficulty = 'normal', elapsed = 0, indicators: readonly Pick<SpawnIndicator, 'type'>[] = [], progression = 360): EnemyType | null {
+    difficulty: Difficulty = 'normal', elapsed = 0, indicators: readonly Pick<SpawnIndicator, 'type'>[] = [], progression = 360, packetSize = 1): EnemyType | null {
     const pressure = pool.filter(type => PRESSURE.has(type));
     const count = enemies.filter(e => e.hp > 0 && TACTICAL.has(e.type)).length + indicators.filter(e => TACTICAL.has(e.type)).length;
-    const tactical = count < this.tacticalCap(difficulty, progression) && this.pace(elapsed, difficulty) === 'pressure' ? pool.filter(type => TACTICAL.has(type)) : [];
+    const tactical = count < this.tacticalCap(difficulty, progression) && this.pace(elapsed, difficulty, progression) === 'pressure' ? pool.filter(type => TACTICAL.has(type)) : [];
     const value = clamp(Number.isFinite(roll) ? roll : 0, 0, 1 - Number.EPSILON);
-    const choosePressure = value < THREAT_PACING.pressureShare;
+    // Only the first member can be tactical: scale that draw to keep the whole squad near 75/25.
+    const pressureShare = 1 - Math.min(0.75, (1 - THREAT_PACING.pressureShare) * Math.max(1, packetSize));
+    const choosePressure = value < pressureShare;
     const choices = choosePressure && pressure.length || !tactical.length ? pressure : tactical;
     const eligible = choices.length ? choices : tactical;
     if (!eligible.length) return null;
-    const fraction = eligible === pressure && tactical.length ? value / THREAT_PACING.pressureShare
-      : eligible === tactical && pressure.length ? (value - THREAT_PACING.pressureShare) / (1 - THREAT_PACING.pressureShare) : value;
+    const fraction = eligible === pressure && tactical.length ? value / pressureShare
+      : eligible === tactical && pressure.length ? (value - pressureShare) / (1 - pressureShare) : value;
     return eligible[Math.min(eligible.length - 1, Math.floor(Math.max(0, fraction) * eligible.length))];
   }
   canCommit(intent: AttackIntent, ctx: ThreatContext): boolean {
     this.update(ctx.elapsed, ctx.enemies);
     if (this.active.some(active => active.sourceId === intent.sourceId)) return false;
-    const cfg = THREAT_PACING[ctx.difficulty];
-    const cap = this.pace(ctx.elapsed, ctx.difficulty) === 'pressure' ? cfg.slots : cfg.breatherSlots;
+    const cfg = threatProfile(ctx.difficulty, ctx.progression ?? 0);
+    const cap = this.pace(ctx.elapsed, ctx.difficulty, ctx.progression ?? 0) === 'pressure' ? cfg.slots : cfg.breatherSlots;
     const due = ctx.elapsed + 1e-8 >= (this.retryAt.get(intent.sourceId) ?? 0)
       && ctx.elapsed + 1e-8 >= this.nextCommit && this.active.length < cap;
     // No pressure-fixture burst may perform dozens of geometric forecasts in one fixed tick.

@@ -1,11 +1,12 @@
 import type { CarryoverSnapshot, Difficulty, SeasonId } from './types';
 
-export const PROFILE_KEY = 'mafuyu-sekai:profile:v2';
+export const PROFILE_KEY = 'mafuyu-sekai:profile:v3';
 export const PROFILE_BACKUP_KEY = `${PROFILE_KEY}:backup`;
-export const PROFILE_VERSION = 2;
+export const PROFILE_VERSION = 3;
 export type ProfileStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export const LEGACY_PROFILE_KEY = 'mafuyu-sekai:profile:v1';
-export const RULESET = 'v5';
+export const RULESET = 'v6';
+export const LEGACY_V5_PROFILE_KEY = 'mafuyu-sekai:profile:v2';
 export type RunMode = 'story' | 'endless';
 export interface CompletionInput {
   runId: string; difficulty: Difficulty; encounterId: string; score: number; source: 'gameplay'; completedAt?: number;
@@ -19,8 +20,12 @@ export interface LegacyHistory {
   clears: number; records: Record<string, LegacyCompletionRecord>;
   bestScores: Record<SeasonId, Record<Difficulty, number>>;
 }
+export interface LegacyV5History {
+  clears: number; records: Record<string, Omit<CompletionRecord, 'ruleset'> & { ruleset: 'v5' }>;
+  bestScores: Record<Difficulty, Record<RunMode, number>>;
+}
 export interface SaveProfile {
-  version: 2; revision: number; clears: Record<string, CompletionRecord>;
+  version: 3; revision: number; clears: Record<string, CompletionRecord>;
   bestScores: Record<typeof RULESET, Record<Difficulty, Record<RunMode, number>>>;
 }
 export type SaveStatus = 'saved' | 'session-only';
@@ -33,7 +38,7 @@ const difficultyId = (value: unknown): value is Difficulty => value === 'normal'
 const clone = <T>(value: T): T => structuredClone(value);
 
 export function emptyProfile(): SaveProfile {
-  return { version: PROFILE_VERSION, revision: 0, clears: {}, bestScores: { v5: { normal: { story: 0, endless: 0 }, hard: { story: 0, endless: 0 } } } };
+  return { version: PROFILE_VERSION, revision: 0, clears: {}, bestScores: { v6: { normal: { story: 0, endless: 0 }, hard: { story: 0, endless: 0 } } } };
 }
 
 // Frozen v4 thresholds: live balance changes cannot invalidate historical records.
@@ -65,6 +70,30 @@ export function validateLegacyProfile(value: unknown): LegacyHistory | null {
   history.clears = Object.keys(history.records).length;
   return history;
 }
+const emptyV5History = (): LegacyV5History => ({ clears: 0, records: {}, bestScores: { normal: { story: 0, endless: 0 }, hard: { story: 0, endless: 0 } } });
+/** Frozen v5 history is never converted into a v6 clear or starting equipment. */
+export function validateLegacyV5Profile(value: unknown): LegacyV5History | null {
+  if (!object(value) || value.version !== 2 || !integer(value.revision, 0) || !object(value.clears)) return null;
+  const history = emptyV5History();
+  const scores = object(value.bestScores) ? value.bestScores.v5 : null;
+  if (object(scores)) for (const difficulty of ['normal', 'hard'] as const) {
+    const modes = scores[difficulty];
+    if (object(modes)) for (const mode of ['story', 'endless'] as const)
+      if (integer(modes[mode], 0)) history.bestScores[difficulty][mode] = modes[mode];
+  }
+  for (const record of Object.values(value.clears)) {
+    if (!object(record) || record.ruleset !== 'v5' || typeof record.runId !== 'string' || !record.runId.length || record.runId.length > 160
+      || !difficultyId(record.difficulty) || record.source !== 'gameplay' || record.encounterId !== 's2:final'
+      || !integer(record.score, 0) || !integer(record.completedAt, 0)) continue;
+    const normalized: LegacyV5History['records'][string] = { runId: record.runId, ruleset: 'v5', difficulty: record.difficulty,
+      encounterId: 's2:final', score: record.score, source: 'gameplay', completedAt: record.completedAt };
+    const key = 'v5:' + record.runId;
+    if (!history.records[key] || JSON.stringify(normalized) < JSON.stringify(history.records[key])) history.records[key] = normalized;
+    history.bestScores[record.difficulty].story = Math.max(history.bestScores[record.difficulty].story, record.score);
+  }
+  history.clears = Object.keys(history.records).length;
+  return history;
+}
 function validCompletion(value: unknown): value is CompletionRecord {
   return object(value) && value.ruleset === RULESET && typeof value.runId === 'string' && value.runId.length > 0 && value.runId.length <= 160
     && difficultyId(value.difficulty) && value.source === 'gameplay' && value.encounterId === 's2:final'
@@ -78,7 +107,7 @@ function derive(profile: SaveProfile): SaveProfile {
   const ordered: Record<string, CompletionRecord> = {};
   for (const key of Object.keys(profile.clears).sort()) {
     const record = profile.clears[key]; ordered[key] = record;
-    profile.bestScores.v5[record.difficulty].story = Math.max(profile.bestScores.v5[record.difficulty].story, record.score);
+    profile.bestScores.v6[record.difficulty].story = Math.max(profile.bestScores.v6[record.difficulty].story, record.score);
   }
   profile.clears = ordered; return profile;
 }
@@ -86,10 +115,10 @@ export function validateProfile(value: unknown): SaveProfile | null {
   if (!object(value) || value.version !== PROFILE_VERSION || !integer(value.revision, 0) || !object(value.clears)) return null;
   const profile = emptyProfile(); profile.revision = value.revision;
   for (const record of Object.values(value.clears)) if (validCompletion(record)) profile.clears[RULESET + ':' + record.runId] = normalizeRecord(record);
-  const scores = object(value.bestScores) ? value.bestScores.v5 : null;
+  const scores = object(value.bestScores) ? value.bestScores.v6 : null;
   if (object(scores)) for (const difficulty of ['normal', 'hard'] as const) {
     const modes = scores[difficulty];
-    if (object(modes)) for (const mode of ['story', 'endless'] as const) if (integer(modes[mode], 0)) profile.bestScores.v5[difficulty][mode] = modes[mode];
+    if (object(modes)) for (const mode of ['story', 'endless'] as const) if (integer(modes[mode], 0)) profile.bestScores.v6[difficulty][mode] = modes[mode];
   }
   return derive(profile);
 }
@@ -97,7 +126,7 @@ export function mergeProfiles(a: SaveProfile, b: SaveProfile): SaveProfile {
   const merged = emptyProfile(); merged.revision = Math.max(a.revision, b.revision);
   for (const source of [a, b]) {
     for (const difficulty of ['normal', 'hard'] as const) for (const mode of ['story', 'endless'] as const)
-      merged.bestScores.v5[difficulty][mode] = Math.max(merged.bestScores.v5[difficulty][mode], source.bestScores.v5[difficulty][mode]);
+      merged.bestScores.v6[difficulty][mode] = Math.max(merged.bestScores.v6[difficulty][mode], source.bestScores.v6[difficulty][mode]);
     for (const [key, record] of Object.entries(source.clears)) {
       const existing = merged.clears[key];
       if (!existing || JSON.stringify(record) < JSON.stringify(existing)) merged.clears[key] = clone(record);
@@ -114,6 +143,7 @@ function fingerprint(profile: SaveProfile): string {
 export class SaveRepository {
   private current = emptyProfile();
   private legacy: LegacyHistory = { clears: 0, records: {}, bestScores: { s1: { normal: 0, hard: 0 }, s2: { normal: 0, hard: 0 } } };
+  private legacyV5: LegacyV5History = emptyV5History();
   private storage: ProfileStorage | null;
   private futureVersion = false;
   private readFailed = false;
@@ -133,6 +163,7 @@ export class SaveRepository {
 
   getProfile(): SaveProfile { return clone(this.current); }
   getLegacyHistory(): LegacyHistory { return clone(this.legacy); }
+  getLegacyV5History(): LegacyV5History { return clone(this.legacyV5); }
 
   load(): SaveProfile {
     this.current = mergeProfiles(this.current, this.readDisk());
@@ -141,7 +172,7 @@ export class SaveRepository {
 
   recordScore(mode: RunMode, difficulty: Difficulty, score: number): SaveResult {
     if ((mode !== 'story' && mode !== 'endless') || !difficultyId(difficulty) || !integer(score, 0)) return this.result(false);
-    const next = this.getProfile(); next.bestScores.v5[difficulty][mode] = Math.max(next.bestScores.v5[difficulty][mode], score);
+    const next = this.getProfile(); next.bestScores.v6[difficulty][mode] = Math.max(next.bestScores.v6[difficulty][mode], score);
     return this.commit(next);
   }
 
@@ -185,6 +216,19 @@ export class SaveRepository {
         for (const season of ['s1', 's2'] as const) for (const difficulty of ['normal', 'hard'] as const)
           this.legacy.bestScores[season][difficulty] = Math.max(this.legacy.bestScores[season][difficulty], history.bestScores[season][difficulty]);
       } catch { /* A corrupt legacy profile must not invalidate current records. */ }
+    }
+    for (const key of [LEGACY_V5_PROFILE_KEY, LEGACY_V5_PROFILE_KEY + ':backup']) {
+      try {
+        const history = validateLegacyV5Profile(JSON.parse(this.storage.getItem(key) ?? 'null'));
+        if (!history) continue;
+        for (const [id, record] of Object.entries(history.records)) {
+          const previous = this.legacyV5.records[id];
+          if (!previous || JSON.stringify(record) < JSON.stringify(previous)) this.legacyV5.records[id] = record;
+        }
+        this.legacyV5.clears = Object.keys(this.legacyV5.records).length;
+        for (const difficulty of ['normal', 'hard'] as const) for (const mode of ['story', 'endless'] as const)
+          this.legacyV5.bestScores[difficulty][mode] = Math.max(this.legacyV5.bestScores[difficulty][mode], history.bestScores[difficulty][mode]);
+      } catch { /* Preserve unreadable legacy data without poisoning the current ruleset. */ }
     }
     for (const difficulty of ['normal', 'hard'] as const) {
       const raw = this.storage.getItem('mafuyu-sekai:best:v3' + (difficulty === 'hard' ? ':hard' : '')), score = raw === null ? 0 : Number(raw);

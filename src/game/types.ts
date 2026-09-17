@@ -2,26 +2,31 @@ import type { SpellBrain } from './spellcards';
 import type { Season2Brain } from './season2-ai';
 import type { CampaignProgress } from './campaign';
 import type { KeyBindings } from './settings';
+import type { BossActionState } from './boss-actions';
+import type { EliteBrain } from './elite-ai';
+import type { ModuleVisual } from './module-combat';
 
 export type Difficulty = 'normal' | 'hard';
 export type SeasonId = 's1' | 's2';
 export interface CarryoverSnapshot { level: number; xp: number; companions: number }
 export interface RunStartOptions { difficulty: Difficulty; seed?: number }
-export type ModuleId = 'piercing' | 'wingShots' | 'precision' | 'shatter' | 'chain' | 'prism' | 'droneHoming' | 'droneBurst' | 'slow' | 'division' | 'intercept' | 'orbitBlade' | 'doubleDash' | 'vent' | 'reserveAmmo' | 'graze' | 'revive' | 'magnet' | 'ricochet' | 'rearSpark' | 'crossOrbit' | 'returnWing' | 'brakeField' | 'dashEcho';
-export type EvolutionId = 'needleArray' | 'spiralBloom' | 'forkNetwork' | 'triangleAssault' | 'huntingReturn' | 'echoTrail';
-export type ModuleRank = 1 | 2;
-export type UpgradeSource = 'level' | 'boss';
+export type ModuleId = 'piercing' | 'wingShots' | 'precision' | 'shatter' | 'chain' | 'prism' | 'droneHoming' | 'droneBurst' | 'slow' | 'division' | 'intercept' | 'orbitBlade' | 'doubleDash' | 'vent' | 'reserveAmmo' | 'graze' | 'revive' | 'magnet' | 'ricochet' | 'rearSpark' | 'crossOrbit' | 'returnWing' | 'brakeField' | 'dashEcho' | 'pulseChamber' | 'anchorStars' | 'crescentMagazine' | 'beamCircuit' | 'droneSpotlight' | 'droneNotes' | 'dronePlectrum' | 'droneConduit' | 'decoyEcho' | 'slipstream' | 'dashLane' | 'counterPulse';
+export type EvolutionId = 'needleArray' | 'spiralBloom' | 'forkNetwork' | 'triangleAssault' | 'huntingReturn' | 'echoTrail' | 'sonicBreak' | 'starCarpet' | 'lunarCut' | 'choralBeam' | 'stageSpotlight' | 'staticGarden' | 'stringEcho' | 'triangleHall' | 'livingSpeaker' | 'headwindFlame' | 'echoHighway' | 'counterCurtain';
+/** Positive whole numbers, with no gameplay rank ceiling. */
+export type ModuleRank = number;
+export type UpgradeSource = 'level' | 'boss' | 'elite' | 'resonance';
 export type ResourceChoiceId = 'reward:heal' | 'reward:bomb' | 'reward:xp';
 export type UpgradeChoiceId = ModuleId | `evolution:${EvolutionId}` | ResourceChoiceId;
-export interface UpgradeReward { id: string; source: UpgradeSource }
+export interface UpgradeReward { id: string; source: UpgradeSource; sequence?: number; count?: number }
 export interface PlayerBuild {
   modules: ModuleId[]; ranks: Partial<Record<ModuleId, ModuleRank>>; evolutions: EvolutionId[];
   levelFloor: number; resonance: number; resonanceXp: number; choices: UpgradeChoiceId[]; choiceIndex: number;
   pendingRewards: UpgradeReward[]; rewardHistory: UpgradeReward[]; rerollsRemaining: number; offerRevision: number; offerId: string | null;
+  rewardWatermarks?: Partial<Record<UpgradeSource, number>>; rewardSequence?: number;
 }
 export interface ArenaRect { x: number; y: number; width: number; height: number }
 export type EnemyType = 'basic' | 'dasher' | 'sniper' | 'sprayer' | 'minelayer' | 'mine' | 'boss' | 'miniboss' | 'shield' | 'weaver' | 'returner' | 'sampler' | 'repairer' | 'carrier' | 'palisade' | 'reprise' | 'arm' | 'node' | 'core';
-export type EnemyRole = 'mob' | 'miniboss' | 'boss' | 'part' | 'hazard';
+export type EnemyRole = 'mob' | 'elite' | 'miniboss' | 'boss' | 'part' | 'hazard';
 export type PickupType = 'xp' | 'hp' | 'bomb' | 'supply' | 'coolant' | 'miniBomb' | 'blackHole' | 'support';
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'upgrade' | 'failed' | 'complete' | 'error';
 export type Quality = 'low' | 'medium' | 'high';
@@ -65,6 +70,8 @@ export interface Enemy extends MovingBody {
   archetypeId?: string; role?: EnemyRole; encounterId?: string;
   spell?: SpellBrain; season2?: Season2Brain; parentId?: number; disabledUntil?: number; slowUntil?: number;
   slowAmount?: number;
+  action?: BossActionState; elite?: EliteBrain; exposedUntil?: number;
+  lootCarrier?: boolean; squadId?: number;
 }
 export interface Bullet extends MovingBody {
   friendlyDamage?: number; friendlyHits?: number;
@@ -77,6 +84,7 @@ export interface Bullet extends MovingBody {
   sourceId?: number; grazed?: boolean; homingTime?: number; turnSpeed?: number; bornTick?: number;
   attackGroup?: 'wall';
   returnOriginX?: number; returnOriginY?: number; returning?: boolean; returnAt?: number; returnHitIds?: Set<number>; moduleId?: ModuleId;
+  attackSource?: 'main' | 'drone' | 'secondary' | 'enemy'; visualId?: string;
 }
 export interface Companion extends MovingBody { id: number; angle: number; shotCooldown: number; targetId: number | null; transit?: number; orbitTargetId?: number | null; transitX?: number; transitY?: number }
 export interface PlayerBeam extends Vec2 { id: number; angle: number; length: number; width: number; life: number; duration: number }
@@ -85,7 +93,7 @@ export interface PlayerArea extends Vec2 {
   warning: number; warningDuration: number; life: number; duration: number; damage: number; slow?: number; hitIds: Set<number>;
 }
 export interface Pickup extends Vec2 { id: number; type: PickupType; value: number; age: number }
-export interface SpawnIndicator extends Vec2 { id: number; type: EnemyType; time: number; duration: number; encounterId?: string }
+export interface SpawnIndicator extends Vec2 { id: number; type: EnemyType; time: number; duration: number; encounterId?: string; eliteStage?: number; eliteVariant?: 0 | 1; lootCarrier?: boolean; squadId?: number }
 export interface WorldState {
   status: 'playing' | 'upgrade' | 'failed' | 'complete'; mode: 'story' | 'endless'; difficulty: Difficulty; elapsed: number; tick: number;
   score: number; kills: number; wave: number; waveTime: number; spawnTimer: number;
@@ -95,6 +103,7 @@ export interface WorldState {
   enemies: Enemy[]; bullets: Bullet[]; pickups: Pickup[]; indicators: SpawnIndicator[];
   companions: Companion[]; beams: PlayerBeam[]; hazards: AreaHazard[];
   playerAreas: PlayerArea[];
+  moduleVisuals?: readonly ModuleVisual[];
   seasonId: SeasonId; campaign: CampaignProgress; build: PlayerBuild; arena: ArenaRect | null;
 }
 export type CombatEventType = 'shot' | 'enemyShot' | 'hit' | 'kill' | 'dash' | 'bomb' | 'damage' | 'pickup' | 'heal' | 'levelup' | 'leveldown' | 'wave' | 'boss' | 'bossLow' | 'complete' | 'failure' | 'spawn' | 'attack' | 'beam' | 'support' | 'upgrade' | 'card' | 'interrupt' | 'shieldBreak' | 'command' | 'module' | 'xpLoss';
@@ -127,7 +136,9 @@ export interface HudSnapshot {
   progression: number; historicalBestScore: number;
   modules: readonly ModuleId[]; moduleRanks: Partial<Record<ModuleId, ModuleRank>>; evolutions: readonly EvolutionId[];
   upgradeChoices: readonly UpgradeChoiceId[]; choiceSource: UpgradeSource | null; upgradeOfferId: string | null; rerollsRemaining: number;
-  resonance: number; dashCharges: number;
+  resonance: number; resonanceXp?: number; dashCharges: number;
+  recentUpgrade?: { id: UpgradeChoiceId; sequence: number };
+  eliteName?: string; eliteHp?: number; eliteMaxHp?: number;
 }
 export interface RuntimeControls {
   start(options?: Partial<RunStartOptions>): void; pause(): void; resume(): void; restart(): void; continueEndless(): void; returnToMenu(): void;

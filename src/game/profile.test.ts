@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyProfile, mergeProfiles, PROFILE_BACKUP_KEY, PROFILE_KEY, SaveRepository, validateProfile, validateLegacyProfile, validCarryover, LEGACY_PROFILE_KEY } from './profile';
+import { emptyProfile, mergeProfiles, PROFILE_BACKUP_KEY, PROFILE_KEY, SaveRepository, validateProfile, validateLegacyProfile, validCarryover, LEGACY_PROFILE_KEY, LEGACY_V5_PROFILE_KEY, validateLegacyV5Profile } from './profile';
 import type { CompletionInput, ProfileStorage } from './profile';
 
 class MemoryStorage implements ProfileStorage {
@@ -47,7 +47,7 @@ describe('versioned campaign completion profiles', () => {
     expect(repo.getProfile()).toEqual(emptyProfile());
     repo.recordScore('story', 'normal', 100); repo.recordScore('endless', 'normal', 200);
     repo.recordScore('story', 'hard', 300); repo.recordScore('endless', 'hard', 400);
-    expect(repo.getProfile().bestScores.v5).toEqual({ normal: { story: 100, endless: 200 }, hard: { story: 300, endless: 400 } });
+    expect(repo.getProfile().bestScores.v6).toEqual({ normal: { story: 100, endless: 200 }, hard: { story: 300, endless: 400 } });
     expect(storage.getItem(LEGACY_PROFILE_KEY)).toBe('{broken'); expect(storage.getItem(LEGACY_PROFILE_KEY + ':backup')).toBe(old);
     expect(storage.getItem('mafuyu-sekai:best:v3')).toBe('9000');
     for (const bad of [NaN, Infinity, -1, .5]) expect(repo.recordScore('story', 'normal', bad).changed).toBe(false);
@@ -108,7 +108,7 @@ describe('save failure recovery and validation', () => {
     storage.values.set(PROFILE_BACKUP_KEY, stale);
     expect(repo.recordScore('endless', 'hard', 9000).changed).toBe(false);
     expect(storage.getItem(PROFILE_BACKUP_KEY)).toBe(storage.getItem(PROFILE_KEY));
-    expect(new SaveRepository(storage).getProfile().bestScores.v5.hard.endless).toBe(9000);
+    expect(new SaveRepository(storage).getProfile().bestScores.v6.hard.endless).toBe(9000);
   });
 
   it('does not repair over a future-version sibling or after storage reads are denied', () => {
@@ -149,7 +149,7 @@ describe('save failure recovery and validation', () => {
     const recovered = new SaveRepository(storage);
     expect(Object.keys(recovered.getProfile().clears).length > 0).toBe(true); expect(Object.keys(recovered.getProfile().clears)).toHaveLength(1);
     recovered.recordScore('endless', 'normal', 200);
-    expect(new SaveRepository(storage).getProfile().bestScores.v5.normal.endless).toBe(200);
+    expect(new SaveRepository(storage).getProfile().bestScores.v6.normal.endless).toBe(200);
     expect(Object.keys(validateProfile(JSON.parse(storage.getItem(PROFILE_BACKUP_KEY)!))!.clears)).toHaveLength(1);
   });
 
@@ -180,12 +180,48 @@ describe('save failure recovery and validation', () => {
     const repo = new SaveRepository(storage); expect(repo.recordCompletion(clear()).status).toBe('session-only');
     expect(storage.values.get(PROFILE_KEY)).toBe(future); expect(storage.writes).toBe(0);
     expect(validateProfile({ ...emptyProfile(), carryover: { level: 10, companions: 3, xp: 0 }, unlocked: ['s2'] })!.clears).toEqual({});
-    for (const score of [-1, NaN, Infinity, .5]) expect(validateProfile({ ...emptyProfile(), clears: { test: { ...clear('test', { score }), ruleset: 'v5' } } })!.clears).toEqual({});
+    for (const score of [-1, NaN, Infinity, .5]) expect(validateProfile({ ...emptyProfile(), clears: { test: { ...clear('test', { score }), ruleset: 'v6' } } })!.clears).toEqual({});
     expect(validateProfile(null)).toBeNull(); expect(validateProfile({ ...emptyProfile(), revision: Infinity })).toBeNull();
   });
 });
 
 describe('cross-tab progress convergence', () => {
+  it('keeps v5 primary and backup history intact while writing only v6 scores', () => {
+    const storage = new MemoryStorage();
+    const historical = (id: string, score: number) => JSON.stringify({ version: 2, revision: 7,
+      clears: { [id]: { ...clear(id, { score }), ruleset: 'v5' } },
+      bestScores: { v5: { normal: { story: score, endless: 18000 }, hard: { story: 40000, endless: 23000 } } } });
+    const primary = historical('old-a', 9000), backup = historical('old-b', 8000);
+    storage.values.set(LEGACY_V5_PROFILE_KEY, primary); storage.values.set(LEGACY_V5_PROFILE_KEY + ':backup', backup);
+    const repo = new SaveRepository(storage);
+    expect(repo.getProfile()).toEqual(emptyProfile());
+    expect(repo.getLegacyV5History()).toMatchObject({ clears: 2, bestScores: { normal: { story: 9000, endless: 18000 } } });
+    repo.recordCompletion(clear('current'));
+    expect(repo.getProfile().version).toBe(3); expect(repo.getProfile().bestScores.v6.normal.story).toBe(3000);
+    expect(Object.keys(repo.getProfile().clears)).toEqual(['v6:current']);
+    expect(storage.getItem(LEGACY_V5_PROFILE_KEY)).toBe(primary); expect(storage.getItem(LEGACY_V5_PROFILE_KEY + ':backup')).toBe(backup);
+    const history = repo.getLegacyV5History(); history.records['v5:old-a'].score = 0;
+    expect(repo.getLegacyV5History().records['v5:old-a'].score).toBe(9000);
+  });
+
+  it('recovers malformed v5 history from backup without accepting v5 data as v6 progress', () => {
+    const storage = new MemoryStorage(), backup = JSON.stringify({ version: 2, revision: 1,
+      clears: { valid: { ...clear('old'), ruleset: 'v5' }, forged: { ...clear('fake'), ruleset: 'v6' } } });
+    storage.values.set(LEGACY_V5_PROFILE_KEY, '{bad'); storage.values.set(LEGACY_V5_PROFILE_KEY + ':backup', backup);
+    const repo = new SaveRepository(storage);
+    expect(repo.getLegacyV5History().clears).toBe(1); expect(repo.getProfile().clears).toEqual({});
+    expect(validateProfile(JSON.parse(backup))).toBeNull(); expect(validateLegacyV5Profile(emptyProfile())).toBeNull();
+    repo.mergeExternal(backup); expect(repo.getProfile().clears).toEqual({});
+    expect(storage.getItem(LEGACY_V5_PROFILE_KEY)).toBe('{bad');
+  });
+
+  it('reloads historical v5 scores changed by another tab without importing combat progress', () => {
+    const storage = new MemoryStorage(), repo = new SaveRepository(storage);
+    storage.values.set(LEGACY_V5_PROFILE_KEY, JSON.stringify({ version: 2, revision: 1, clears: {}, bestScores: { v5: { hard: { endless: 80000 } } } }));
+    repo.load(); expect(repo.getLegacyV5History().bestScores.hard.endless).toBe(80000);
+    expect(repo.getProfile()).toEqual(emptyProfile());
+  });
+
   it('merges the latest disk profile before a stale tab writes, preserving both score and completion changes', () => {
     const storage = new MemoryStorage(), a = new SaveRepository(storage), b = new SaveRepository(storage);
     a.recordCompletion(clear('a'));
@@ -193,7 +229,7 @@ describe('cross-tab progress convergence', () => {
     expect(Object.keys(b.getProfile().clears).length > 0).toBe(true);
     a.mergeExternal(storage.getItem(PROFILE_KEY));
     expect(a.getProfile()).toEqual(b.getProfile());
-    expect(a.getProfile().bestScores.v5.hard.endless).toBe(5000);
+    expect(a.getProfile().bestScores.v6.hard.endless).toBe(5000);
     const writes = storage.writes; a.mergeExternal(storage.getItem(PROFILE_KEY)); expect(storage.writes).toBe(writes);
   });
 
@@ -203,7 +239,7 @@ describe('cross-tab progress convergence', () => {
     const merged = mergeProfiles(a.getProfile(), b.getProfile());
     expect(mergeProfiles(b.getProfile(), a.getProfile())).toEqual(merged);
     expect(Object.keys(merged.clears)).toHaveLength(2);
-    expect(merged.bestScores.v5).toEqual({ normal: { story: 3000, endless: 0 }, hard: { story: 9000, endless: 0 } });
+    expect(merged.bestScores.v6).toEqual({ normal: { story: 3000, endless: 0 }, hard: { story: 9000, endless: 0 } });
     a.mergeExternal(JSON.stringify(b.getProfile())); b.mergeExternal(JSON.stringify(a.getProfile()));
     expect(a.getProfile().clears).toEqual(b.getProfile().clears);
   });

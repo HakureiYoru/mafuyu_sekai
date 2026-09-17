@@ -7,9 +7,9 @@ import type { CombatEvent, EnemyType } from './types';
 const event = (type: CombatEvent['type'], extra: Partial<CombatEvent> = {}): CombatEvent => ({ type, x: 0, y: 0, ...extra });
 
 describe('two-character combat conversations', () => {
-  it('authors 24 short exchanges with alternating characters and all eight expressions', () => {
-    expect(CONVERSATIONS).toHaveLength(24);
-    expect(new Set(CONVERSATIONS.map(item => item.id)).size).toBe(24);
+  it('authors 27 short exchanges with alternating characters and all eight expressions', () => {
+    expect(CONVERSATIONS).toHaveLength(27);
+    expect(new Set(CONVERSATIONS.map(item => item.id)).size).toBe(27);
     const counts: Record<string, number> = {};
     for (const conversation of CONVERSATIONS) {
       counts[conversation.category] = (counts[conversation.category] ?? 0) + 1;
@@ -21,7 +21,7 @@ describe('two-character combat conversations', () => {
         if (i) expect(line.speaker).not.toBe(conversation.lines[i - 1].speaker);
       });
     }
-    expect(counts).toEqual({ opening: 2, wonderhoy: 6, damage: 3, heal: 2, upgrade: 3,
+    expect(counts).toEqual({ elite: 1, armBreak: 1, evolution: 1, opening: 2, wonderhoy: 6, damage: 3, heal: 2, upgrade: 3,
       echo: 1, palisade: 1, mafuyu: 1, reprise: 1, lacuna: 1, failure: 1, complete: 1, endless: 1 });
     expect(new Set(CONVERSATIONS.flatMap(item => item.lines.map(line => line.mood))).size).toBe(8);
   });

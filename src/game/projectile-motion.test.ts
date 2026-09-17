@@ -39,7 +39,7 @@ describe('bounded danmaku trajectories', () => {
     for (const dt of [0, -1, NaN, Infinity]) advanceProjectileMotion(hostile, dt);
     expect(hostile.motionAge).toBeUndefined(); expect(hostile.vy).toBe(0);
   });
-  it('clears enemy curvature and visual shape when pooled bullets become friendly after a restart', () => {
+  it('isolates the enemy pool from friendly bullets after a restart', () => {
     const sim = new GameSimulation(34001, 'hard');
     const boss = sim.spawnEnemy('boss', 2000, 2000)!;
     sim.state.player.x = sim.state.player.prevX = 2520; sim.state.player.invincible = 999;
@@ -50,7 +50,7 @@ describe('bounded danmaku trajectories', () => {
     sim.reset(); sim.state.spawnTimer = 999;
     sim.step({ ...idle, shoot: true });
     const shot = sim.state.bullets.find(b => b.owner === 'player')!;
-    expect(originals.has(shot)).toBe(true);
+    expect(originals.has(shot)).toBe(false);
     expect(shot.shape).toBeUndefined();
     expect(shot).toMatchObject({ motionAge: 0, turnRate: 0, turnDelay: 0, turnDuration: 0, acceleration: 0 });
     expect(shot.program).toBeUndefined(); expect(shot.attackGroup).toBeUndefined(); expect(shot.grazed).toBe(false);

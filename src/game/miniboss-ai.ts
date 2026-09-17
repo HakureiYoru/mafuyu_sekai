@@ -1,6 +1,7 @@
 import { BALANCE, VIEW, WORLD } from './config';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, TAU } from './math';
 import type { CombatEvent, Difficulty, Enemy, EnemyShotOptions, MiniBossBrain, Player } from './types';
+import { beginBossAction, bossActionTarget, updateBossAction, type AttackBudgetContext } from './boss-actions';
 
 const EPSILON = 1e-8;
 
@@ -32,7 +33,7 @@ export function miniBossAttacks(difficulty: Difficulty = 'normal') {
   return difficulty === 'hard' ? HARD_ATTACKS : MINIBOSS_ATTACKS;
 }
 
-export interface MiniBossAiContext {
+export interface MiniBossAiContext extends AttackBudgetContext {
   player: Player;
   elapsed: number;
   difficulty?: Difficulty;
@@ -145,6 +146,7 @@ function recover(e: Enemy, brain: MiniBossBrain, ctx: MiniBossAiContext): void {
   const cfg = miniBossAttacks(ctx.difficulty);
   e.state = 'recover'; e.timer = brain.phase === 2 ? cfg.phase2Recovery : cfg.recovery;
   brain.dashesLeft = brain.lasersLeft = 0; stop(e);
+  e.exposedUntil = ctx.elapsed + e.timer;
 }
 
 function fireLanding(e: Enemy, ctx: MiniBossAiContext): void {
@@ -179,6 +181,11 @@ function beginLaser(e: Enemy, brain: MiniBossBrain, ctx: MiniBossAiContext): voi
 export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): void {
   if (e.hp <= 0 || ctx.player.hp <= 0 || !Number.isFinite(dt) || dt <= 0) return;
   const cfg = miniBossAttacks(ctx.difficulty), brain = e.miniboss ??= createMiniBossBrain();
+  if (e.action) {
+    updateBossAction(e, dt, ctx);
+    if (!e.action) { brain.dashesLeft = 0; brain.lasersLeft = cfg.laser.counts[brain.phase - 1]; brain.laserIndex = 0; beginLaser(e, brain, ctx); }
+    return;
+  }
   // Finish committed warnings/attacks before changing phase; low health never produces an unannounced replacement.
   if (brain.phase === 1 && e.hp / Math.max(1, e.maxHp) <= cfg.phaseThreshold && (e.state === 'chase' || e.state === 'recover')) {
     brain.phase = 2; brain.dashesLeft = brain.lasersLeft = 0;
@@ -252,7 +259,12 @@ export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): 
   }
   e.angle = Math.atan2(ctx.player.y - e.y, ctx.player.x - e.x);
   if (e.timer > EPSILON || e.cooldown > EPSILON || !ctx.canCommit()) { reposition(e, dt, ctx); return; }
+  // Only landing bursts consume this reservation; expire spare ring capacity before the laser/recovery ends.
+  const duration = cfg.dash.counts[brain.phase - 1] * ((brain.phase === 2 ? cfg.dash.phase2Warning : cfg.dash.warning) + cfg.dash.duration + cfg.settle) + 0.15;
+  if (ctx.reserveAttack && !ctx.reserveAttack(e.id, cfg.dash.counts[brain.phase - 1] * cfg.landing.ringCount, 0, duration)) return;
   brain.cycle++; brain.combo = brain.cycle % 2 ? 'pursuit' : 'crossfire';
+  if (brain.cycle % 3 === 0 && beginBossAction(e, { kind: 'sidestep', ...bossActionTarget(e, ctx.player, 350, brain.cycle % 2 ? 1.05 : -1.05),
+    warning: ctx.difficulty === 'hard' ? 0.5 : 0.65, duration: 0.45, recovery: ctx.difficulty === 'hard' ? 0.5 : 0.7 }, ctx)) return;
   brain.dashesLeft = cfg.dash.counts[brain.phase - 1]; brain.lasersLeft = cfg.laser.counts[brain.phase - 1];
   brain.laserIndex = brain.chainIndex = 0;
   if (!beginCharge(e, brain, ctx)) recover(e, brain, ctx);

@@ -1843,3 +1843,29 @@ kbd {
   .battle-weapon .skill-chip { padding: 3px; }
   .battle-weapon .skill-chip>span { flex-direction: row; flex-wrap: wrap; gap: 3px; }
 }
+/* v6 keeps the unlimited build in a compact status rail, with details on demand. */
+.module-summary strong { color: #d4f4ee; font-weight: 600; font-variant-numeric: tabular-nums; }
+.module-recent { display: block; margin: 6px 0; min-height: 18px; font-size: 11px; line-height: 18px; color: #afe5dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.module-recent>span { display: inline-block; }
+.elite-health { width: 100%; display: grid !important; grid-template-columns: auto minmax(60px, 1fr); align-items: center; gap: 8px !important; }
+.elite-health>span { color: #ffcca4 !important; font-size: 11px !important; }
+.elite-health .meter { width: 100%; height: 4px; }
+.meter-elite .meter-fill { background: #ffb374; }
+.upgrade-card>strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.upgrade-rank { font-size: 12px; font-weight: 500; color: #a4d8df; white-space: nowrap; }
+.module-preview { display: block; width: 100%; height: 80px; flex-shrink: 0; margin: 6px 0 2px; overflow: hidden; color: #8fdde7; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.module-preview .preview-guide { stroke: #7195a5; opacity: .16; stroke-width: 1; }
+.module-preview .preview-player { stroke: #c4fff1; fill: #244b4a; }
+.module-preview .preview-target { color: #aa8f9b; stroke-width: 1; opacity: .7; }
+.module-preview .preview-highlight { stroke: #e6fffa; stroke-width: 3; }
+.module-preview .preview-muted { opacity: .4; }
+.module-preview.is-evolved { color: #c7b5ff; }
+.module-preview .preview-action { transform-origin: 50% 50%; animation: module-demonstration 1.8s ease-out 2 both; }
+.module-preview[data-static="true"] .preview-action { animation: none; }
+@keyframes module-demonstration { 0% { opacity: .15; transform: translateX(-12px) scaleX(.9); } 40%,100% { opacity: 1; transform: translateX(0) scaleX(1); } }
+.upgrade-dialog .paused-modules { margin-top: 12px; padding-top: 10px; }
+.upgrade-dialog .paused-modules article p { margin: 6px 0 0; }
+.battle-hud[data-comms-layout="compact"] .module-recent { margin: 2px 0; font-size: 10px; line-height: 14px; min-height: 14px; }
+@media (max-height: 780px) { .module-preview { height: 60px; }.upgrade-card { padding: 15px; }.upgrade-card p { font-size: 12px; line-height: 1.6; margin-top: 7px; }.upgrade-card .module-flavor { font-size: 10px; }.upgrade-branch { margin-bottom: 10px; } }
+@media (max-width: 720px) { .battle-comms .module-summary { display: block; font-size: 9px; margin-top: 3px; }.module-recent { font-size: 8px !important; line-height: 11px !important; min-height: 11px !important; margin: 1px 0 !important; }.module-preview { height: 52px; }.elite-health { grid-template-columns: 1fr; gap: 2px !important; }.elite-health>span { font-size: 9px !important; } }
+@media (prefers-reduced-motion: reduce) { .module-preview .preview-action { animation: none; } }

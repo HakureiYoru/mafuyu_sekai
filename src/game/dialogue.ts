@@ -18,6 +18,8 @@ const entryCategory = (event: CombatEvent): Conversation['category'] => event.en
 const isEntrance = (event: CombatEvent) => event.type === 'boss' || (event.type === 'attack' && event.text === 'arrival');
 const importance = (event: CombatEvent) => isEntrance(event) ? 100 : event.type === 'card' ? 90
   : event.type === 'damage' ? 80 : event.type === 'attack' && event.text === 'encounterCleared' ? 70
+    : event.type === 'attack' && (event.text?.startsWith('elite-arrival:') || event.text === 'part-break') ? 65
+      : event.type === 'module' && event.text === 'evolution' ? 55
     : event.type === 'bossLow' ? 60 : event.type === 'levelup' || event.type === 'leveldown' ? 50 : 0;
 const lineDuration = (message: CommsMessage) => Math.max(1.8, message.fullText.length / 35 + 1.4);
 
@@ -109,6 +111,9 @@ export class Dialogue {
         if (urgent.text === 'cleared') this.say('CARD_CLEARED', true);
         else this.narrate(`「${urgent.text ?? '下一张符卡'}」`);
       } else if (urgent.type === 'damage') this.converse('damage', true);
+      else if (urgent.text?.startsWith('elite-arrival:')) this.converse('elite', true);
+      else if (urgent.text === 'part-break') this.converse('armBreak', true);
+      else if (urgent.text === 'evolution') this.converse('evolution', true);
       else if (urgent.type === 'levelup') this.converse('upgrade', true, {}, (urgent.amount ?? 1) >= 10);
       else if (urgent.type === 'leveldown') this.say('LEVEL_DOWN_EVENT', true);
       else if (urgent.type === 'bossLow') this.say('BOSS_LOW_HP', true);

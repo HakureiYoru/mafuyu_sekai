@@ -79,7 +79,7 @@ function harness(season: SeasonId = 's1', difficulty: Difficulty = 'normal', car
 
 describe('independent six-card encounters', () => {
   it.each(['s1', 's2'] as const)('%s retains the agreed six names and exact normal/hard HP without shared mutable brains', season => {
-    const expected = season === 's1' ? [700, 750, 800, 850, 900, 1000] : [1500, 1700, 1800, 1900, 2100, 2200];
+    const expected = season === 's1' ? [1200, 1300, 1400, 1500, 1700, 1900] : [2600, 2900, 3100, 3500, 3800, 4100];
     expect(SPELL_CARDS[season].normal.map(card => card.hp)).toEqual(expected);
     expect(SPELL_CARDS[season].hard.map(card => card.hp)).toEqual(expected.map(hp => Math.round(hp * 1.35)));
     expect(new Set(SPELL_CARDS[season].normal.map(card => card.pattern)).size).toBe(6);
@@ -143,7 +143,7 @@ describe('committed attacks and source lifetime', () => {
     h.run(0.65);
     expect(spellTelegraphs(h.enemy)[0]).toMatchObject({ x: original.x, y: original.y, angle: original.angle });
     expect(h.shots).toHaveLength(0);
-    h.run(0.1); expect(h.shots.length).toBe(11); expect(spellTelegraphs(h.enemy)).toHaveLength(0);
+    h.run(0.1); expect(h.shots.length).toBe(15); expect(spellTelegraphs(h.enemy)).toHaveLength(0);
   });
   it.each(['normal', 'hard'] as const)('all %s lasers have full warnings and immutable origin, direction and length', difficulty => {
     const h = harness('s1', difficulty, 3); h.run(SPELL_CARDS.s1[difficulty][3].intro);
@@ -302,10 +302,11 @@ describe('fixed clock and bounded encounter lifetime', () => {
 });
 
 describe('production simulation spell integration', () => {
-  it.each(['normal', 'hard'] as const)('runs all seven %s slice walls with real input, 7-radius damage, no dash and no invulnerability', difficulty => {
+  it.each(['normal', 'hard'] as const)('isolates seven %s slice walls to retain their measured 7-radius gap route independently of body actions', difficulty => {
     const sim = new GameSimulation(7004, difficulty);
     sim.reset('story', 7004, difficulty, { difficulty });
     const boss = sim.spawnEnemy('boss', 2000, 1780, 's2:final')!;
+    boss.spell!.nextMotion = Infinity;
     const p = sim.state.player; p.invincible = 0; p.x = p.prevX = ARENA.x + 100;
     let cueId = 0, reactAt = Infinity, target = p.y, emitted = 0;
     for (let tick = 0; tick < 12 * 60; tick++) {

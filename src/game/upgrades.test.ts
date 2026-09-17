@@ -1,41 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { addResonanceXp, BEHAVIOR_MODULES, buildDamageMultiplier, buildModuleViews, choiceView, chooseModule, createBuild, eligibleEvolutions, enqueueUpgrade, EVOLUTIONS, hasEvolution, moduleRank, MODULES, MODULE_VALUES, offerModules, rankValue, rerollModules } from './upgrades';
+import { addResonanceXp, BEHAVIOR_MODULES, buildDamageMultiplier, buildModuleViews, choiceView, chooseModule, createBuild, eligibleEvolutions, enqueueUpgrade, EVOLUTIONS, hasEvolution, moduleRank, MODULES, MODULE_VALUES, NEW_MODULE_IDS, newModuleStats, offerModules, rankValue, rerollModules, resolveBuildStats } from './upgrades';
 import type { ModuleId, PlayerBuild, UpgradeChoiceId } from './types';
 
-function owned(build: PlayerBuild, id: ModuleId, rank: 1 | 2 = 1): void {
+function owned(build: PlayerBuild, id: ModuleId, rank = 1): void {
   if (!build.modules.includes(id)) build.modules.push(id);
   build.ranks[id] = rank;
 }
-function pending(build: PlayerBuild, source: 'level' | 'boss' = 'level', id = `${source}:${build.rewardHistory.length}`): void {
+function pending(build: PlayerBuild, source: 'level' | 'boss' = 'level', id = `${source}:${(build.rewardWatermarks?.[source] ?? -1) + 1}`): void {
   expect(enqueueUpgrade(build, source, id)).toBe(true);
 }
 function isModule(id: UpgradeChoiceId): id is ModuleId { return id in MODULES; }
 
 describe('continuous-campaign module rewards', () => {
-  it('has 24 ranked modules and six recipes with no inherited build strength', () => {
-    expect(Object.keys(MODULES)).toHaveLength(24);
-    for (const branch of ['main', 'drone', 'resource']) expect(Object.values(MODULES).filter(module => module.branch === branch)).toHaveLength(8);
-    expect(Object.keys(EVOLUTIONS)).toHaveLength(6);
+  it('has 36 ranked modules and eighteen recipes with no inherited build strength', () => {
+    expect(Object.keys(MODULES)).toHaveLength(36);
+    for (const branch of ['main', 'drone', 'resource']) expect(Object.values(MODULES).filter(module => module.branch === branch)).toHaveLength(12);
+    expect(Object.keys(EVOLUTIONS)).toHaveLength(18);
     const build = createBuild();
     expect(build.modules).toEqual([]); expect(build.ranks).toEqual({}); expect(build.evolutions).toEqual([]);
     expect(build.levelFloor).toBe(1); expect(build.rerollsRemaining).toBe(2);
     expect(offerModules(build, 10, 1)).toEqual([]);
   });
 
-  it('enqueues nine unique level rewards and four boss rewards, even before choosing', () => {
+  it('keeps receiving unique rewards past the old thirteen-reward ceiling', () => {
     const build = createBuild();
     for (let level = 2; level <= 10; level++) pending(build, 'level', `level:${level}`);
     for (let boss = 0; boss < 4; boss++) pending(build, 'boss', `boss:${boss}`);
     expect(build.pendingRewards).toHaveLength(13);
-    expect(enqueueUpgrade(build, 'level', 'level:11')).toBe(false);
-    expect(enqueueUpgrade(build, 'boss', 'boss:4')).toBe(false);
+    expect(enqueueUpgrade(build, 'level', 'level:11')).toBe(true);
+    expect(enqueueUpgrade(build, 'boss', 'boss:4')).toBe(true);
     expect(enqueueUpgrade(build, 'boss', 'level:2')).toBe(false);
-    for (let index = 0; index < 13; index++) {
+    for (let index = 0; index < 15; index++) {
       const offers = offerModules(build, 10, 22);
       expect(offers).toHaveLength(3); expect(new Set(offers).size).toBe(3);
       expect(chooseModule(build, offers[0], { offerId: build.offerId! })).toBe(true);
     }
-    expect(build.pendingRewards).toEqual([]); expect(build.choiceIndex).toBe(13);
+    expect(build.pendingRewards).toEqual([]); expect(build.choiceIndex).toBe(15);
     expect(enqueueUpgrade(build, 'level', 'level:2')).toBe(false);
     expect(offerModules(build, 10, 22)).toEqual([]);
   });
@@ -64,7 +64,7 @@ describe('continuous-campaign module rewards', () => {
     expect(build.choiceIndex).toBe(1); expect(build.pendingRewards).toHaveLength(1);
   });
 
-  it('offers an owned rank and a new slot where possible, while protecting the six-slot limit', () => {
+  it('offers owned growth and new modules even beyond six equipped modules', () => {
     for (let seed = 0; seed < 100; seed++) {
       const build = createBuild(); owned(build, 'piercing'); build.choiceIndex = 2; pending(build);
       const offered = offerModules(build, 5, seed);
@@ -73,10 +73,10 @@ describe('continuous-campaign module rewards', () => {
     const build = createBuild();
     for (const id of ['piercing', 'wingShots', 'precision', 'shatter', 'chain', 'prism'] as const) owned(build, id);
     pending(build); const offered = offerModules(build, 10, 2);
-    expect(offered.every(id => isModule(id) && build.modules.includes(id))).toBe(true);
-    const id = offered[0] as ModuleId; expect(chooseModule(build, id)).toBe(true);
-    expect(moduleRank(build, id)).toBe(2); expect(build.modules).toHaveLength(6);
-    pending(build); expect(offerModules(build, 10, 2)).not.toContain(id);
+    expect(offered.some(id => isModule(id) && !build.modules.includes(id))).toBe(true);
+    const id = offered.find(id => isModule(id) && !build.modules.includes(id)) as ModuleId; expect(chooseModule(build, id)).toBe(true);
+    expect(moduleRank(build, id)).toBe(1); expect(build.modules).toHaveLength(7);
+    pending(build); expect(offerModules(build, 10, 2)).toHaveLength(3);
   });
 
   it('provides a behavior in both opening offers and withholds special upgrades before Lv4', () => {
@@ -110,26 +110,24 @@ describe('continuous-campaign module rewards', () => {
     expect(a.pendingRewards).toHaveLength(1); expect(a.choiceIndex).toBe(0);
   });
 
-  it('uses three distinct resource fallbacks after ranks are exhausted', () => {
+  it('never exhausts upgrades even when all modules are already at very high rank', () => {
     const build = createBuild();
-    for (const id of ['piercing', 'wingShots', 'precision', 'shatter', 'chain', 'prism'] as const) owned(build, id, 2);
-    pending(build); expect(offerModules(build, 10, 2).sort()).toEqual(['reward:bomb', 'reward:heal', 'reward:xp']);
-    const modules = structuredClone(build.modules);
-    expect(chooseModule(build, 'reward:heal')).toBe(true); expect(build.modules).toEqual(modules);
-    pending(build); expect(offerModules(build, 10, 2).sort()).toEqual(['reward:bomb', 'reward:heal', 'reward:xp']);
+    for (const id of Object.keys(MODULES) as ModuleId[]) owned(build, id, 10000);
+    pending(build); const offers = offerModules(build, 10, 2); expect(offers.every(isModule)).toBe(true);
+    expect(new Set(offers).size).toBe(3); expect(chooseModule(build, offers[0])).toBe(true);
+    expect(moduleRank(build, offers[0] as ModuleId)).toBe(10001); expect(build.modules).toHaveLength(36);
     expect(choiceView(build, 'reward:xp').kind).toBe('resource');
   });
 
-  it('does not offer or commit consumed revival upgrades', () => {
-    const build = createBuild(); owned(build, 'revive'); pending(build);
-    expect(offerModules(build, 10, 2, { reviveConsumed: true })).not.toContain('revive');
+  it('allows passive revival growth after the single revival was consumed', () => {
+    const build = createBuild(); owned(build, 'revive', 2); pending(build);
     build.choices = ['revive'];
-    expect(chooseModule(build, 'revive', { reviveConsumed: true })).toBe(false);
-    expect(moduleRank(build, 'revive')).toBe(1); expect(build.pendingRewards).toHaveLength(1);
+    expect(chooseModule(build, 'revive', { reviveConsumed: true })).toBe(true);
+    expect(moduleRank(build, 'revive')).toBe(3); expect(build.pendingRewards).toHaveLength(0);
   });
 });
 
-describe('two in-place evolution slots', () => {
+describe('in-place evolutions without a global ceiling', () => {
   it('requires the complete II + I recipe and a boss reward', () => {
     for (const evolution of Object.values(EVOLUTIONS)) {
       const build = createBuild(); owned(build, evolution.primary); owned(build, evolution.partner);
@@ -146,16 +144,16 @@ describe('two in-place evolution slots', () => {
     }
   });
 
-  it('never offers a third evolution or frees a slot after evolving', () => {
+  it('offers a third evolution without removing its primary or partner', () => {
     const build = createBuild();
     for (const id of ['piercing', 'precision', 'wingShots', 'rearSpark', 'chain', 'slow'] as const) owned(build, id, 2);
     for (const evolution of ['needleArray', 'spiralBloom'] as const) {
       pending(build, 'boss'); offerModules(build, 10, 6); build.choices = [`evolution:${evolution}`];
       expect(chooseModule(build, `evolution:${evolution}`)).toBe(true);
     }
-    expect(build.modules).toHaveLength(6); expect(eligibleEvolutions(build)).toEqual([]);
-    pending(build, 'boss'); expect(offerModules(build, 10, 3).every(id => !id.startsWith('evolution:'))).toBe(true);
-    build.choices = ['evolution:forkNetwork']; expect(chooseModule(build, 'evolution:forkNetwork')).toBe(false);
+    expect(build.modules).toHaveLength(6); expect(eligibleEvolutions(build)).toContain('forkNetwork');
+    pending(build, 'boss'); expect(offerModules(build, 10, 3)).toContain('evolution:forkNetwork');
+    expect(chooseModule(build, 'evolution:forkNetwork')).toBe(true); expect(build.evolutions).toHaveLength(3);
   });
 });
 
@@ -168,12 +166,13 @@ describe('ranked numbers and capped resonance', () => {
     build.ranks.prism = 2; expect(rankValue(build, 'prism', MODULE_VALUES.prism.sideDamage)).toBe(18);
   });
 
-  it('grants one resonance per 600 surplus XP and caps the bonus at four ranks', () => {
+  it('grants one choice per 600 XP forever while capping only the old damage bonus', () => {
     const build = createBuild();
     expect(addResonanceXp(build, 599)).toBe(0); expect(addResonanceXp(build, 21)).toBe(1); expect(build.resonanceXp).toBe(20);
     expect(addResonanceXp(build, 1200)).toBe(2); expect(build.resonanceXp).toBe(20);
-    expect(addResonanceXp(build, 10000)).toBe(1); expect(build.resonance).toBe(4); expect(build.resonanceXp).toBe(0);
-    expect(addResonanceXp(build, 600)).toBe(0);
+    expect(addResonanceXp(build, 10000)).toBe(16); expect(build.resonance).toBe(19); expect(build.resonanceXp).toBe(420);
+    expect(addResonanceXp(build, 600)).toBe(1); expect(buildDamageMultiplier(build)).toBe(1.2);
+    expect(build.pendingRewards).toHaveLength(1); expect(build.pendingRewards[0].count).toBe(20);
   });
 
   it('ignores invalid or pre-Lv10 resonance and adds precision I / II only to main shots', () => {
@@ -184,5 +183,61 @@ describe('ranked numbers and capped resonance', () => {
     expect(buildDamageMultiplier(build)).toBe(1.2); expect(buildDamageMultiplier(build, true)).toBe(1.4);
     build.ranks.precision = 2; expect(buildDamageMultiplier(build, true)).toBe(1.5);
     build.resonance = 999; expect(buildDamageMultiplier(build, true)).toBe(1.5);
+  });
+});
+
+describe('bounded identity and finite infinite-rank growth', () => {
+  it('keeps bounded history and rejects ancient replay after thousands of rewards', () => {
+    const build = createBuild();
+    for (let sequence = 1; sequence <= 2000; sequence++) {
+      expect(enqueueUpgrade(build, 'elite', `elite:${sequence}`, sequence)).toBe(true);
+      build.choices = ['pulseChamber']; expect(chooseModule(build, 'pulseChamber')).toBe(true);
+    }
+    expect(build.rewardHistory.length).toBeLessThanOrEqual(32); expect(build.pendingRewards).toEqual([]);
+    expect(enqueueUpgrade(build, 'elite', 'elite:1', 1)).toBe(false);
+    expect(moduleRank(build, 'pulseChamber')).toBe(2000);
+  });
+  it('compresses enormous XP rewards without losing identity on partial consumption', () => {
+    const build = createBuild(); expect(addResonanceXp(build, 600 * 10000 + 23)).toBe(10000);
+    expect(build.pendingRewards).toHaveLength(1); expect(build.pendingRewards[0].count).toBe(10000); expect(build.resonanceXp).toBe(23);
+    const offers = offerModules(build, 10, 44), firstId = build.offerId!; chooseModule(build, offers[0], { offerId: firstId });
+    offerModules(build, 10, 44); expect(build.pendingRewards[0].count).toBe(9999);
+    expect(chooseModule(build, build.choices[0], { offerId: firstId })).toBe(false);
+    addResonanceXp(build, 600); expect(build.pendingRewards).toHaveLength(1); expect(build.pendingRewards[0].count).toBe(10000);
+  });
+  it('allows continued growth after evolution and collects all eighteen recipes', () => {
+    const build = createBuild(); for (const id of Object.keys(MODULES) as ModuleId[]) owned(build, id, 3);
+    for (const evolution of Object.keys(EVOLUTIONS) as (keyof typeof EVOLUTIONS)[]) {
+      pending(build, 'boss'); offerModules(build, 10, 3); build.choices = [`evolution:${evolution}`]; expect(chooseModule(build, `evolution:${evolution}`)).toBe(true);
+    }
+    expect(build.evolutions).toHaveLength(18); expect(build.modules).toHaveLength(36);
+    pending(build); build.choices = ['piercing']; expect(chooseModule(build, 'piercing')).toBe(true); expect(moduleRank(build, 'piercing')).toBe(4);
+  });
+  it('preserves every original layer-I and layer-II tuple', () => {
+    for (const id of Object.keys(MODULE_VALUES) as (keyof typeof MODULE_VALUES)[]) {
+      const build = createBuild(); owned(build, id);
+      for (const value of Object.values(MODULE_VALUES[id])) if (Array.isArray(value)) {
+        expect(rankValue(build, id, value as unknown as readonly [number, number])).toBe(value[0]);
+        build.ranks[id] = 2; expect(rankValue(build, id, value as unknown as readonly [number, number])).toBe(value[1]); build.ranks[id] = 1;
+      }
+    }
+  });
+  it('keeps damage increasing, cooldown positive and entity counts fixed after V', () => {
+    for (const id of NEW_MODULE_IDS) {
+      const five = newModuleStats(id, 5); let lastDamage = 0;
+      for (const rank of [1, 3, 5, 20, 100, 10000]) {
+        const stats = newModuleStats(id, rank); for (const value of Object.values(stats)) expect(Number.isFinite(value)).toBe(true);
+        expect(stats.cooldown).toBeGreaterThanOrEqual(five.cooldown * 0.65);
+        if (stats.damage !== undefined) { expect(stats.damage).toBeGreaterThanOrEqual(lastDamage); lastDamage = stats.damage; }
+        if (rank > 5) for (const key of ['count', 'capacity', 'targets']) if (five[key] !== undefined) expect(stats[key]).toBe(five[key]);
+      }
+    }
+  });
+  it('reuses immutable snapshots and scales scalar as well as tuple cooldowns', () => {
+    const build = createBuild(); owned(build, 'vent', 2); const first = resolveBuildStats(build);
+    expect(resolveBuildStats(build)).toBe(first); expect(first.values.vent?.cooldown).toBe(4);
+    build.ranks.vent = 5; const next = resolveBuildStats(build); expect(next).not.toBe(first); expect(next.values.vent?.cooldown).toBeCloseTo(3.2);
+    expect(first.values.vent?.cooldown).toBe(4); expect(Object.isFrozen(next.values.vent)).toBe(true);
+    owned(build, 'doubleDash', 4); expect(choiceView(build, 'doubleDash').description).toContain('1.84'); expect(choiceView(build, 'doubleDash').description).not.toContain('2.3 秒');
   });
 });

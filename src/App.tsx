@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ASSET_URLS, BALANCE } from './game/config';
-import type { GameSettings, HudSnapshot, RuntimeControls } from './game/types';
+import type { GameSettings, HudSnapshot, ModuleId, RuntimeControls } from './game/types';
 import changelog from 'virtual:changelog';
 import { MODULES, EVOLUTIONS, choiceView, buildModuleViews } from './game/upgrades';
 import { BINDING_LABELS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, rebindKey } from './game/settings';
 import type { BindingAction } from './game/settings';
 import { BattleComms, useCommsPlacement } from './components/BattleComms';
+import { ModulePreview } from './components/ModulePreview';
 
 type IconName = 'play' | 'pause' | 'settings' | 'arrow' | 'close' | 'sound' | 'spark' | 'restart';
 
@@ -23,6 +24,9 @@ function Icon({ name, className = '' }: { name: IconName; className?: string }) 
   };
   return <svg className={`icon ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
+
+const buildLayers = (s: HudSnapshot) => s.modules.reduce((total, id) => total + (s.moduleRanks[id] ?? 1), 0);
+const rankLabel = (rank: number) => rank <= 5 ? ['I', 'II', 'III', 'IV', 'V'][Math.max(0, rank - 1)] : `Lv.${rank}`;
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -48,7 +52,7 @@ function Dialog({ children, title, eyebrow, onClose, className = '' }: { childre
   return <div className="screen-overlay dialog-overlay" onKeyDown={event => {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose?.(); }
     if (event.key !== 'Tab') return;
-    const focusable = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input, select, a[href], [tabindex="0"]') ?? []);
+    const focusable = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input, select, summary, a[href], [tabindex="0"]') ?? []);
     const first = focusable[0]; const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -112,36 +116,39 @@ function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; ru
     <div className="battle-top">
       <div className="stage-summary"><div><span className="status-dot" /><strong>{s.mode === 'endless' ? '无尽' : '战役'} · {s.difficulty === 'hard' ? '困难' : '普通'}</strong><span>{s.mode === 'endless' ? '∞' : `${Math.floor(s.progression / 360 * 100)}%`}</span></div><span className="stage-title">{s.stageName}{s.waveBlocked ? ' · 击败首领后继续' : ''}</span><Meter value={s.waveProgress} label="战役推进进度" /></div>
       <div className="encounter-summary">
+        {(s.eliteMaxHp ?? 0) > 0 && <div className="elite-health" aria-label="波内精英"><span>{s.eliteName} · 必须击败</span><Meter value={s.eliteHp ?? 0} max={s.eliteMaxHp} className="meter-elite" label="精英生命" /></div>}
         {bossMax > 0 ? <><div><strong>{s.cardName || s.minibossAction.split(' · ')[0]}</strong><span>{s.cardCount > 0 ? `${s.cardIndex} / ${s.cardCount}` : '首领战'} · {Math.ceil(100 * bossHp / bossMax)}%</span></div><Meter value={bossHp} max={bossMax} className="meter-violet" label={s.bossMaxHp > 0 ? '真冬生命' : '迷你首领生命'} /><p aria-label={s.bossMaxHp > 0 ? '首领行动' : '迷你首领行动'}>{s.bossMaxHp > 0 ? s.bossAction : s.minibossAction.split(' · ').slice(1).join(' · ')}</p></> : <><strong className="battle-announcement" role="status">{s.announcement || (s.arena ? '固定竞技场 · 注意场地边界' : '跑起来！捡经验，别捡弹幕。')}</strong><span>{formatTime(s.elapsed)} · SCORE {String(s.score).padStart(7, '0')}</span></>}
       </div>
       <div className="battle-actions"><span className="battle-score">{String(s.score).padStart(7, '0')}<small>{formatTime(s.elapsed)}</small></span><span className="battle-bombs">✦ {s.bombs}<small>炸弹 / {key('bomb')}</small></span><button className="icon-button" onClick={() => runtime.pause()} aria-label="暂停游戏"><Icon name="pause" /></button><button className="icon-button" onClick={openSettings} aria-label="暂停并打开设置"><Icon name="settings" /></button></div>
     </div>
     <div className="battle-bottom">
-      <div className="battle-player"><div className="compact-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><strong>LV. {String(s.level).padStart(2, '0')}</strong><span>{s.hp} / {s.maxHp} HP</span><span className="support-status" aria-label="子机支援">子机 {s.companions} / {BALANCE.companion.max}</span></div><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><div className="compact-growth health-reserve"><span aria-label="备用血药">血药 ×{s.hpReserve}</span><span title="每份恢复 1 HP，致命伤不会消耗血药复活">受伤自动补血</span></div><div className="compact-growth"><span>{s.level >= 10 ? `共鸣 ${s.resonance} / 4 · 伤害 +${s.resonance * 5}%` : '武器成长'}</span><span>{s.level >= 10 ? 'MAX' : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= 10 ? 1 : s.xp} max={s.level >= 10 ? 1 : s.xpNeeded} className="meter-violet" label="武器成长" /></div>
-      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-label={commsCollapsed ? '展开战斗通讯' : '收起战斗通讯'} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '战斗通讯'}<span aria-hidden="true">{commsCollapsed ? '+' : '−'}</span></button><BattleComms snapshot={s} placement={commsPlacement} portalHost={hud} collapsed={commsCollapsed} /><div className="module-summary" aria-label="已装配模块">{s.modules.length} / 6 模块 · {s.evolutions.length} / 2 进化</div><div className="module-slots" aria-label="六个模块栏位">{Array.from({ length: 6 }, (_, i) => {
-        const id = s.modules[i], evolved = id && s.evolutions.map(key => EVOLUTIONS[key]).find(item => item.primary === id);
-        return <span key={i} className={evolved ? 'is-evolved' : id ? 'is-equipped' : ''} title={id ? evolved?.name ?? MODULES[id].name : '空模块栏位'}>{id ? <>{evolved?.name ?? MODULES[id].name}<b>{evolved ? '✦' : (s.moduleRanks[id] ?? 1) === 2 ? 'II' : 'I'}</b></> : '—'}</span>;
-      })}</div><div className="module-live" aria-label="模块即时状态">{activeModules.map(module => <span key={module.id} className={`module-${module.status}`}>{MODULES[module.id].name} · {module.status === 'consumed' ? '已用尽' : module.status === 'active' ? '生效中' : `${module.remaining.toFixed(1)}s`}</span>)}</div></div>
+      <div className="battle-player"><div className="compact-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><strong>LV. {String(s.level).padStart(2, '0')}</strong><span>{s.hp} / {s.maxHp} HP</span><span className="support-status" aria-label="子机支援">子机 {s.companions} / {BALANCE.companion.max}</span></div><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><div className="compact-growth health-reserve"><span aria-label="备用血药">血药 ×{s.hpReserve}</span><span title="每份恢复 1 HP，致命伤不会消耗血药复活">受伤自动补血</span></div><div className="compact-growth"><span>{s.level >= 10 ? `共鸣 +${Math.min(4, s.resonance) * 5}% · 继续强化` : '武器成长'}</span><span>{s.level >= 10 ? `${Math.floor(s.resonanceXp ?? 0)} / 600` : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= 10 ? s.resonanceXp ?? 0 : s.xp} max={s.level >= 10 ? 600 : s.xpNeeded} className="meter-violet" label="武器成长" /></div>
+      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-label={commsCollapsed ? '展开战斗通讯' : '收起战斗通讯'} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '战斗通讯'}<span aria-hidden="true">{commsCollapsed ? '+' : '−'}</span></button><BattleComms snapshot={s} placement={commsPlacement} portalHost={hud} collapsed={commsCollapsed} /><div className="module-summary" aria-label="已装配模块"><strong>{s.modules.length}</strong> 种 · <strong>{buildLayers(s)}</strong> 层 · {s.evolutions.length} 进化</div><div className="module-recent" aria-label="最近强化">{s.recentUpgrade ? (() => {
+        const item = s.recentUpgrade.id.startsWith('evolution:') ? EVOLUTIONS[s.recentUpgrade.id.slice(10) as keyof typeof EVOLUTIONS] : MODULES[s.recentUpgrade.id as ModuleId];
+        const rank = s.moduleRanks[s.recentUpgrade.id as ModuleId];
+        return item ? <span key={s.recentUpgrade.sequence}>＋ {item.name}{rank ? ` ${rankLabel(rank)}` : ' ✦'}</span> : '继续收集经验，强化没有层数上限';
+      })() : '继续收集经验，强化没有层数上限'}</div><div className="module-live" aria-label="模块即时状态">{activeModules.map(module => <span key={module.id} className={`module-${module.status}`}>{MODULES[module.id].name} · {module.status === 'consumed' ? '已用尽' : module.status === 'active' ? '生效中' : `${module.remaining.toFixed(1)}s`}</span>)}</div></div>
       <div className="battle-weapon"><div className={`compact-resource ${s.overheated ? 'is-hot' : ''}`}><span>{s.overheated ? '过热 · 松开射击' : '热量'} <strong>{Math.round(s.heat)}%</strong></span><Meter value={s.heat} max={100} className="meter-heat" label="武器热量" /></div><div className="weapon-skills"><div className={`skill-chip ${s.dashCharges > 0 ? 'is-ready' : ''}`}><kbd>{key('dash')}</kbd><span>冲刺 <strong>{s.dashCharges > 0 ? s.modules.includes('doubleDash') ? `${s.dashCharges}/2` : '就绪' : `${s.dashCooldown.toFixed(1)}s`}</strong></span></div><div className={`skill-chip ${perfect ? 'is-beam-ready' : ''}`}><kbd>左键</kbd><span>贯穿炮 <strong>{perfect ? `${s.perfectWindow.toFixed(2)}s` : '冲刺后射击'}</strong></span></div></div></div>
     </div>
   </div>;
 }
 
 function EvolutionRecipes({ snapshot: s }: { snapshot: HudSnapshot }) {
-  return <details className="evolution-recipes"><summary>进化组合 <span>{s.evolutions.length} / 2</span></summary><p>主模块 II＋搭配模块 I，在首领奖励中选择进化；仍占原有栏位。</p><div>{Object.values(EVOLUTIONS).map(item => <p key={item.id} className={s.evolutions.includes(item.id) ? 'is-evolved' : ''}><strong>{item.name}</strong><span>{MODULES[item.primary].name} II ＋ {MODULES[item.partner].name} I</span></p>)}</div></details>;
+  return <details className="evolution-recipes"><summary>进化组合 <span>已获得 {s.evolutions.length} 种</span></summary><p>主模块达到 II、搭配达到 I，即可在精英或首领奖励中选择进化；进化后仍能继续升层。</p><div>{Object.values(EVOLUTIONS).map(item => <p key={item.id} className={s.evolutions.includes(item.id) ? 'is-evolved' : ''}><strong>{item.name}</strong><span>{MODULES[item.primary].name} II ＋ {MODULES[item.partner].name} I</span></p>)}</div></details>;
 }
 
 function UpgradeChoice({ snapshot: s, runtime }: { snapshot: HudSnapshot; runtime: RuntimeControls }) {
   const branches = { main: '主炮', drone: '子机', resource: '机动与资源' };
-  const kinds = { module: '新模块', rank: '升至 II', evolution: '组合进化', resource: '补给' };
-  return <Dialog title={s.choiceSource === 'boss' ? '首领奖励' : '选择强化'} eyebrow={`已装配 ${s.modules.length} / 6 · 已进化 ${s.evolutions.length} / 2`} className="upgrade-dialog">
+  const kinds = { module: '新模块', rank: '继续升层', evolution: '组合进化', resource: '补给' };
+  return <Dialog title={s.choiceSource === 'boss' ? '首领奖励' : s.choiceSource === 'elite' ? '精英奖励' : '选择强化'} eyebrow={`${s.modules.length} 种模块 · ${buildLayers(s)} 层 · ${s.evolutions.length} 种进化`} className="upgrade-dialog">
     <p className="dialog-description">笑梦：「哇！变强！」战斗已暂停，按 1 / 2 / 3 或点击选择后继续。</p>
     <div className="upgrade-cards">{s.upgradeChoices.map((id, index) => {
       const item = choiceView({ modules: [...s.modules], ranks: s.moduleRanks }, id);
-      return <button key={s.upgradeOfferId + ':' + id} className={`upgrade-card branch-${item.branch} choice-${item.kind}`} onClick={() => runtime.chooseUpgrade(id, s.upgradeOfferId ?? undefined)}><span className="upgrade-branch">{branches[item.branch]} · {kinds[item.kind]}<kbd>{index + 1}</kbd></span><strong>{item.name}</strong>{item.flavor && <small className="module-flavor">{item.flavor}</small>}<p>{item.description}</p><span className="upgrade-confirm">选择强化 <Icon name="arrow" /></span></button>;
+      const previewId = item.kind === 'evolution' ? EVOLUTIONS[id.slice(10) as keyof typeof EVOLUTIONS].primary : item.kind === 'resource' ? null : id as ModuleId;
+      return <button key={s.upgradeOfferId + ':' + id} className={`upgrade-card branch-${item.branch} choice-${item.kind}`} onClick={() => runtime.chooseUpgrade(id, s.upgradeOfferId ?? undefined)}><span className="upgrade-branch">{branches[item.branch]} · {kinds[item.kind]}<kbd>{index + 1}</kbd></span><strong>{item.name}{item.rank !== null && <small className="upgrade-rank">{item.kind === 'rank' ? `${rankLabel(item.rank - 1)} → ${rankLabel(item.rank)}` : rankLabel(item.rank)}</small>}</strong>{previewId && <ModulePreview id={previewId} rank={item.rank ?? s.moduleRanks[previewId] ?? 1} evolved={item.kind === 'evolution'} reducedMotion={s.settings.reducedMotion} />}{item.flavor && <small className="module-flavor">{item.flavor}</small>}<p>{item.description}</p><span className="upgrade-confirm">选择强化 <Icon name="arrow" /></span></button>;
     })}</div>
-    <div className="upgrade-toolbar"><span>{s.modules.length ? `已装配：${buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => item.name + (item.evolution ? ' ✦' : item.rank === 2 ? ' II' : ' I')).join(' · ')}` : '模块在本局持续生效，受伤不会丢失。'}</span><button className="button button-secondary button-small" disabled={s.rerollsRemaining === 0} onClick={() => runtime.rerollUpgrades()}>重抽 · {s.rerollsRemaining}</button></div>
-    <EvolutionRecipes snapshot={s} />
+    <div className="upgrade-toolbar"><span>{s.modules.length ? `模块可一直增加与升层；本局已强化 ${buildLayers(s)} 层。` : '模块在本局持续生效，受伤不会丢失。'}</span><button className="button button-secondary button-small" disabled={s.rerollsRemaining === 0} onClick={() => runtime.rerollUpgrades()}>重抽 · {s.rerollsRemaining}</button></div>
+    <PausedModules snapshot={s} expanded={false} />
     <button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button>
   </Dialog>;
 }
@@ -168,11 +175,11 @@ function Settings({ settings, setSettings, onClose }: { settings: GameSettings; 
   </Dialog>;
 }
 
-function PausedModules({ snapshot: s }: { snapshot: HudSnapshot }) {
+function PausedModules({ snapshot: s, expanded = true }: { snapshot: HudSnapshot; expanded?: boolean }) {
   const labels = { ready: '就绪', active: '生效中', cooldown: '冷却', consumed: '本局已消耗' };
-  return <><details className="paused-modules" open><summary>本局模块 <span>{s.modules.length} / 6</span></summary><div>{buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => {
+  return <><details className="paused-modules" open={expanded}><summary>本局模块 <span>{s.modules.length} 种 · {buildLayers(s)} 层</span></summary><div>{buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => {
     const state = s.moduleStates.find(module => module.id === item.id);
-    return <article key={item.id}><div><strong>{item.name} {item.evolution ? '✦' : item.rank === 2 ? 'II' : 'I'}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{item.description}</p>{item.flavor && <small className="module-flavor">{item.flavor}</small>}</article>;
+    return <article key={item.id}><div><strong>{item.name} {rankLabel(item.rank)}{item.evolution ? ' ✦' : ''}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{item.description}</p>{item.flavor && <small className="module-flavor">{item.flavor}</small>}</article>;
   })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><EvolutionRecipes snapshot={s} /></>;
 }
 

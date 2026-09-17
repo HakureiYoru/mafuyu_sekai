@@ -5,8 +5,13 @@ import type { CombatEvent, Difficulty, InputAction } from './types';
 
 const difficulties = ['normal', 'hard'] as const;
 const input: InputAction = { moveX: 0, moveY: 0, aimX: 3500, aimY: 2000, shoot: false, bomb: false, dash: false };
-function quiet(difficulty: Difficulty) { const sim = new GameSimulation(3401, difficulty); sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9; return sim; }
+// These fixtures isolate the main-boss gate after its light elite has already been defeated.
+function quiet(difficulty: Difficulty) {
+  const sim = new GameSimulation(3401, difficulty); sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9;
+  sim.state.campaign.spawnedElites.push('elite:1:0'); sim.state.campaign.defeatedElites.push('elite:1:0'); return sim;
+}
 function ticks(sim: GameSimulation, count: number) { const events: CombatEvent[] = []; for (let i = 0; i < count; i++) events.push(...sim.step(input)); return events; }
+function drainUpgrades(sim: GameSimulation): void { while (sim.state.status === 'upgrade') sim.chooseUpgrade(sim.state.build.choices[0]); }
 function holding(difficulty: Difficulty) {
   const sim = quiet(difficulty); sim.state.waveTime = 90 - STEP;
   sim.step(input); ticks(sim, 96);
@@ -61,24 +66,30 @@ describe('continuous encounter progression gates', () => {
   });
   it.each(difficulties)('%s also holds endless progression during its scheduled ECHO encounter', difficulty => {
     const sim = quiet(difficulty); sim.reset('endless'); sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9;
+    sim.state.wave = 10; sim.state.waveTime = 18 - STEP; sim.step(input); ticks(sim, 78);
+    const elite = sim.state.enemies.find(e => e.role === 'elite')!; expect(elite).toBeDefined(); sim.damageEnemy(elite, elite.hp);
+    drainUpgrades(sim);
     sim.state.wave = 10; sim.state.waveTime = BALANCE.spawn.waveDuration - STEP; sim.step(input); ticks(sim, 96);
     const mini = sim.state.enemies.find(e => e.type === 'miniboss')!; expect(mini).toBeDefined();
     const before = sim.state.waveTime; ticks(sim, 120); expect(sim.state.wave).toBe(10); expect(sim.state.waveTime).toBe(before);
-    sim.damageEnemy(mini, mini.hp); expect(sim.state.wave).toBe(11); expect(sim.state.status).toBe('playing');
+    sim.damageEnemy(mini, mini.hp); expect(sim.state.wave).toBe(11); expect(sim.state.status).toBe('upgrade');
+    expect(sim.state.build.pendingRewards.some(reward => reward.source === 'boss')).toBe(true);
+    drainUpgrades(sim);
+    expect(sim.state.status).toBe('playing');
   });
 });
 
 describe('bounded reinforcements while a Boss holds progression', () => {
   it.each(difficulties)('%s counts pending births and never accumulates catch-up debt', difficulty => {
     const { sim } = holding(difficulty); fillAdds(sim, limit(difficulty) - 2 - activeAdds(sim));
-    sim.step(input); sim.state.spawnTimer = 0; const spawnTimes: number[] = [];
+    sim.step(input); sim.state.spawnTimer = 0; const spawnTimes: number[] = [], initialKills = sim.state.kills;
     for (let i = 0; i < 600; i++) {
       const events = sim.step(input);
       if (events.some(e => e.type === 'spawn' && e.enemyType !== 'miniboss')) spawnTimes.push(sim.state.elapsed);
       expect(activeAdds(sim)).toBeLessThanOrEqual(limit(difficulty)); expect(sim.state.spawnTimer).toBeGreaterThanOrEqual(-STEP);
     }
     expect(spawnTimes).toHaveLength(2); expect(spawnTimes[1] - spawnTimes[0]).toBeGreaterThanOrEqual(interval(difficulty) - STEP - 1e-8);
-    expect(activeAdds(sim)).toBe(limit(difficulty)); expect(sim.state.spawnTimer).toBeGreaterThan(0);
+    expect(activeAdds(sim) + sim.state.kills - initialKills).toBe(limit(difficulty)); expect(sim.state.spawnTimer).toBeGreaterThan(0);
   });
   it.each(difficulties)('%s includes queued ordinary births when a minelayer tries to add a mine', difficulty => {
     const { sim } = holding(difficulty), layer = sim.spawnEnemy('minelayer', 2000, 2300)!;

@@ -135,7 +135,8 @@ describe('v5 resource state, collision core and progression', () => {
   it('earns only local resonance at level ten and clears it on a fresh Lv1 retry', () => {
     const sim = run([], 10); const p = sim.state.player; p.xp = 0;
     sim.state.pickups.push({ id: 990, type: 'xp', value: 2500, age: 0, x: p.x, y: p.y });
-    sim.step(input()); expect(sim.state.build).toMatchObject({ resonance: 4, resonanceXp: 0 });
+    sim.step(input()); expect(sim.state.build).toMatchObject({ resonance: 4, resonanceXp: 100 });
+    expect(sim.state.build.pendingRewards[0]?.source).toBe('resonance');
     sim.reset('story', 400, 'normal');
     expect(sim.state.build).toMatchObject({ resonance: 0, modules: [], levelFloor: 1 });
     expect(sim.state.player).toMatchObject({ level: 1, xp: 0 });

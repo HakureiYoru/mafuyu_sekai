@@ -1,8 +1,10 @@
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
-import { EffectSystem } from './effects';
+import { EffectSystem, retainEffectNumberFont } from './effects';
 import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
+import { bossActionTelegraph } from './boss-actions';
+import { eliteTelegraphs } from './elite-ai';
 import { season2Telegraphs } from './season2-ai';
 import type { Season2Telegraph } from './season2-ai';
 import { spellCardDefinition, spellReturnPreview, spellTelegraphs } from './spellcards';
@@ -224,6 +226,7 @@ export class GameRenderer {
   private readonly pickupFree: PickupVisual[] = [];
   private readonly bullets: BulletVisual[] = [];
   private readonly companions: CompanionVisual[] = [];
+  private readonly moduleDecoys: Sprite[] = [];
   private assets!: Record<AssetKey, Texture>;
   private supportAssets!: Record<SupportAssetKey, Texture>;
   private pickupHint!: Text;
@@ -232,6 +235,7 @@ export class GameRenderer {
   private atlas!: Atlas;
   private generated: Texture[] = [];
   private effects!: EffectSystem;
+  private releaseNumberFont?: () => void;
   private playerArt!: Sprite;
   private playerHit!: Sprite;
   private playerRing!: Sprite;
@@ -291,6 +295,7 @@ export class GameRenderer {
     this.generated.push(playerWhite, enemyWhite);
     // Retain one shared silhouette texture instead of allocating a filter for each hit.
     this.enemyWhite = enemyWhite;
+    this.releaseNumberFont = retainEffectNumberFont();
     this.effects = new EffectSystem({ glow: atlas.glow, spark: atlas.spark, ring: atlas.ring, player: this.assets.player }, this.settings);
     this.app.stage.eventMode = 'none';
     this.app.stage.addChild(this.scene);
@@ -517,13 +522,14 @@ export class GameRenderer {
       }
       visual.badge.width = enemy.radius * 2.95; visual.badge.height = enemy.radius * 2.95;
       visual.badge.alpha = machine ? 0.9 : enemy.state === 'charge' || enemy.state === 'aim' ? 0.9 : 0.55;
+      if (enemy.role === 'elite') { visual.badge.tint = 0xffc990; visual.badge.alpha = .95; }
       if ((enemy.shieldBrokenUntil ?? 0) > state.elapsed) { visual.badge.alpha = 0.25; visual.badge.tint = 0x7b879c; }
       visual.badge.rotation = enemy.type === 'shield' || enemy.type === 'returner' ? enemy.angle : enemy.type === 'dasher' || enemy.type === 'miniboss' ? enemy.angle + Math.PI / 2 : enemy.type === 'boss' || enemy.type === 'sprayer' ? (this.settings.reducedMotion ? 0 : state.elapsed * 0.12) : 0;
       visual.halo.visible = isMine || this.settings.quality !== 'low';
       visual.halo.width = enemy.radius * (isMine ? 2.8 : 4.3); visual.halo.height = visual.halo.width;
       visual.halo.tint = isMine ? 0x030811 : color;
       visual.halo.alpha = isMine ? 0.85 : enemy.type === 'boss' ? 0.22 : 0.11 + hit * 0.17;
-      const showHealth = !disabled && enemy.hp < enemy.maxHp && !isMine && enemy.type !== 'core' && enemy.type !== 'boss' && enemy.type !== 'miniboss' && enemy.type !== 'palisade' && enemy.type !== 'reprise';
+      const showHealth = !disabled && (enemy.hp < enemy.maxHp || enemy.role === 'elite') && !isMine && enemy.type !== 'core' && enemy.type !== 'boss' && enemy.type !== 'miniboss' && enemy.type !== 'palisade' && enemy.type !== 'reprise';
       visual.health.visible = showHealth; visual.bar.visible = showHealth;
       if (showHealth) {
         const width = Math.max(36, enemy.radius * 1.5);
@@ -583,6 +589,13 @@ export class GameRenderer {
   }
 
   private renderAttachment(graph: Graphics, enemy: Enemy, x: number, y: number) {
+    if (enemy.role === 'elite') {
+      const radius = enemy.radius + 9;
+      graph.arc(x, y, radius, Math.PI * .13, Math.PI * .87).stroke({ color: 0xffce91, width: 3, alpha: .85 });
+      graph.arc(x, y, radius, Math.PI * 1.13, Math.PI * 1.87).stroke({ color: 0xffce91, width: 3, alpha: .85 });
+      graph.poly([x - 13, y - radius - 9, x - 7, y - radius - 3, x, y - radius - 13, x + 7, y - radius - 3, x + 13, y - radius - 9])
+        .stroke({ color: 0xffe6c2, width: 2.2, alpha: 1 });
+    }
     if (!['shield', 'sniper', 'sprayer', 'weaver', 'sampler', 'repairer', 'palisade', 'reprise'].includes(enemy.type)) return;
     const windup = ['charge', 'aim', 'laserWarmup'].includes(enemy.state);
     const firing = ['volley', 'laser', 'dash'].includes(enemy.state);
@@ -614,6 +627,7 @@ export class GameRenderer {
   private renderCombatMarks(state: WorldState, alpha: number) {
     const graph = this.combatMarks.clear();
     this.commandHint.visible = false;
+    this.renderModuleVisuals(state, alpha, graph);
     // Friendly module areas use the simulation geometry and stay below hostile shots.
     for (const area of state.playerAreas ?? []) {
       const waiting = area.warning > 0;
@@ -634,6 +648,16 @@ export class GameRenderer {
     }
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0 || (enemy.disabledUntil ?? 0) > state.elapsed) continue;
+      if ((enemy.exposedUntil ?? 0) > state.elapsed) {
+        const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha), radius = Math.min(32, enemy.radius * .45);
+        graph.circle(x, y, radius).fill({ color: 0xffe7b1, alpha: .18 }).stroke({ color: 0x171220, width: 7 });
+        graph.circle(x, y, radius).stroke({ color: 0xffe7b1, width: 2.5, alpha: 1 });
+        graph.poly([x, y - radius * .7, x + radius * .7, y, x, y + radius * .7, x - radius * .7, y]).stroke({ color: 0xfff5d5, width: 2 });
+        for (let i = 0; i < 4; i++) {
+          const angle = i * Math.PI / 2;
+          this.directionMark(graph, x + Math.cos(angle) * (radius + 11), y + Math.sin(angle) * (radius + 11), angle + Math.PI, 0xffdd94, 6);
+        }
+      }
       const weak = enemy.weakpoint;
       if (weak && weak.hp > 0 && this.visible(weak.x, weak.y, 50)) {
         // This circle is the exposed weakpoint supplied by the simulation, including its real radius.
@@ -657,6 +681,78 @@ export class GameRenderer {
       this.commandHint.visible = true; this.commandHint.position.set(x, y - radius - 21);
       this.commandHint.text = '护刃追迹';
     }
+  }
+
+  private renderModuleVisuals(state: WorldState, alpha: number, graph: Graphics) {
+    let decoys = 0;
+    for (const effect of state.moduleVisuals ?? []) {
+      const x = lerp(effect.prevX, effect.x, alpha), y = lerp(effect.prevY, effect.y, alpha), shape = effect.geometry;
+      const warning = effect.age < effect.warning, remaining = Math.max(0, effect.duration - effect.age);
+      const opacity = warning ? .42 : Math.min(1, remaining / .18);
+      const color = effect.kind === 'star' || effect.kind === 'note' ? 0xc6bcff : effect.kind === 'wind' || effect.kind === 'lane' ? 0x97edec : 0xa5f4ef;
+      const line = warning ? 1.5 : 2.3;
+      const utility = effect.utilityGeometry;
+      if (utility?.shape === 'path' && utility.points.length > 1) {
+        const points = utility.points.flatMap(point => [point.x, point.y]);
+        if (utility.closed) graph.poly(points).fill({ color: 0x92d9e9, alpha: .065 * opacity });
+        // Utility boundaries stay dim and thin; only the original conduit has a bright damage core.
+        graph.poly(points, utility.closed).stroke({ color: 0x92d9e9, width: 1, alpha: .32 * opacity });
+        if (shape.shape === 'path') graph.poly(shape.points.flatMap(point => [point.x, point.y]), shape.closed)
+          .stroke({ color: 0x92d9e9, width: utility.width, alpha: .035 * opacity });
+      }
+      if (effect.kind === 'decoy') {
+        let sprite = this.moduleDecoys[decoys];
+        if (!sprite) { sprite = centered(this.assets.player, 54); this.companionLayer.addChild(sprite); this.moduleDecoys.push(sprite); }
+        sprite.visible = true; sprite.position.set(x, y); sprite.alpha = .34 * opacity; decoys++;
+      }
+      if (shape.shape === 'circle') {
+        if (!this.visible(x, y, shape.radius + 30)) continue;
+        graph.circle(x, y, shape.radius).fill({ color, alpha: .035 * opacity }).stroke({ color, width: line, alpha: opacity * .7 });
+        if (effect.kind === 'blade') {
+          const angle = Math.atan2(effect.y - effect.prevY, effect.x - effect.prevX), radius = Math.max(8, shape.radius);
+          graph.arc(x, y, radius, angle - Math.PI * .7, angle + Math.PI * .7).stroke({ color: 0xd7ffff, width: 3, alpha: opacity });
+          graph.moveTo(x - Math.cos(angle) * radius, y - Math.sin(angle) * radius)
+            .lineTo(x - Math.cos(angle) * (radius + 20), y - Math.sin(angle) * (radius + 20)).stroke({ color, width: 1.6, alpha: .6 * opacity });
+        } else if (effect.kind === 'star' || effect.kind === 'note') {
+          const r = effect.kind === 'star' ? 12 : 7;
+          graph.poly([x, y-r, x+r*.35, y-r*.35, x+r, y, x+r*.35, y+r*.35, x, y+r, x-r*.35, y+r*.35, x-r, y, x-r*.35, y-r*.35])
+            .fill({ color, alpha: opacity * .65 }).stroke({ color: 0xe5ffff, width: 1.5, alpha: opacity });
+          if (effect.kind === 'note') graph.moveTo(x + 6, y).lineTo(x + 6, y - 18).lineTo(x + 16, y - 21).stroke({ color, width: 2.5, alpha: opacity });
+        } else if (effect.kind === 'counter') {
+          for (let i = 0; i < 8; i++) { const a = i * TAU / 8; this.directionMark(graph, x + Math.cos(a) * shape.radius, y + Math.sin(a) * shape.radius, a, color, 6); }
+        }
+        if (warning && effect.warning > 0) graph.arc(x, y, Math.min(24, shape.radius * .8), -Math.PI / 2, -Math.PI / 2 + TAU * effect.age / effect.warning).stroke({ color: 0xe5ffff, width: 2, alpha: .8 });
+      } else if (shape.shape === 'beam') {
+        const geometry = beamGeometry(x, y, shape.angle, shape.length, shape.width);
+        graph.poly(geometry.corners).fill({ color, alpha: (warning ? .025 : .065) * opacity }).stroke({ color, width: warning ? 1 : 1.6, alpha: .55 * opacity });
+        graph.moveTo(x, y).lineTo(geometry.endX, geometry.endY).stroke({ color: 0xe1fffa, width: warning ? 1 : Math.min(6, shape.width * .3), alpha: opacity * .8 });
+        if (effect.kind === 'pulse' && !warning) {
+          const progress = clamp(effect.age / effect.duration, 0, 1), px = x + Math.cos(shape.angle) * shape.length * progress, py = y + Math.sin(shape.angle) * shape.length * progress;
+          graph.arc(px, py, shape.width / 2, shape.angle - Math.PI / 2, shape.angle + Math.PI / 2).stroke({ color: 0xeaffff, width: 3, alpha: opacity });
+        }
+      } else if (shape.shape === 'arc') {
+        graph.arc(x, y, shape.radius, shape.angle, shape.angle + shape.arc).stroke({ color, width: shape.width, alpha: .17 * opacity });
+        graph.arc(x, y, shape.radius, shape.angle, shape.angle + shape.arc).stroke({ color: 0xd9ffff, width: line, alpha: opacity });
+        const endAngle = shape.angle + shape.arc;
+        graph.moveTo(x + Math.cos(endAngle) * (shape.radius - shape.width / 2), y + Math.sin(endAngle) * (shape.radius - shape.width / 2))
+          .lineTo(x + Math.cos(endAngle) * (shape.radius + shape.width / 2), y + Math.sin(endAngle) * (shape.radius + shape.width / 2)).stroke({ color: 0xe7ffff, width: 3, alpha: opacity });
+      } else if (shape.points.length > 1) {
+        const points = shape.points.flatMap(point => [point.x, point.y]);
+        if (shape.closed) graph.poly(points).fill({ color, alpha: .025 * opacity });
+        graph.poly(points, shape.closed).stroke({ color, width: Math.min(shape.width, 14), alpha: .10 * opacity });
+        graph.poly(points, shape.closed).stroke({ color: 0xd1fff7, width: line, alpha: opacity * .8 });
+        if (effect.kind === 'lane') {
+          for (let i = 1; i < shape.points.length; i++) {
+            const a = shape.points[i - 1], b = shape.points[i];
+            const area = beamGeometry(a.x, a.y, Math.atan2(b.y - a.y, b.x - a.x), Math.hypot(b.x - a.x, b.y - a.y), shape.width);
+            graph.poly(area.corners).fill({ color, alpha: .035 * opacity }).stroke({ color, width: 1, alpha: .35 * opacity });
+          }
+          const a = shape.points[0], b = shape.points[shape.points.length - 1], angle = Math.atan2(b.y - a.y, b.x - a.x);
+          for (const fraction of [.25, .5, .75]) this.directionMark(graph, lerp(a.x, b.x, fraction), lerp(a.y, b.y, fraction), angle, color, 8);
+        }
+      }
+    }
+    for (let i = decoys; i < this.moduleDecoys.length; i++) this.moduleDecoys[i].visible = false;
   }
 
   private renderBullets(state: WorldState, alpha: number) {
@@ -686,6 +782,7 @@ export class GameRenderer {
       effect.width = hostile ? Math.max(30, bullet.radius * 5) : perfect ? 115 : bullet.kind === 'special' ? 40 : bullet.kind === 'drone' ? 25 : 31;
       effect.height = hostile ? effect.width : perfect ? 29 : bullet.kind === 'special' ? 20 : 12;
       effect.tint = hostile ? bullet.shape ? bullet.color : 0xff713e : perfect ? 0xecffcc : bullet.color || 0x9ef8e4;
+      if (!hostile && bullet.color === 0xffcb69) effect.tint = 0x9bddff;
       effect.alpha = hostile ? bullet.shape ? this.settings.quality === 'low' ? 0 : 0.12 : 0.22 : 0.85;
       const tailOffset = hostile ? 0 : perfect ? 28 : 8;
       effect.position.set(x - Math.cos(angle) * tailOffset, y - Math.sin(angle) * tailOffset);
@@ -705,6 +802,33 @@ export class GameRenderer {
       if (hostile && bullet.shape) {
         const size = bullet.radius * (bullet.shape === 'orb' ? 3.25 : bullet.shape === 'rice' ? 4 : 4.5);
         core.width = core.height = size;
+      }
+      if (!hostile) {
+        const motif = bullet.visualId ?? bullet.moduleId;
+        // Texture transforms stay in the existing batched bullet sprites; no per-shot filters.
+        if (motif === 'needle' || motif === 'needleArray') {
+          effect.width = 96; effect.height = 5; effect.tint = 0xa8f6ff; effect.alpha = .9;
+          effect.position.set(x - Math.cos(angle) * 37, y - Math.sin(angle) * 37);
+          core.texture = this.atlas.bolt; core.rotation = angle; core.width = 36; core.height = 5; core.tint = 0xf0ffff;
+        } else if (motif === 'wing' || motif === 'wingShots') {
+          effect.width = 39; effect.height = 6; effect.tint = 0x8ddcff;
+          core.texture = this.atlas.bolt; core.rotation = angle; core.width = 18; core.height = 6; core.tint = 0xc7f4ff;
+        } else if (motif === 'crystal' || motif === 'shatter') {
+          core.texture = this.atlas.diamond; core.width = 13; core.height = 8; core.tint = 0xc4faff;
+          core.rotation = angle; effect.width = 20; effect.height = 5; effect.tint = 0xa2d4ff;
+        } else if (motif === 'ricochet' || motif === 'chain') {
+          core.texture = this.atlas.diamond; core.width = 12; core.height = 9; core.tint = 0xbafff2;
+          effect.width = 42; effect.height = 5; effect.tint = 0x83e9d2;
+          const dx = Math.cos(angle), dy = Math.sin(angle), nx = -dy, ny = dx;
+          this.combatMarks.moveTo(x - dx * 34, y - dy * 34).lineTo(x - dx * 21 + nx * 5, y - dy * 21 + ny * 5)
+            .lineTo(x - dx * 10 - nx * 4, y - dy * 10 - ny * 4).lineTo(x, y).stroke({ color: 0x94f3ea, width: 1.3, alpha: .75 });
+        } else if (motif === 'returnWing' || bullet.returning) {
+          core.texture = this.atlas.bolt; core.width = 23; core.height = 9; core.rotation = angle; core.tint = 0xd0c6ff;
+          effect.width = 37; effect.height = 8; effect.tint = 0xb2b6ff;
+        } else if (motif === 'droneBurst') {
+          core.texture = this.atlas.bolt; core.width = 30; core.height = 8; core.rotation = angle; core.tint = 0xf0f1ff;
+          effect.width = 63; effect.height = 11; effect.tint = 0xacbaff;
+        } else if (motif === 'rearSpark') { core.width = 11; core.height = 11; effect.width = 26; effect.height = 5; effect.tint = 0xa6fff0; }
       }
       heavy.visible = hostile && (bullet.friendlyDamage ?? 0) > 0 && (bullet.friendlyHits ?? 0) > 0;
       if (heavy.visible) {
@@ -737,6 +861,19 @@ export class GameRenderer {
       visual.glow.visible = this.settings.quality !== 'low';
       visual.glow.alpha = companion.shotCooldown > BALANCE.companion.interval - 0.08 ? 0.48 : 0.22;
       visual.barrel.alpha = companion.targetId === null ? 0.55 : 1;
+      const x = visual.root.x, y = visual.root.y, angle = companion.angle;
+      if ((state.build.ranks.orbitBlade ?? 0) > 0) {
+        const radius = 24;
+        for (const side of [-1, 1]) this.combatMarks.arc(x, y, radius, angle + side * Math.PI / 2 - .65, angle + side * Math.PI / 2 + .65)
+          .stroke({ color: companion.orbitTargetId ? 0xe5fff9 : 0xa6d7ff, width: 2.5, alpha: .9 });
+        if (companion.orbitTargetId) this.combatMarks.moveTo(lerp(companion.prevX, companion.x, 0), lerp(companion.prevY, companion.y, 0))
+          .lineTo(x, y).stroke({ color: 0xa6d7ff, width: 3, alpha: .5 });
+      }
+      if ((state.build.ranks.droneBurst ?? 0) > 0) {
+        const readiness = clamp(1 - companion.shotCooldown / BALANCE.companion.interval, 0, 1);
+        this.combatMarks.arc(x, y, 30, angle - Math.PI, angle - Math.PI + readiness * TAU)
+          .stroke({ color: 0xc4caff, width: 1.5, alpha: .6 });
+      }
     }
     for (let index = count; index < this.companions.length; index++) this.companions[index].root.visible = false;
   }
@@ -809,6 +946,13 @@ export class GameRenderer {
     graph.circle(x, y, 2.3).fill({ color: 0xf2fff8, alpha: 0.9 });
     if (player.invincible > 0) graph.circle(x, y, 35).stroke({ color: 0xe5fff6, width: 1.5, alpha: 0.85 });
     const cos = Math.cos(player.angle), sin = Math.sin(player.angle), nx = -sin, ny = cos;
+    if ((state.build.ranks.wingShots ?? 0) > 0) for (const side of [-1, 1]) {
+      const cannonX = x + nx * side * 22, cannonY = y + ny * side * 22;
+      graph.moveTo(cannonX - cos * 6, cannonY - sin * 6).lineTo(cannonX + cos * 36, cannonY + sin * 36)
+        .stroke({ color: 0x112734, width: 6, alpha: .8 });
+      graph.moveTo(cannonX + cos * 23, cannonY + sin * 23).lineTo(cannonX + cos * 36, cannonY + sin * 36)
+        .stroke({ color: 0xb0eeff, width: 2.5, alpha: .95 });
+    }
     const frontX = x + cos * 51, frontY = y + sin * 51;
     graph.poly([frontX + cos * 8, frontY + sin * 8, frontX - cos * 3 + nx * 4, frontY - sin * 3 + ny * 4,
       frontX - cos * 3 - nx * 4, frontY - sin * 3 - ny * 4]).fill(ready ? 0xffe6b3 : 0xb4ffed);
@@ -969,11 +1113,40 @@ export class GameRenderer {
     }
     for (const enemy of state.enemies) {
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha);
-      if (enemy.spell) {
+      const action = bossActionTelegraph(enemy);
+      if (action && action.phase !== 'recover') {
+        const length = Math.hypot(action.endX - action.x, action.endY - action.y);
+        this.dashWarning(graph, action.x, action.y, action.angle, length, action.width / 2, 0xffb27d, true);
+        const progress = action.phase === 'warning' ? clamp(1 - action.remaining / action.warning, 0, 1) : 1;
+        graph.arc(action.x, action.y, enemy.radius + 14, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffe0ab, width: 3, alpha: .95 });
+        if (action.kind === 'retrace') this.directionMark(graph, action.endX, action.endY, action.angle, 0xffddb4, 14);
+      }
+      if (enemy.elite) {
+        for (const cue of eliteTelegraphs(enemy)) {
+          const progress = clamp(1 - cue.remaining / Math.max(.001, cue.warning), 0, 1), color = 0xffbc86;
+          if (cue.kind === 'beam') {
+            const shape = beamGeometry(cue.x, cue.y, cue.angle, cue.length, cue.width);
+            graph.poly(shape.corners).fill({ color, alpha: .07 + .06 * progress }).stroke({ color, width: 2, alpha: .95 });
+            graph.moveTo(cue.x, cue.y).lineTo(shape.endX, shape.endY).stroke({ color: 0xffe7cb, width: 1, alpha: .8 });
+          } else if (cue.kind === 'wall' && cue.points?.length) {
+            // Individual slots use the exact committed shot origins; gaps stay visibly empty.
+            for (const point of cue.points) {
+              graph.circle(point.x, point.y, 7).stroke({ color, width: 2, alpha: .9 });
+              this.directionMark(graph, point.x + Math.cos(cue.angle) * 18, point.y + Math.sin(cue.angle) * 18, cue.angle, color, 5);
+            }
+          } else if (cue.kind === 'sample') {
+            for (const point of cue.points ?? [cue]) graph.circle(point.x, point.y, cue.radius).fill({ color, alpha: .065 }).stroke({ color, width: 2, alpha: .9 });
+          } else if (cue.kind === 'ring') {
+            graph.circle(cue.x, cue.y, cue.radius).stroke({ color, width: 2, alpha: .7 });
+            for (let i = 0; i < 8; i++) { const a = cue.angle + i * TAU / 8; this.directionMark(graph, cue.x + Math.cos(a) * cue.radius, cue.y + Math.sin(a) * cue.radius, a, color, 7); }
+          } else this.sector(graph, cue.x, cue.y, cue.angle - cue.spread / 2, cue.spread, cue.length, color, .065);
+          graph.arc(cue.x, cue.y, 20, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffdfb5, width: 3, alpha: .9 });
+        }
+      } else if (enemy.spell) {
         this.renderSpellWarnings(graph, enemy, state);
       } else if (enemy.season2) {
         for (const cue of season2Telegraphs(enemy, state.difficulty)) this.renderSeason2Warning(graph, enemy, cue);
-      } else if (enemy.type === 'miniboss' && enemy.miniboss) {
+      } else if (enemy.type === 'miniboss' && enemy.miniboss && !enemy.action) {
         const cfg = miniBossAttacks(state.difficulty), brain = enemy.miniboss;
         if (['charge', 'dash', 'aim'].includes(enemy.state) && brain.laserIndex === 0) {
           const landing = miniBossLandingTelegraph(enemy, state.difficulty);
@@ -1110,6 +1283,7 @@ export class GameRenderer {
     for (const [id, visual] of this.pickups) { visual.root.visible = false; this.pickupFree.push(visual); this.pickups.delete(id); }
     for (const visual of this.bullets) { visual.effect.visible = false; visual.core.visible = false; visual.heavy.visible = false; }
     for (const visual of this.companions) visual.root.visible = false;
+    for (const sprite of this.moduleDecoys) sprite.visible = false;
     this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.combatMarks.clear(); this.attachments.clear();
     this.pickupHint.visible = false; this.skillHint.visible = false; this.commandHint.visible = false;
   }
@@ -1123,6 +1297,7 @@ export class GameRenderer {
     this.app.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.app.canvas.removeEventListener('pointerleave', this.onPointerLeave);
     this.effects?.destroy();
+    this.releaseNumberFont?.(); this.releaseNumberFont = undefined;
     this.app.destroy(true, { children: true });
     for (const texture of this.generated) texture.destroy(true);
     for (const texture of Object.values(this.assets ?? {})) texture.destroy(true);

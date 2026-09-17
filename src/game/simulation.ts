@@ -3,11 +3,14 @@ import { difficultyConfig } from './difficulty';
 import { createMiniBossBrain, updateMiniBossAi } from './miniboss-ai';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, SeededRandom, segmentCircleHit, SpatialGrid, TAU } from './math';
 import { ObjectPool } from './pool';
+import { AttackBudget } from './attack-budget';
+import { ModuleCombat, type ModuleCombatContext } from './module-combat';
+import { createEliteBrain, updateEliteAi, ELITE_GROUPS } from './elite-ai';
 import { enemyAttacks, updateEnemyAi, interruptEnemy, cancelEnemyAttack, refreshWeakpoint } from './enemy-ai';
-import { ThreatDirector, isTacticalEnemy, type AttackIntent } from './threat-director';
+import { ThreatDirector, isTacticalEnemy, threatProfile, spawnPacketSize, type AttackIntent } from './threat-director';
 import { advanceProjectileMotion } from './projectile-motion';
 import { CampaignDirector, CAMPAIGN_STAGES, ENEMY_INTRODUCTIONS, ENCOUNTERS, type CampaignAction, type EncounterId } from './campaign';
-import { createBuild, offerModules, chooseModule, buildDamageMultiplier, addResonanceXp, RESONANCE, moduleRank, hasEvolution, enqueueUpgrade, rerollModules, MODULES, MODULE_VALUES, EVOLUTION_VALUES } from './upgrades';
+import { createBuild, offerModules, chooseModule, buildDamageMultiplier, addResonanceXp, RESONANCE, moduleRank, rankValue, highRankFactor, resolveBuildStats, hasEvolution, enqueueUpgrade, rerollModules, MODULES, MODULE_VALUES, EVOLUTION_VALUES, type ResolvedBuildStats } from './upgrades';
 import { createSpellBrain, spellCardDefinition, advanceSpellCard, updateSpellBoss } from './spellcards';
 import { createSeason2Brain, updateSeason2Ai, shieldDamageMultiplier, breakShield, onSeason2Death, type Season2AiContext } from './season2-ai';
 import type { AreaHazard, Bullet, CombatEvent, Companion, Difficulty, Enemy, EnemyShotOptions, EnemyType, InputAction, ModuleId, ModuleState, Pickup, PickupType, Player, ProjectileMotionPhase, RunStartOptions, WorldState, UpgradeChoiceId, EvolutionId } from './types';
@@ -56,7 +59,16 @@ export class GameSimulation {
   private readonly impacts: { enemy: Enemy; time: number; weakpoint?: boolean }[] = [];
   private readonly suppliedWaves = new Set<number>();
   private readonly shotFeedback = new Set<number>();
-  private readonly bulletPool = new ObjectPool(emptyBullet, bullet => bullet.hitIds.clear(), BALANCE.limits.bullets);
+  private readonly playerBulletPool = new ObjectPool(emptyBullet, bullet => bullet.hitIds.clear(), BALANCE.limits.playerBullets);
+  private readonly enemyBulletPool = new ObjectPool(emptyBullet, bullet => bullet.hitIds.clear(), BALANCE.limits.enemyBullets);
+  private readonly attackBudget = new AttackBudget(BALANCE.limits.enemyBullets, BALANCE.ai.hazards);
+  private readonly modules = new ModuleCombat();
+  private buildStats!: ResolvedBuildStats;
+  private livePlayerBullets = 0;
+  private liveEnemyBullets = 0;
+  private packetIndex = 0;
+  private endlessEliteWave = 0;
+  recentUpgrade: { id: UpgradeChoiceId; sequence: number } | undefined;
   private director!: CampaignDirector;
   private readonly threats = new ThreatDirector();
   private focusTime = 0;
@@ -80,7 +92,7 @@ export class GameSimulation {
   constructor(seed = 12345, difficulty: Difficulty = 'normal') { this.seed = seed; this.reset('story', seed, difficulty); }
 
   reset(mode: 'story' | 'endless' = 'story', seed = this.seed, difficulty: Difficulty = this.state?.difficulty ?? 'normal', options?: Partial<RunStartOptions>): void {
-    if (this.state) for (const bullet of this.state.bullets) this.bulletPool.release(bullet);
+    if (this.state) for (const bullet of this.state.bullets) this.releaseBullet(bullet);
     this.seed = seed;
     this.random = new SeededRandom(seed);
     this.nextId = 1;
@@ -106,7 +118,7 @@ export class GameSimulation {
     this.focusTime = this.shatterTimer = this.burstTimer = this.burstHits = this.ventTimer = this.reserveTimer = this.interceptTimer = this.grazeWindow = this.grazeCount = this.magnetTimer = this.magnetTime = 0;
     this.dashStock = 1; this.doubleDashActive = this.reviveUsed = false; this.bladeTimes.clear(); this.pendingCardClear = null;
     const season = 's1';
-    this.director = new CampaignDirector();
+    this.director = new CampaignDirector('s1', seed);
     this.threats.reset();
     const x = WORLD.width / 2, y = WORLD.height / 2;
     const player: Player = { x, y, prevX: x, prevY: y, vx: 0, vy: 0, radius: BALANCE.player.radius,
@@ -120,6 +132,10 @@ export class GameSimulation {
       blackHoleTime: 0, player, camera: { x, y, prevX: x, prevY: y }, enemies: [], bullets: [], pickups: [], indicators: [], companions: [], beams: [], hazards: [],
       seasonId: season, campaign: this.director.state, build: createBuild(), arena: null, playerAreas: [] };
     if (mode === 'story') this.handleCampaignActions(this.director.start());
+    this.liveEnemyBullets = this.livePlayerBullets = this.packetIndex = this.endlessEliteWave = 0;
+    this.recentUpgrade = undefined; this.attackBudget.reset(); this.modules.reset();
+    this.buildStats = resolveBuildStats(this.state.build);
+    this.state.moduleVisuals = this.modules.visuals;
   }
 
   /** Edge history is reset on pause/blur so a new physical press resumes cleanly. */
@@ -159,11 +175,16 @@ export class GameSimulation {
     this.useHpReserve();
     world.tick++;
     world.elapsed += dt;
+    this.liveEnemyBullets = this.livePlayerBullets = 0;
+    for (const bullet of world.bullets) { if (bullet.owner === 'enemy') this.liveEnemyBullets++; else this.livePlayerBullets++; }
+    this.attackBudget.expire(world.elapsed);
     this.threats.update(world.elapsed, world.enemies);
     world.blackHoleTime = Math.max(0, world.blackHoleTime - dt);
     this.updateBeams(dt);
     this.rebuildGrid();
-    this.updatePlayer(input, dt);
+    this.modules.step(dt, this.moduleContext(), input);
+    world.moduleVisuals = this.modules.visuals;
+    if (world.status === 'playing') this.updatePlayer(input, dt);
     if (world.status === 'playing') this.updatePlayerAreas(dt);
     if (world.status === 'playing') this.updateHazards(dt);
     if (world.status === 'playing') {
@@ -200,7 +221,7 @@ export class GameSimulation {
     this.grazeWindow += dt;
     if (this.grazeWindow >= 1) { this.grazeWindow %= 1; this.grazeCount = 0; }
     if (this.has('magnet') && this.magnetTimer <= EPSILON) { this.magnetTimer = this.value('magnet', MODULE_VALUES.magnet.cooldown); this.magnetTime = MODULE_VALUES.magnet.duration; this.moduleEvent('magnet'); }
-    if (this.has('reserveAmmo') && p.heat >= MODULE_VALUES.reserveAmmo.threshold && this.reserveTimer <= EPSILON) { p.heat = Math.max(0, p.heat - this.value('reserveAmmo', MODULE_VALUES.reserveAmmo.heat)); this.reserveTimer = MODULE_VALUES.reserveAmmo.cooldown; this.moduleEvent('reserveAmmo'); }
+    if (this.has('reserveAmmo') && p.heat >= MODULE_VALUES.reserveAmmo.threshold && this.reserveTimer <= EPSILON) { p.heat = Math.max(0, p.heat - this.value('reserveAmmo', MODULE_VALUES.reserveAmmo.heat)); this.reserveTimer = this.scalar('reserveAmmo', 'cooldown', MODULE_VALUES.reserveAmmo.cooldown); this.moduleEvent('reserveAmmo'); }
     p.prevX = p.x; p.prevY = p.y;
     p.focus = !!input.focus;
     this.focusTime = p.focus ? this.focusTime + dt : 0;
@@ -240,16 +261,16 @@ export class GameSimulation {
       p.dashTime = Math.max(0, p.dashTime - dt);
       if (p.dashTime <= EPSILON) {
         p.dashTime = 0; p.perfectWindow = BALANCE.dash.window;
-        if (this.has('vent') && this.ventTimer <= EPSILON) { p.heat = Math.max(0, p.heat - this.value('vent', MODULE_VALUES.vent.heat)); this.ventTimer = MODULE_VALUES.vent.cooldown; this.moduleEvent('vent'); }
-        this.createDashEcho();
+        if (this.has('vent') && this.ventTimer <= EPSILON) { p.heat = Math.max(0, p.heat - this.value('vent', MODULE_VALUES.vent.heat)); this.ventTimer = this.scalar('vent', 'cooldown', MODULE_VALUES.vent.cooldown); this.moduleEvent('vent'); }
       }
     }
-    const moveSpeed = p.focus ? BALANCE.player.focusSpeed : BALANCE.player.speed;
+    const moveSpeed = p.focus ? BALANCE.player.focusSpeed : Math.min(400, this.modules.moveSpeed(BALANCE.player.speed, this.moduleContext()));
     p.vx = dashDelta > 0 ? p.dashVx : direction.x * moveSpeed;
     p.vy = dashDelta > 0 ? p.dashVy : direction.y * moveSpeed;
     const arena = this.state.arena ?? { x: 0, y: 0, width: WORLD.width, height: WORLD.height };
     p.x = clamp(p.x + direction.x * moveSpeed * (dt - dashDelta), arena.x + p.radius, arena.x + arena.width - p.radius);
     p.y = clamp(p.y + direction.y * moveSpeed * (dt - dashDelta), arena.y + p.radius, arena.y + arena.height - p.radius);
+    if (dashDelta > 0 && p.dashTime <= EPSILON) { this.createDashEcho(); this.modules.onDashEnd(this.moduleContext(), this.dashStart); }
     if (input.bomb && !this.previousBomb && p.bombs > 0) this.useBomb();
     this.previousBomb = input.bomb;
     if (this.state.status !== 'playing') return;
@@ -274,7 +295,7 @@ export class GameSimulation {
     }
     if (p.overheated && p.heatLock <= EPSILON && p.heat <= BALANCE.heat.unlock + EPSILON) p.overheated = false;
     if (this.has('brakeField') && this.focusTime >= MODULE_VALUES.brakeField.hold - EPSILON && this.brakeTimer <= EPSILON) {
-      this.brakeTimer = MODULE_VALUES.brakeField.cooldown; this.addPlayerArea('brake', p.x, p.y, this.value('brakeField', MODULE_VALUES.brakeField.radius), 0, 0.8, 0, this.value('brakeField', MODULE_VALUES.brakeField.slow)); this.moduleEvent('brakeField');
+      this.brakeTimer = this.scalar('brakeField', 'cooldown', MODULE_VALUES.brakeField.cooldown); this.addPlayerArea('brake', p.x, p.y, this.value('brakeField', MODULE_VALUES.brakeField.radius), 0, 0.8, 0, this.value('brakeField', MODULE_VALUES.brakeField.slow)); this.moduleEvent('brakeField');
     }
     if (firing && !beamReady) this.shootPassiveModules();
     this.updateSpecial(dt);
@@ -284,18 +305,24 @@ export class GameSimulation {
     const p = this.state.player, lv = clamp(p.level, 1, BALANCE.xp.cap) - 1;
     const baseCount = BALANCE.weapon.counts[lv], needle = this.evolved('needleArray') && p.focus;
     const count = needle ? 1 : baseCount;
-    if (this.state.bullets.length + count > BALANCE.limits.bullets) return;
+    if (this.livePlayerBullets + count > BALANCE.limits.playerBullets) return;
     p.shotCooldown = BALANCE.weapon.intervals[lv] * STEP;
     const color = p.level >= 10 ? 0xffcb69 : p.level >= 7 ? 0xc99dff : p.level >= 4 ? 0x69baff : 0x73f7eb;
-    const damage = BALANCE.weapon.damage * buildDamageMultiplier(this.state.build, this.focusTime >= MODULE_VALUES.precision.hold - EPSILON);
+    const piercingRank = moduleRank(this.state.build, 'piercing');
+    const damage = BALANCE.weapon.damage * buildDamageMultiplier(this.state.build, this.focusTime >= MODULE_VALUES.precision.hold - EPSILON) * highRankFactor(piercingRank);
     for (let i = 0; i < count; i++) {
       const angle = p.angle + (i - (count - 1) / 2) * BALANCE.weapon.spreads[lv] * (p.focus ? BALANCE.player.focusSpread : 1);
-      this.addBullet(p.x, p.y, angle, needle ? 1500 : BALANCE.weapon.speeds[lv], 'player', damage * (needle ? baseCount : 1),
-        p.level >= 10 ? 6 : 4, color, 'normal', needle ? EVOLUTION_VALUES.needleArray.targets : (p.level >= 10 ? 2 : 1) + moduleRank(this.state.build, 'piercing'), !needle && p.level >= 7, BALANCE.weapon.homingRange);
+      const bullet = this.addBullet(p.x, p.y, angle, needle ? 1500 : BALANCE.weapon.speeds[lv], 'player', damage * (needle ? baseCount : 1),
+        p.level >= 10 ? 6 : 4, color, 'normal', needle ? EVOLUTION_VALUES.needleArray.targets : (p.level >= 10 ? 2 : 1) + this.value('piercing', MODULE_VALUES.piercing.extraHits), !needle && p.level >= 7, BALANCE.weapon.homingRange);
+      if (bullet) bullet.visualId = needle ? 'needle' : 'main';
     }
-    if (this.has('wingShots')) for (const side of [-1, 1]) this.addBullet(p.x - Math.sin(p.angle) * side * 22, p.y + Math.cos(p.angle) * side * 22,
-      p.angle, BALANCE.weapon.speeds[lv], 'player', this.value('wingShots', MODULE_VALUES.wingShots.damage) * buildDamageMultiplier(this.state.build), 4, 0x9be6ff, 'module');
+    if (this.has('wingShots')) for (const side of [-1, 1]) {
+      const bullet = this.addBullet(p.x - Math.sin(p.angle) * side * 22, p.y + Math.cos(p.angle) * side * 22,
+        p.angle, BALANCE.weapon.speeds[lv], 'player', this.value('wingShots', MODULE_VALUES.wingShots.damage) * buildDamageMultiplier(this.state.build), 4, 0x9be6ff, 'module');
+      if (bullet) { bullet.visualId = 'wing'; bullet.moduleId = 'wingShots'; }
+    }
     this.emit({ type: 'shot', x: p.x + Math.cos(p.angle) * 30, y: p.y + Math.sin(p.angle) * 30, angle: p.angle, color: 0x73f7eb, amount: BALANCE.weapon.damage });
+    this.modules.onMainShot(this.moduleContext());
   }
 
   private fireDashBeam(): void {
@@ -306,7 +333,7 @@ export class GameSimulation {
     this.emit({ type: 'beam', x: p.x, y: p.y, angle: p.angle, amount: dash.damage, color: 0x73ffcd });
     let keep = 0;
     for (const b of this.state.bullets) {
-      if (b.owner === 'enemy' && pointInBeam(b.x, b.y, b.radius, beam)) this.bulletPool.release(b);
+      if (b.owner === 'enemy' && pointInBeam(b.x, b.y, b.radius, beam)) this.releaseBullet(b);
       else this.state.bullets[keep++] = b;
     }
     this.state.bullets.length = keep;
@@ -334,6 +361,7 @@ export class GameSimulation {
         hitIds.add(enemy.id); this.damageEnemy(enemy, this.value('prism', MODULE_VALUES.prism.sideDamage) * buildDamageMultiplier(this.state.build), { x: p.x, y: p.y, kind: 'prism' });
       }
     }
+    if (this.state.status === 'playing') this.modules.onBeam(this.moduleContext(), { x: p.x, y: p.y, angle: p.angle, length: dash.beamLength, width: dash.beamWidth });
   }
 
   private updateBeams(dt: number): void {
@@ -352,16 +380,16 @@ export class GameSimulation {
   private shootPassiveModules(): void {
     const p = this.state.player, multiplier = buildDamageMultiplier(this.state.build);
     if (this.has('rearSpark') && this.rearTimer <= EPSILON) {
-      this.rearTimer = MODULE_VALUES.rearSpark.cooldown; this.moduleEvent('rearSpark');
+      this.rearTimer = this.scalar('rearSpark', 'cooldown', MODULE_VALUES.rearSpark.cooldown); this.moduleEvent('rearSpark');
       for (const side of [-1, 1]) {
         const bullet = this.addBullet(p.x, p.y, p.angle + Math.PI + side * 0.16, 720, 'player', this.value('rearSpark', MODULE_VALUES.rearSpark.damage) * multiplier, 4, 0x73f7eb, 'module');
-        if (bullet) bullet.life = MODULE_VALUES.rearSpark.range / 720;
+        if (bullet) { bullet.life = MODULE_VALUES.rearSpark.range / 720; bullet.visualId = 'rearSpark'; }
       }
     }
     if (this.evolved('spiralBloom') && this.bloomTimer <= EPSILON) {
       this.bloomTimer = EVOLUTION_VALUES.spiralBloom.cooldown;
       for (let i = 0; i < 6; i++) {
-        const bullet = this.addBullet(p.x, p.y, p.angle + i * TAU / 6, 700, 'player', 2 * multiplier, 4, 0x73f7eb, 'module');
+        const bullet = this.addBullet(p.x, p.y, p.angle + i * TAU / 6, 700, 'player', 2 * highRankFactor(moduleRank(this.state.build, 'wingShots')) * multiplier, 4, 0x73f7eb, 'module');
         if (bullet) bullet.life = 420 / 700;
       }
     }
@@ -376,7 +404,7 @@ export class GameSimulation {
   private createDashEcho(): void {
     if (!this.has('dashEcho') || this.echoTimer > EPSILON) return;
     const p = this.state.player;
-    this.echoTimer = MODULE_VALUES.dashEcho.cooldown; this.moduleEvent('dashEcho');
+    this.echoTimer = this.scalar('dashEcho', 'cooldown', MODULE_VALUES.dashEcho.cooldown); this.moduleEvent('dashEcho');
     if (this.evolved('echoTrail')) this.addPlayerArea('trail', this.dashStart.x, this.dashStart.y, EVOLUTION_VALUES.echoTrail.width / 2, 0, EVOLUTION_VALUES.echoTrail.duration, this.value('dashEcho', EVOLUTION_VALUES.echoTrail.damage), undefined, p.x, p.y);
     else this.addPlayerArea('echo', p.x, p.y, this.value('dashEcho', MODULE_VALUES.dashEcho.radius), 0.3, 0.18, this.value('dashEcho', MODULE_VALUES.dashEcho.damage));
   }
@@ -483,19 +511,19 @@ export class GameSimulation {
         if (shot) {
           shot.targetId = target.id;
           if (!returns && this.has('droneHoming')) { shot.homingTime = this.value('droneHoming', MODULE_VALUES.droneHoming.duration); shot.turnSpeed = 2; }
-          if (returns) { shot.returnOriginX = shot.x; shot.returnOriginY = shot.y; shot.returnAt = 0.4; shot.returning = false; shot.life = 0.8; shot.moduleId = 'returnWing'; }
+          if (returns) { shot.returnOriginX = shot.x; shot.returnOriginY = shot.y; shot.returnAt = 0.4; shot.returning = false; shot.life = 0.8; shot.moduleId = 'returnWing'; shot.visualId = 'returnWing'; }
           this.emit({ type: 'shot', text: 'drone', x: companion.x, y: companion.y, angle: companion.angle, amount: shot.damage, color: 0x9ceaff, targetId: target.id });
         }
         }
       }
       const returnHits = this.returnBladeHits.get(companion.id);
-      if (returnHits && !bladeTarget) for (const enemy of this.state.enemies) {
+      if (returnHits && !bladeTarget) for (const enemy of this.queryEnemies((companion.x + companion.prevX) / 2, (companion.y + companion.prevY) / 2, Math.hypot(companion.x - companion.prevX, companion.y - companion.prevY) / 2 + 24)) {
         if (!this.validCommandTarget(enemy) || returnHits.has(enemy.id)) continue;
         if (segmentCircleHit(companion.prevX, companion.prevY, companion.x, companion.y, enemy.x, enemy.y, enemy.radius + 24) === null) continue;
-        returnHits.add(enemy.id); this.damageEnemy(enemy, 4 * buildDamageMultiplier(this.state.build), { x: companion.x, y: companion.y, kind: 'huntingReturn' });
+        returnHits.add(enemy.id); this.damageEnemy(enemy, 4 * highRankFactor(moduleRank(this.state.build, 'orbitBlade')) * buildDamageMultiplier(this.state.build), { x: companion.x, y: companion.y, kind: 'huntingReturn' });
       }
       if ((companion.transit ?? 0) <= EPSILON) this.returnBladeHits.delete(companion.id);
-      if (this.has('orbitBlade') && (companion.transit ?? 0) <= EPSILON) for (const enemy of this.state.enemies) {
+      if (this.has('orbitBlade') && (companion.transit ?? 0) <= EPSILON) for (const enemy of this.queryEnemies(companion.x, companion.y, 24)) {
         if (enemy.hp <= 0 || (this.bladeTimes.get(enemy.id) ?? 0) > this.state.elapsed || Math.hypot(companion.x - enemy.x, companion.y - enemy.y) > enemy.radius + 24) continue;
         this.bladeTimes.set(enemy.id, this.state.elapsed + 0.4);
         this.damageEnemy(enemy, this.value('orbitBlade', MODULE_VALUES.orbitBlade.damage) * buildDamageMultiplier(this.state.build), { x: companion.x, y: companion.y, kind: 'blade' });
@@ -549,11 +577,11 @@ export class GameSimulation {
           if (bullet) {
             bullet.targetId = target.id; p.specialCooldown = BALANCE.special.cooldown; this.emit({ type: 'shot', x: p.x, y: p.y, color: 0xf096ff, angle, amount: BALANCE.special.damage });
             if (this.evolved('forkNetwork')) {
-              const targets = this.state.enemies.filter(e => e.id !== target.id && this.validCommandTarget(e) && Math.hypot(e.x - p.x, e.y - p.y) <= range + e.radius)
+              const targets = this.queryEnemies(p.x, p.y, range).filter(e => e.id !== target.id && this.validCommandTarget(e))
                 .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y) || a.id - b.id).slice(0, 2);
               for (const other of targets) {
-                const extra = this.addBullet(p.x, p.y, Math.atan2(other.y - p.y, other.x - p.x), BALANCE.special.speed, 'player', 6 * buildDamageMultiplier(this.state.build), 7, 0x9be6ff, 'module', 1, true, range);
-                if (extra) { extra.targetId = other.id; extra.hitIds.add(target.id); }
+                const extra = this.addBullet(p.x, p.y, Math.atan2(other.y - p.y, other.x - p.x), BALANCE.special.speed, 'player', 6 * highRankFactor(moduleRank(this.state.build, 'chain')) * buildDamageMultiplier(this.state.build), 7, 0x9be6ff, 'module', 1, true, range);
+                if (extra) { extra.targetId = other.id; extra.hitIds.add(target.id); extra.visualId = 'chain'; }
               }
             }
           }
@@ -575,7 +603,7 @@ export class GameSimulation {
     }
     let keep = 0;
     for (const b of this.state.bullets) {
-      if (b.owner === 'enemy') this.bulletPool.release(b);
+      if (b.owner === 'enemy') this.releaseBullet(b);
       else this.state.bullets[keep++] = b;
     }
     this.state.bullets.length = keep;
@@ -583,12 +611,12 @@ export class GameSimulation {
   }
 
   private updateWaves(dt: number): void {
-    const w = this.state, difficulty = difficultyConfig(w.difficulty);
+    const w = this.state;
     if (w.mode === 'story') {
       const progress = this.director.state;
       // Public clocks remain controllable by deterministic debug fixtures.
       if (w.wave !== progress.stage && w.wave >= 1 && w.wave <= CAMPAIGN_STAGES.length) {
-        progress.stage = w.wave; progress.phase = 'stage'; progress.activeEncounter = null;
+        progress.stage = w.wave; progress.phase = 'stage'; progress.activeEncounter = null; progress.activeElite = null; progress.eliteGate = false;
       }
       if (progress.phase === 'stage') progress.stageElapsed = w.waveTime;
       this.handleCampaignActions(this.director.step(dt));
@@ -597,8 +625,13 @@ export class GameSimulation {
         this.suppliedWaves.add(0); this.supplyCompanion();
       }
     } else if (!w.bossStage && !w.bossPending && !w.enemies.some(e => e.hp > 0 && e.role === 'miniboss')) {
-      w.waveTime += dt;
-      if (w.waveTime >= BALANCE.spawn.waveDuration - EPSILON) {
+      w.waveTime = Math.min(BALANCE.spawn.waveDuration, w.waveTime + dt);
+      if (w.waveTime >= 18 && this.endlessEliteWave !== w.wave) {
+        this.endlessEliteWave = w.wave;
+        const stage = (w.wave - 1) % 5 + 1, variant = ((this.seed ^ w.wave) & 1) as 0 | 1;
+        this.handleCampaignActions([{ type: 'elite', id: `endless-elite:${w.wave}`, stage, variant }]);
+      }
+      if (w.waveTime >= BALANCE.spawn.waveDuration - EPSILON && !this.eliteAlive()) {
         w.waveTime = 0;
         if (w.wave % BALANCE.spawn.endlessBossInterval === 0) {
           const id = ENCOUNTERS[(Math.floor(w.wave / BALANCE.spawn.endlessBossInterval) - 1) % ENCOUNTERS.length];
@@ -610,14 +643,15 @@ export class GameSimulation {
     if (!w.bossStage && !w.bossPending) {
       w.spawnTimer -= dt;
       if (w.spawnTimer <= EPSILON) {
-        if (this.isWaveBlocked()) {
+        if (this.isWaveBlocked() && !this.eliteAlive()) {
           w.spawnTimer = w.difficulty === 'hard' ? 2.4 : 3;
           if (this.addCount() + w.indicators.filter(i => !i.encounterId).length < this.holdAddLimit()) this.queueSpawn();
         } else {
           const progression = w.mode === 'story' ? w.campaign.progression : 360;
-          const interval = 1.1 - 0.4 * clamp(progression / 360, 0, 1);
-          w.spawnTimer = (w.mode === 'endless' ? Math.max(0.5, interval - Math.max(0, w.wave - 5) * 0.015) : interval) * difficulty.spawnInterval;
-          this.queueSpawn();
+          const profile = threatProfile(w.difficulty, progression);
+          w.spawnTimer = profile.interval * (this.eliteAlive() ? 1.35 : 1);
+          const size = spawnPacketSize(progression, this.packetIndex++);
+          this.queueSpawn(size);
         }
       }
     }
@@ -625,17 +659,21 @@ export class GameSimulation {
       const indicator = w.indicators[i]; indicator.time -= dt;
       if (indicator.time <= EPSILON) {
         w.indicators.splice(i, 1);
-        const spawned = this.spawnEnemy(indicator.type, indicator.x, indicator.y, indicator.encounterId as EncounterId | undefined);
+        const spawned = indicator.eliteStage ? this.spawnElite(indicator.eliteStage, indicator.eliteVariant ?? 0, indicator.x, indicator.y, indicator.encounterId!)
+          : this.spawnEnemy(indicator.type, indicator.x, indicator.y, indicator.encounterId as EncounterId | undefined);
+        if (spawned) { spawned.lootCarrier = indicator.lootCarrier; spawned.squadId = indicator.squadId; }
         if (!spawned && indicator.encounterId) { indicator.time = 0.5; w.indicators.push(indicator); }
       }
     }
   }
 
   isWaveBlocked(): boolean {
-    return this.state.mode === 'story' ? this.state.campaign.phase === 'encounter' : this.state.enemies.some(e => e.hp > 0 && e.role === 'miniboss');
+    return this.state.mode === 'story' ? this.state.campaign.phase === 'encounter' || this.state.campaign.eliteGate : this.state.enemies.some(e => e.hp > 0 && e.role === 'miniboss') || (this.state.waveTime >= BALANCE.spawn.waveDuration && this.eliteAlive());
   }
+  private eliteAlive(): boolean { return this.state.enemies.some(e => e.hp > 0 && e.role === 'elite') || this.state.indicators.some(i => !!i.eliteStage); }
+  private eliteAddLimit(): number { return this.state.difficulty === 'hard' ? 32 : 24; }
   private holdAddLimit(): number { return this.state.difficulty === 'hard' ? 16 : 12; }
-  private addCount(): number { return this.state.enemies.filter(e => e.hp > 0 && e.role !== 'boss' && e.role !== 'miniboss' && e.role !== 'part').length; }
+  private addCount(): number { return this.state.enemies.filter(e => e.hp > 0 && e.role === 'mob').length; }
 
   private handleCampaignActions(actions: CampaignAction[]): void {
     const w = this.state, p = w.player;
@@ -644,6 +682,20 @@ export class GameSimulation {
         w.wave = action.stage; w.waveTime = 0; w.spawnTimer = 0.8; w.bossStage = w.bossPending = false;
         w.seasonId = w.campaign.season;
         this.emit({ type: 'wave', x: p.x, y: p.y, amount: w.wave, seasonId: w.seasonId });
+      } else if (action.type === 'elite') {
+        const definition = ELITE_GROUPS[action.stage - 1][action.variant];
+        const angle = Math.atan2(WORLD.height / 2 - p.y, WORLD.width / 2 - p.x) + 0.55;
+        const x = clamp(p.x + Math.cos(angle) * 540, 100, WORLD.width - 100), y = clamp(p.y + Math.sin(angle) * 340, 100, WORLD.height - 100);
+        const mobs = w.enemies.filter(e => e.hp > 0 && e.role === 'mob');
+        for (const extra of mobs.slice(this.eliteAddLimit())) this.retirePart(extra);
+        let pending = Math.max(0, this.eliteAddLimit() - this.addCount());
+        w.indicators = w.indicators.filter(indicator => !!indicator.encounterId || pending-- > 0);
+        w.indicators.push({ id: this.nextId++, type: definition.type, x, y, time: 1.3, duration: 1.3, encounterId: action.id, eliteStage: action.stage, eliteVariant: action.variant });
+        this.emit({ type: 'attack', x, y, text: `elite-arrival:${definition.name}`, encounterId: action.id });
+      } else if (action.type === 'eliteCleared') {
+        this.gainXp([40, 60, 80, 100, 120][action.stage - 1]);
+        enqueueUpgrade(w.build, 'elite', action.id, w.mode === 'endless' ? w.wave : action.stage);
+        this.emit({ type: 'attack', x: p.x, y: p.y, text: 'elite-cleared', encounterId: action.id });
       } else if (action.type === 'encounterCleared') {
         this.pendingEncounterCleanup = true;
         p.hp = Math.min(p.maxHp, p.hp + 2);
@@ -687,6 +739,9 @@ export class GameSimulation {
     if (w.status !== 'upgrade' || !chooseModule(w.build, id, { offerId, reviveConsumed: this.reviveUsed })) return false;
     if (id in MODULES && MODULES[id as ModuleId].branch === 'drone' && !w.companions.length) this.deployCompanion();
     if (id === 'doubleDash' && !this.doubleDashActive) { this.doubleDashActive = true; this.dashStock = w.player.dashCooldown > EPSILON ? 1 : 2; }
+    this.buildStats = resolveBuildStats(w.build);
+    this.recentUpgrade = { id, sequence: w.build.choiceIndex };
+    if (id.startsWith('evolution:')) this.emit({ type: 'module', text: 'evolution', x: w.player.x, y: w.player.y });
     if (id === 'reward:heal') { const heal = Math.min(2, w.player.maxHp - w.player.hp); w.player.hp += heal; this.gainXp((2 - heal) * 30); }
     else if (id === 'reward:bomb') { if (w.player.bombs < BALANCE.player.maxBombs) w.player.bombs++; else this.gainXp(30); }
     else if (id === 'reward:xp') this.gainXp(100);
@@ -698,23 +753,32 @@ export class GameSimulation {
     return rerollModules(this.state.build, this.state.player.level, this.seed, { reviveConsumed: this.reviveUsed }).length > 0;
   }
   get dashCharges(): number { return this.has('doubleDash') ? this.dashStock : Number(this.state.player.dashCooldown <= EPSILON); }
+  get resourceCounts() { return { enemyBullets: this.liveEnemyBullets, playerBullets: this.livePlayerBullets,
+    pools: { enemyAllocated: this.enemyBulletPool.created, enemyFree: this.enemyBulletPool.size, playerAllocated: this.playerBulletPool.created, playerFree: this.playerBulletPool.size },
+    promises: { sources: this.attackBudget.sources, bullets: this.attackBudget.reservedBullets, hazards: this.attackBudget.reservedHazards }, modules: this.modules.getStats() }; }
   private has(id: ModuleId): boolean { return moduleRank(this.state.build, id) > 0; }
-  private value(id: ModuleId, values: readonly [number, number]): number { return values[moduleRank(this.state.build, id) === 2 ? 1 : 0]; }
+  private value(id: ModuleId, values: readonly [number, number]): number { return rankValue(this.state.build, id, values); }
+  refreshBuild(): void { this.buildStats = resolveBuildStats(this.state.build); }
+  private scalar(id: ModuleId, key: string, fallback: number): number { return this.buildStats.values[id]?.[key] ?? fallback; }
   private evolved(id: EvolutionId): boolean { return hasEvolution(this.state.build, id); }
-  private get dashRecharge(): number { return this.value('doubleDash', MODULE_VALUES.doubleDash.cooldown); }
-  private get droneRange(): number { return (this.has('division') ? this.value('division', MODULE_VALUES.division.range) : BALANCE.companion.range) + (moduleRank(this.state.build, 'crossOrbit') === 2 ? 80 : 0); }
+  private get dashRecharge(): number { return this.has('doubleDash') ? this.value('doubleDash', MODULE_VALUES.doubleDash.cooldown) : BALANCE.dash.cooldown; }
+  private get droneRange(): number { return (this.has('division') ? this.value('division', MODULE_VALUES.division.range) : BALANCE.companion.range) + this.value('crossOrbit', MODULE_VALUES.crossOrbit.bonusRange); }
 
-  private queueSpawn(): void {
+  private queueSpawn(size = 1): void {
     const w = this.state, progression = w.mode === 'story' ? w.campaign.progression : 360;
     if (this.enemyCount + w.indicators.length >= BALANCE.limits.enemies - 1) return;
     if (w.elapsed < this.introductionUntil) return;
     const introduction = w.mode === 'story' && w.campaign.phase === 'stage' ? ENEMY_INTRODUCTIONS.find(item => item.time <= progression && !this.introducedTypes.has(item.type)) : undefined;
     const pool = ENEMY_INTRODUCTIONS.filter(item => item.time <= progression).map(item => item.type);
-    const type = introduction?.type ?? this.threats.selectSpawn(pool, w.enemies, this.random.next(), w.difficulty, w.elapsed, w.indicators, progression);
+    const ordinary = w.enemies.filter(e => e.role === 'mob'), pending = w.indicators.filter(i => !i.encounterId);
+    const room = this.eliteAlive() ? this.eliteAddLimit() - this.addCount() - pending.length : BALANCE.limits.enemies - this.enemyCount - w.indicators.length - 1;
+    const count = Math.max(0, Math.min(introduction ? 1 : size, room));
+    if (!count) return;
+    const type = introduction?.type ?? this.threats.selectSpawn(pool, ordinary, this.random.next(), w.difficulty, w.elapsed, pending, progression, count);
     if (!type) return;
-    if (isTacticalEnemy(type) && w.enemies.filter(e => e.hp > 0 && isTacticalEnemy(e.type)).length + w.indicators.filter(e => isTacticalEnemy(e.type)).length >= this.threats.tacticalCap(w.difficulty, progression)) return;
+    if (isTacticalEnemy(type) && ordinary.filter(e => e.hp > 0 && isTacticalEnemy(e.type)).length + pending.filter(e => isTacticalEnemy(e.type)).length >= this.threats.tacticalCap(w.difficulty, progression)) return;
     const kindCap = type === 'repairer' ? 2 : type === 'weaver' || type === 'sampler' ? 3 : 180;
-    if (w.enemies.filter(e => e.hp > 0 && e.type === type).length + w.indicators.filter(e => e.type === type).length >= kindCap) return;
+    if (ordinary.filter(e => e.hp > 0 && e.type === type).length + pending.filter(e => e.type === type).length >= kindCap) return;
     const angle = this.random.next() * TAU;
     let x = clamp(w.player.x + Math.cos(angle) * 980, 70, WORLD.width - 70), y = clamp(w.player.y + Math.sin(angle) * 980, 70, WORLD.height - 70);
     if (Math.hypot(x - w.player.x, y - w.player.y) < 420) {
@@ -725,7 +789,31 @@ export class GameSimulation {
       this.introducedTypes.add(type); this.introductionUntil = w.elapsed + 4; this.nextEnemyCommit = Math.max(this.nextEnemyCommit, this.introductionUntil);
       // One new silhouette at a time; ordinary pressure resumes after the four-second introduction.
     }
-    w.indicators.push({ id: this.nextId++, x, y, type, time: BALANCE.spawn.warning, duration: BALANCE.spawn.warning });
+    const carrier = Math.floor(this.random.next() * count), squadId = this.nextId++;
+    const formation = Math.min(3, Math.floor(progression / 90)), pressurePool = pool.filter(item => !isTacticalEnemy(item));
+    for (let index = 0; index < count; index++) {
+      const memberType = index === 0 ? type : pressurePool[Math.floor(this.random.next() * pressurePool.length)];
+      const flank = formation >= 1 && index % 2 ? -1 : 1;
+      let sx = flank === 1 ? x : clamp(w.player.x - (x - w.player.x), 70, WORLD.width - 70);
+      let sy = flank === 1 ? y : clamp(w.player.y - (y - w.player.y), 70, WORLD.height - 70);
+      if (formation === 3 && type === 'shield') { sx = x + Math.cos(angle + Math.PI / 2) * index * 85; sy = y + Math.sin(angle + Math.PI / 2) * index * 85; }
+      else { sx += Math.cos(angle + Math.PI / 2) * index * 65; sy += Math.sin(angle + Math.PI / 2) * index * 65; }
+      const warning = BALANCE.spawn.warning + (formation >= 2 ? index * 0.14 : 0);
+      w.indicators.push({ id: this.nextId++, x: clamp(sx, 70, WORLD.width - 70), y: clamp(sy, 70, WORLD.height - 70), type: memberType, time: warning, duration: warning, lootCarrier: index === carrier, squadId });
+    }
+  }
+
+  private spawnElite(stage: number, variant: 0 | 1, x: number, y: number, encounterId: string): Enemy | null {
+    const definition = ELITE_GROUPS[stage - 1][variant];
+    const enemy = this.spawnEnemy(definition.type, x, y);
+    if (!enemy) return null;
+    const growth = this.state.mode === 'endless' ? 1 + Math.max(0, this.state.wave - 5) * 0.2 : 1;
+    enemy.role = 'elite'; enemy.elite = createEliteBrain(stage, variant); enemy.season2 = undefined;
+    enemy.archetypeId = definition.id; enemy.encounterId = encounterId;
+    enemy.hp = enemy.maxHp = Math.ceil(definition.hp * difficultyConfig(this.state.difficulty).bossHp * growth);
+    enemy.radius = definition.radius; enemy.speed = 200 * difficultyConfig(this.state.difficulty).enemySpeed;
+    enemy.cooldown = 0.7; enemy.lootCarrier = false;
+    return enemy;
   }
 
   spawnEnemy(type: EnemyType, x: number, y: number, encounterId?: EncounterId): Enemy | null {
@@ -753,7 +841,8 @@ export class GameSimulation {
     }
     const base = ENEMIES[type], progression = w.mode === 'story' ? w.campaign.progression : 360;
     let hp = hazard || part || mini || type === 'boss' ? base.hp : base.hp * (1 + 3 * clamp(progression / 360, 0, 1));
-    if (!hazard) hp *= type === 'boss' || mini ? difficulty.bossHp : difficulty.enemyHp;
+    if (!hazard && !part && !mini && type !== 'boss' && isTacticalEnemy(type)) hp *= 1 + 0.8 * clamp(progression / 360, 0, 1);
+    if (!hazard) hp *= type === 'boss' || mini || type === 'arm' ? difficulty.bossHp : difficulty.enemyHp;
     let speed = base.speed as number, radius = base.radius as number;
     if (w.mode === 'endless' && !part && type !== 'core' && type !== 'boss') {
       const extra = Math.max(0, w.wave - 5);
@@ -809,14 +898,15 @@ export class GameSimulation {
     if (!this.byId.has(part.id)) return;
     part.hp = 0; this.byId.delete(part.id); this.bladeTimes.delete(part.id); this.enemyCount--; if (part.type === 'mine') this.mineCount--;
     this.threats.cancel(part.id);
+    this.attackBudget.cancel(part.id);
     this.state.hazards = this.state.hazards.filter(h => h.sourceId !== part.id);
   }
   private spawnHazard(hazard: Omit<AreaHazard, 'id'>): void {
-    if (this.state.status !== 'playing' || this.state.hazards.length >= BALANCE.ai.hazards) return;
+    if (this.state.status !== 'playing' || !this.attackBudget.take(this.byId.get(hazard.sourceId)?.parentId ?? hazard.sourceId, 'hazards', this.state.hazards.length)) return;
     this.state.hazards.push({ ...hazard, id: this.nextId++ });
   }
   private season2Context(canCommit: (kind?: 'wall' | 'sample', intent?: AttackIntent) => boolean = () => true): Season2AiContext {
-    return { player: this.state.player, difficulty: this.state.difficulty, elapsed: this.state.elapsed, enemies: this.state.enemies,
+    return { player: this.state.player, difficulty: this.state.difficulty, elapsed: this.state.elapsed, enemies: this.state.enemies, arena: this.state.arena, reserveAttack: this.reserveAttack,
       canCommit, shootAt: (e, x, y, angle, speed, radius, color, options) => this.enemyShootAt(e, x, y, angle, speed, radius, color, options),
       spawnHazard: h => this.spawnHazard(h), spawnPart: (parent, type, x, y) => this.spawnPart(parent, type, x, y),
       retirePart: part => this.retirePart(part), emit: event => this.emit(event) };
@@ -866,50 +956,72 @@ export class GameSimulation {
     if (boss) {
       prepare(boss);
       updateSpellBoss(boss, dt, { player: p, elapsed: w.elapsed, difficulty: w.difficulty, arena: w.arena!, enemies: w.enemies,
+        reserveAttack: this.reserveAttack,
         shootAt: (e, x, y, angle, speed, radius, color, options) => this.enemyShootAt(e, x, y, angle, speed, radius, color, options),
         emit: event => this.emit(event), spawnHazard: h => this.spawnHazard(h),
         spawnPart: (parent, type, x, y) => this.spawnPart(parent, type as 'node', x, y), retirePart: part => this.retirePart(part) });
       if (w.status === 'playing') moveAndCollide(boss);
     }
     const exclusive = this.bossExclusive();
-    const difficulty = difficultyConfig(w.difficulty);
-    const committed = (e: Enemy) => e.type !== 'basic' && e.type !== 'mine' && e.type !== 'boss' && ['aim', 'charge', 'dash', 'volley', 'lay', 'laserWarmup', 'laser'].includes(e.state);
+    const profile = threatProfile(w.difficulty, w.mode === 'story' ? w.campaign.progression : 360);
+    const committed = (e: Enemy) => !(e.role === 'mob' && e.type === 'basic') && e.type !== 'mine' && e.type !== 'boss' && ['aim', 'charge', 'dash', 'volley', 'lay', 'laserWarmup', 'laser'].includes(e.state);
     let commitments = w.enemies.reduce((count, e) => count + Number(e.hp > 0 && committed(e)), 0);
     const canCommit = (e: Enemy, kind?: 'wall' | 'sample', intent?: AttackIntent) => {
       const visible = Math.abs(e.x - w.camera.x) < VIEW.width / 2 - 45 && Math.abs(e.y - w.camera.y) < VIEW.height / 2 - 45;
-      if (!visible || exclusive || commitments >= difficulty.attackSlots || w.elapsed < this.nextEnemyCommit) return false;
+      const elitePriority = e.role === 'elite' || e.role === 'miniboss';
+      const pendingElite = w.enemies.some(other => other.hp > 0 && other.role === 'elite' && !committed(other));
+      const slots = profile.slots - (pendingElite && !elitePriority ? 1 : 0);
+      if (!visible || exclusive || commitments >= slots || (!elitePriority && w.elapsed < this.nextEnemyCommit)) return false;
       if (kind && w.enemies.some(other => other !== e && other.hp > 0 && ['weaver', 'sampler', 'palisade'].includes(other.type) && !['chase', 'recover'].includes(other.state))) return false;
       if (kind && (w.hazards.some(h => ['sampler', 'weaver', 'palisade'].includes(this.byId.get(h.sourceId)?.type ?? ''))
         || w.bullets.some(b => b.owner === 'enemy' && b.life > 0 && b.attackGroup === 'wall'))) return false;
       if (intent && e.role === 'mob' && !this.threats.canCommit(intent, { elapsed: w.elapsed, difficulty: w.difficulty, player: p, enemies: w.enemies,
+        progression: w.mode === 'story' ? w.campaign.progression : 360,
         hazards: w.hazards, bullets: w.bullets, arena: w.arena, onDeferredCancel: id => { const source = this.byId.get(id); if (source) cancelEnemyAttack(source); } })) return false;
-      commitments++; this.nextEnemyCommit = w.elapsed + difficulty.commitGap; return true;
+      if (e.role === 'mob' && (e.type === 'sniper' || e.type === 'sprayer')) {
+        const attack = enemyAttacks(w.difficulty)[e.type];
+        if (!this.reserveAttack(e.id, attack.shots, 0, attack.warning + attack.shots * attack.shotGap + 0.2)) { this.threats.cancel(e.id); return false; }
+      }
+      commitments++; this.nextEnemyCommit = w.elapsed + profile.gap; return true;
     };
     const miniboss = w.enemies.find(e => e.type === 'miniboss' && e.hp > 0);
     if (miniboss && w.status === 'playing') {
       prepare(miniboss);
       if (exclusive) { miniboss.state = 'recover'; miniboss.timer = 0.5; miniboss.vx = miniboss.vy = 0; }
       else updateMiniBossAi(miniboss, dt, { player: p, elapsed: w.elapsed, difficulty: w.difficulty,
+        reserveAttack: this.reserveAttack,
         canCommit: () => canCommit(miniboss), emit: event => this.emit(event), damagePlayer: () => this.damagePlayer(undefined, 'miniLaser'),
         shoot: (e, angle, speed, radius, color, options) => this.enemyShoot(e, angle, speed, radius, color, options) });
       if (w.status === 'playing') moveAndCollide(miniboss);
+    }
+    const priority = w.enemies.filter(e => e.hp > 0 && (e.role === 'elite' || (e.role === 'miniboss' && e !== miniboss)));
+    for (const enemy of priority) {
+      prepare(enemy);
+      const context = this.season2Context((kind, intent) => canCommit(enemy, kind, intent));
+      if (enemy.role === 'elite') updateEliteAi(enemy, dt, context);
+      else updateSeason2Ai(enemy, dt, context);
+      if (w.status === 'playing' && enemy.hp > 0) moveAndCollide(enemy);
     }
     // New mines are deliberately skipped until the next step; all movement and damage clocks stay at 60 Hz.
     const count = w.enemies.length;
     for (let i = 0; i < count && w.status === 'playing'; i++) {
       const e = w.enemies[i];
-      if (e.hp <= 0 || e === boss || e === miniboss) continue;
+      if (e.hp <= 0 || e === boss || e === miniboss || priority.includes(e)) continue;
       prepare(e);
       if (e.type === 'node') continue; // Spell emitters are controlled by their parent, once per tick.
       if (e.season2) {
-        updateSeason2Ai(e, dt, this.season2Context((kind, intent) => canCommit(e, kind, intent)));
+        const context = this.season2Context((kind, intent) => canCommit(e, kind, intent));
+        const decoy = e.role === 'mob' && e.state === 'chase' ? this.modules.decoyTarget(this.moduleContext(), e) : null;
+        if (decoy) context.player = { ...p, ...decoy };
+        updateSeason2Ai(e, dt, context);
         if (w.status === 'playing' && e.hp > 0) { moveAndCollide(e); refreshWeakpoint(e); }
         continue;
       }
       const distance = Math.hypot(p.x - e.x, p.y - e.y);
       const decide = distance < 1250 || ((w.tick + e.id) & 1) === 0;
+      const decoy = e.role === 'mob' && e.state === 'chase' ? this.modules.decoyTarget(this.moduleContext(), e) : null;
       updateEnemyAi(e, dt, decide, {
-        player: p, elapsed: w.elapsed, wave: w.wave, difficulty: w.difficulty, allowAttack: !exclusive,
+        player: decoy ? { ...p, ...decoy } : p, elapsed: w.elapsed, wave: w.wave, difficulty: w.difficulty, allowAttack: !exclusive,
         canCommit: intent => canCommit(e, undefined, intent),
         shoot: (enemy, angle, speed, radius, color, options) => this.enemyShoot(enemy, angle, speed, radius, color, options),
         emit: event => this.emit(event),
@@ -933,7 +1045,7 @@ export class GameSimulation {
   }
   private enemyShootAt(e: Enemy, x: number, y: number, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void {
     const difficulty = difficultyConfig(this.state.difficulty);
-    const bullet = this.addBullet(x, y, angle, speed * difficulty.bulletSpeed, 'enemy', difficulty.damage, radius, color);
+    const bullet = this.addBullet(x, y, angle, speed * difficulty.bulletSpeed, 'enemy', difficulty.damage, radius, color, 'normal', 1, false, 0, e.parentId ?? e.id);
     if (bullet) {
       bullet.sourceId = e.id;
       bullet.friendlyDamage = options?.friendlyDamage; bullet.friendlyHits = options?.friendlyHits;
@@ -959,10 +1071,10 @@ export class GameSimulation {
   }
 
   private addBullet(x: number, y: number, angle: number, speed: number, owner: Bullet['owner'], damage: number, radius: number, color: number,
-    kind: Bullet['kind'] = 'normal', remainingHits = 1, homing = false, lockRange = 0): Bullet | null {
-    const cap = owner === 'enemy' ? BALANCE.limits.bullets - BALANCE.limits.playerReserve : BALANCE.limits.bullets;
-    if (this.state.bullets.length >= cap) return null;
-    const b = this.bulletPool.acquire();
+    kind: Bullet['kind'] = 'normal', remainingHits = 1, homing = false, lockRange = 0, reservationSource?: number): Bullet | null {
+    if (owner === 'player' ? this.livePlayerBullets >= BALANCE.limits.playerBullets : !this.attackBudget.take(reservationSource, 'bullets', this.liveEnemyBullets)) return null;
+    const b = (owner === 'player' ? this.playerBulletPool : this.enemyBulletPool).acquire();
+    if (owner === 'player') this.livePlayerBullets++; else this.liveEnemyBullets++;
     b.id = this.nextId++; b.x = b.prevX = x; b.y = b.prevY = y;
     b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
     b.owner = owner; b.damage = damage; b.radius = radius; b.color = color; b.speed = speed;
@@ -975,8 +1087,39 @@ export class GameSimulation {
     b.sourceId = undefined; b.grazed = false; b.homingTime = undefined; b.turnSpeed = 5; b.bornTick = this.state.tick; b.attackGroup = undefined;
     b.friendlyDamage = undefined; b.friendlyHits = undefined;
     b.returnOriginX = b.returnOriginY = b.returnAt = undefined; b.returning = false; b.returnHitIds = undefined; b.moduleId = undefined;
+    b.attackSource = owner === 'enemy' ? 'enemy' : kind === 'normal' ? 'main' : kind === 'drone' ? 'drone' : 'secondary';
+    b.visualId = kind;
     this.state.bullets.push(b);
     return b;
+  }
+
+  private releaseBullet(bullet: Bullet): void {
+    if (bullet.owner === 'enemy') { this.liveEnemyBullets = Math.max(0, this.liveEnemyBullets - 1); this.enemyBulletPool.release(bullet); }
+    else { this.livePlayerBullets = Math.max(0, this.livePlayerBullets - 1); this.playerBulletPool.release(bullet); }
+  }
+  private reserveAttack = (sourceId: number, bullets: number, hazards: number, duration: number): boolean =>
+    this.attackBudget.reserve(this.byId.get(sourceId)?.parentId ?? sourceId, bullets, hazards, duration + STEP * 2, this.state.elapsed, this.liveEnemyBullets, this.state.hazards.length);
+
+  private queryEnemies(x: number, y: number, radius: number): Enemy[] {
+    const result: Enemy[] = [], reach = radius + this.maxEnemyRadius;
+    this.grid.query(x - reach, y - reach, x + reach, y + reach, result);
+    return result.filter(e => e.hp > 0 && (e.disabledUntil ?? 0) <= this.state.elapsed && Math.hypot(e.x - x, e.y - y) <= radius + e.radius);
+  }
+  private moduleContext(): ModuleCombatContext {
+    return { state: this.state, stats: this.buildStats, query: (x, y, radius) => this.queryEnemies(x, y, radius),
+      damage: (enemy, amount, source) => this.damageEnemy(enemy, amount, source),
+      slow: (enemy, amount, duration) => {
+        if (enemy.role !== 'mob' || ['charge', 'dash'].includes(enemy.state)) return;
+        const active = (enemy.slowUntil ?? 0) > this.state.elapsed;
+        enemy.slowAmount = Math.min(0.5, Math.max(active ? enemy.slowAmount ?? 0 : 0, amount));
+        enemy.slowUntil = Math.max(enemy.slowUntil ?? 0, this.state.elapsed + duration);
+      },
+      push: (enemy, dx, dy) => {
+        if (enemy.role !== 'mob' || ['charge', 'dash'].includes(enemy.state)) return;
+        enemy.x = clamp(enemy.x + dx, enemy.radius, WORLD.width - enemy.radius); enemy.y = clamp(enemy.y + dy, enemy.radius, WORLD.height - enemy.radius);
+      },
+      collect: pickup => { const index = this.state.pickups.indexOf(pickup); if (index < 0 || !this.collectPickup(pickup)) return false; this.state.pickups.splice(index, 1); return true; },
+      emit: event => this.emit(event) };
   }
 
   private rebuildGrid(): void {
@@ -1025,14 +1168,14 @@ export class GameSimulation {
     let keep = 0;
     for (let i = 0; i < bullets.length; i++) {
       const b = bullets[i];
-      if (this.pendingCardClear && (b.owner === 'enemy' ? this.pendingCardClear.sources.has(b.sourceId ?? -1) : (b.bornTick ?? 0) <= this.pendingCardClear.tick)) { this.bulletPool.release(b); continue; }
+      if (this.pendingCardClear && (b.owner === 'enemy' ? this.pendingCardClear.sources.has(b.sourceId ?? -1) : (b.bornTick ?? 0) <= this.pendingCardClear.tick)) { this.releaseBullet(b); continue; }
       // Preserve unprocessed objects for terminal cleanup without moving or resolving them.
       if (this.state.status !== 'playing') { bullets[keep++] = b; continue; }
       b.prevX = b.x; b.prevY = b.y;
       if (b.owner === 'player' && b.returnAt !== undefined) {
         b.motionAge = (b.motionAge ?? 0) + dt;
         if (!b.returning && b.motionAge > b.returnAt + EPSILON) {
-          b.returning = true; b.kind = 'module'; b.hitIds.clear(); b.remainingHits = 1;
+          b.returning = true; b.kind = 'module'; b.attackSource = 'secondary'; b.hitIds.clear(); b.remainingHits = 1;
           const back = Math.atan2((b.returnOriginY ?? b.prevY) - b.y, (b.returnOriginX ?? b.prevX) - b.x);
           b.vx = Math.cos(back) * b.speed; b.vy = Math.sin(back) * b.speed;
         }
@@ -1074,10 +1217,13 @@ export class GameSimulation {
             const weak = enemy.weakpoint;
             if (b.kind === 'normal') this.markEnemy(enemy);
             this.emit({ type: 'hit', x: weak.x, y: weak.y, angle: Math.atan2(b.vy, b.vx), amount: Math.min(weak.hp, b.damage), hitResult: 'weakpoint', targetId: enemy.id });
-            if (interruptEnemy(enemy, b.damage, this.state.elapsed, event => this.emit(event))) this.threats.cancel(enemy.id);
+            if (interruptEnemy(enemy, b.damage, this.state.elapsed, event => this.emit(event))) { this.threats.cancel(enemy.id); this.attackBudget.cancel(enemy.id); }
           } else {
             this.damageEnemy(enemy, b.damage, { x: b.prevX, y: b.prevY, kind: b.kind, angle: Math.atan2(b.vy, b.vx), impactX: b.prevX + (b.x - b.prevX) * impact.time, impactY: b.prevY + (b.y - b.prevY) * impact.time });
-            if (this.state.status === 'playing' && enemy.hp < hpBefore && enemy.spell?.cardIndex === cardIndex && enemy.role !== 'hazard') this.applyBulletModules(b, enemy, enemy.hp <= 0);
+            if (this.state.status === 'playing' && enemy.hp < hpBefore && enemy.spell?.cardIndex === cardIndex && enemy.role !== 'hazard') {
+              this.applyBulletModules(b, enemy, enemy.hp <= 0);
+              if (b.kind === 'normal') this.modules.onMainHit(this.moduleContext(), enemy);
+            }
           }
           b.remainingHits--;
           if (b.remainingHits <= 0) { dead = b.returnAt === undefined; break; }
@@ -1093,14 +1239,14 @@ export class GameSimulation {
           && segmentCircleHit(b.prevX - p.prevX, b.prevY - p.prevY, b.x - p.x, b.y - p.y, 0, 0, radius + 24) !== null
           && segmentCircleHit(b.prevX - p.prevX, b.prevY - p.prevY, b.x - p.x, b.y - p.y, 0, 0, radius + 6) === null) {
           b.grazed = true; this.grazeCount++; p.heat = Math.max(0, p.heat - this.value('graze', MODULE_VALUES.graze.heat));
-          const refund = Math.max(0, Math.min(this.value('graze', MODULE_VALUES.graze.recharge), this.value('graze', MODULE_VALUES.graze.refundCap) - this.grazeRefund, p.dashCooldown));
+          const refund = Math.max(0, Math.min(this.value('graze', MODULE_VALUES.graze.recharge), Math.min(this.dashRecharge * 0.25, this.value('graze', MODULE_VALUES.graze.refundCap)) - this.grazeRefund, p.dashCooldown));
           p.dashCooldown -= refund; this.grazeRefund += refund;
         }
       }
       dead ||= b.x < -b.radius || b.y < -b.radius || b.x > WORLD.width + b.radius || b.y > WORLD.height + b.radius;
       const arena = this.state.arena;
       if (arena && b.owner === 'enemy') dead ||= b.x < arena.x - b.radius || b.y < arena.y - b.radius || b.x > arena.x + arena.width + b.radius || b.y > arena.y + arena.height + b.radius;
-      if (dead) this.bulletPool.release(b); else bullets[keep++] = b;
+      if (dead) this.releaseBullet(b); else bullets[keep++] = b;
     }
     bullets.length = keep;
   }
@@ -1126,26 +1272,30 @@ export class GameSimulation {
     const multiplier = buildDamageMultiplier(this.state.build);
     if (b.kind === 'normal') this.markEnemy(enemy);
     if (b.kind === 'normal' && this.has('ricochet') && this.ricochetTimer <= EPSILON) {
-      const target = this.state.enemies.filter(e => e.id !== enemy.id && !b.hitIds.has(e.id) && this.validCommandTarget(e) && Math.hypot(e.x - enemy.x, e.y - enemy.y) <= 220 + e.radius)
+      const target = this.queryEnemies(enemy.x, enemy.y, 220).filter(e => e.id !== enemy.id && !b.hitIds.has(e.id) && this.validCommandTarget(e))
         .sort((a, c) => Math.hypot(a.x - enemy.x, a.y - enemy.y) - Math.hypot(c.x - enemy.x, c.y - enemy.y) || a.id - c.id)[0];
       if (target) {
-        this.ricochetTimer = MODULE_VALUES.ricochet.cooldown;
+        this.ricochetTimer = this.scalar('ricochet', 'cooldown', MODULE_VALUES.ricochet.cooldown);
         const extra = this.addBullet(enemy.x, enemy.y, Math.atan2(target.y - enemy.y, target.x - enemy.x), 900, 'player', b.damage * this.value('ricochet', MODULE_VALUES.ricochet.ratio), 4, 0xa5f8df, 'module', 1, true, 260);
-        if (extra) { extra.targetId = target.id; for (const id of b.hitIds) extra.hitIds.add(id); }
+        if (extra) { extra.targetId = target.id; extra.visualId = 'ricochet'; for (const id of b.hitIds) extra.hitIds.add(id); }
       }
     }
     if (b.kind === 'normal' && killed && this.has('shatter') && this.shatterTimer <= EPSILON) {
-      this.shatterTimer = MODULE_VALUES.shatter.cooldown;
+      this.shatterTimer = this.scalar('shatter', 'cooldown', MODULE_VALUES.shatter.cooldown);
       this.moduleEvent('shatter');
       for (let i = 0; i < 6; i++) {
         const fragment = this.addBullet(enemy.x, enemy.y, i * TAU / 6, 600, 'player', this.value('shatter', MODULE_VALUES.shatter.damage) * multiplier, 3, 0xc6fdff, 'module');
-        if (fragment) fragment.life = 220 / 600;
+        if (fragment) { fragment.life = 220 / 600; fragment.visualId = 'crystal'; }
       }
     }
     if (b.kind === 'special' && this.has('chain')) {
-      const targets = this.state.enemies.filter(e => e.id !== enemy.id && !b.hitIds.has(e.id) && e.hp > 0 && (e.disabledUntil ?? 0) <= this.state.elapsed && Math.hypot(e.x - enemy.x, e.y - enemy.y) <= 220 + e.radius)
+      const targets = this.queryEnemies(enemy.x, enemy.y, 220).filter(e => e.id !== enemy.id && !b.hitIds.has(e.id))
         .sort((a, c) => Math.hypot(a.x - enemy.x, a.y - enemy.y) - Math.hypot(c.x - enemy.x, c.y - enemy.y)).slice(0, this.value('chain', MODULE_VALUES.chain.targets));
-      for (const target of targets) { b.hitIds.add(target.id); this.damageEnemy(target, 5 * multiplier, { x: enemy.x, y: enemy.y, kind: 'chain' }); }
+      for (const target of targets) {
+        b.hitIds.add(target.id); this.damageEnemy(target, this.scalar('chain', 'damage', 5) * multiplier, { x: enemy.x, y: enemy.y, kind: 'chain' });
+        const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x), length = Math.hypot(target.x - enemy.x, target.y - enemy.y);
+        this.state.beams.push({ id: this.nextId++, x: enemy.x, y: enemy.y, angle, length, width: 8, life: 0.16, duration: 0.16 });
+      }
     }
     if (b.kind !== 'drone') return;
     if (this.has('slow')) this.slowEnemy(enemy, this.value('slow', MODULE_VALUES.slow.amount), 0.8);
@@ -1153,11 +1303,17 @@ export class GameSimulation {
       const hits = this.value('droneBurst', MODULE_VALUES.droneBurst.hits);
       this.burstHits = Math.min(hits, this.burstHits + 1);
       if (this.burstHits >= hits && this.burstTimer <= EPSILON) {
-        this.burstHits = 0; this.burstTimer = MODULE_VALUES.droneBurst.cooldown;
+        this.burstHits = 0; this.burstTimer = this.scalar('droneBurst', 'cooldown', MODULE_VALUES.droneBurst.cooldown);
         this.moduleEvent('droneBurst');
         if (this.evolved('triangleAssault') && this.state.companions.length) {
-          for (const drone of this.state.companions) this.addBullet(drone.x, drone.y, Math.atan2(enemy.y - drone.y, enemy.x - drone.x), 900, 'player', 18 / this.state.companions.length * multiplier, 5, 0xffffff, 'module', 2);
-        } else this.addBullet(b.prevX, b.prevY, Math.atan2(b.vy, b.vx), 900, 'player', this.value('droneBurst', MODULE_VALUES.droneBurst.damage) * multiplier, 5, 0xffffff, 'module', 2);
+          for (const drone of this.state.companions) {
+            const bullet = this.addBullet(drone.x, drone.y, Math.atan2(enemy.y - drone.y, enemy.x - drone.x), 900, 'player', 18 * highRankFactor(moduleRank(this.state.build, 'droneBurst')) / this.state.companions.length * multiplier, 5, 0xffffff, 'module', 2);
+            if (bullet) bullet.visualId = 'droneBurst';
+          }
+        } else {
+          const bullet = this.addBullet(b.prevX, b.prevY, Math.atan2(b.vy, b.vx), 900, 'player', this.value('droneBurst', MODULE_VALUES.droneBurst.damage) * multiplier, 5, 0xffffff, 'module', 2);
+          if (bullet) bullet.visualId = 'droneBurst';
+        }
       }
     }
   }
@@ -1169,12 +1325,16 @@ export class GameSimulation {
     else if (this.markRetarget <= EPSILON) { p.markTargetId = enemy.id; p.markTime = MODULE_VALUES.orbitBlade.markDuration; this.markRetarget = MODULE_VALUES.orbitBlade.markCooldown; }
   }
 
-  damageEnemy(enemy: Enemy, amount: number, source: { x: number; y: number; kind?: string; angle?: number; impactX?: number; impactY?: number } = this.state.player): void {
+  damageEnemy(enemy: Enemy, amount: number, source: { x: number; y: number; kind?: string; angle?: number; impactX?: number; impactY?: number; moduleId?: ModuleId } = this.state.player): void {
     if (this.state.status !== 'playing' || enemy.hp <= 0 || amount <= 0 || (enemy.disabledUntil ?? 0) > this.state.elapsed || enemy.spell?.stage === 'intro') return;
-    const shield = shieldDamageMultiplier(enemy, source.x, source.y, this.state.elapsed);
-    const damage = Math.min(enemy.hp, (enemy.type === 'dasher' && enemy.state === 'charge' ? Math.ceil(amount * 1.3) : amount) * shield);
+    const shield = enemy.role === 'elite' ? 1 : shieldDamageMultiplier(enemy, source.x, source.y, this.state.elapsed);
+    const coreRadius = Math.min(32, enemy.radius * 0.45);
+    const core = (enemy.exposedUntil ?? 0) > this.state.elapsed && source.angle !== undefined
+      && Math.abs((enemy.x - source.x) * Math.sin(source.angle) - (enemy.y - source.y) * Math.cos(source.angle)) <= coreRadius;
+    const weakness = core ? enemy.role === 'elite' ? 1.35 : 1.5 : enemy.role === 'mob' && enemy.type === 'dasher' && enemy.state === 'charge' ? 1.3 : 1;
+    const damage = Math.min(enemy.hp, amount * weakness * shield);
     enemy.hp = Math.max(0, enemy.hp - damage); enemy.hitTime = 0.09;
-    this.emit({ type: 'hit', x: source.impactX ?? enemy.x, y: source.impactY ?? enemy.y, angle: source.angle ?? Math.atan2(enemy.y - source.y, enemy.x - source.x), amount: damage, damageSource: source.kind ?? 'direct', hitResult: shield < 1 ? 'shield' : 'body', targetId: enemy.id, enemyType: enemy.type, color: ENEMIES[enemy.type].color });
+    this.emit({ type: 'hit', x: source.impactX ?? enemy.x, y: source.impactY ?? enemy.y, angle: source.angle ?? Math.atan2(enemy.y - source.y, enemy.x - source.x), amount: damage, moduleId: source.moduleId, damageSource: source.kind ?? 'direct', hitResult: shield < 1 ? 'shield' : core ? 'weakpoint' : 'body', targetId: enemy.id, enemyType: enemy.type, color: ENEMIES[enemy.type].color });
     if (shield < 1 && (source.kind === 'beam' || source.kind === 'heavy') && breakShield(enemy, this.state.elapsed, event => this.emit(event))) this.threats.cancel(enemy.id);
     if (enemy.type === 'boss' && enemy.hp < enemy.maxHp * 0.3 && !enemy.lowHpSpoken) {
       enemy.lowHpSpoken = true; this.emit({ type: 'bossLow', x: enemy.x, y: enemy.y, enemyType: 'boss', targetId: enemy.id });
@@ -1200,6 +1360,7 @@ export class GameSimulation {
     if (enemy.season2) onSeason2Death(enemy, this.season2Context());
     this.byId.delete(enemy.id); this.enemyCount--; if (enemy.type === 'mine') this.mineCount--;
     this.threats.cancel(enemy.id);
+    this.attackBudget.cancel(enemy.id);
     this.bladeTimes.delete(enemy.id);
     this.state.hazards = this.state.hazards.filter(h => h.sourceId !== enemy.id);
     this.state.kills++;
@@ -1207,7 +1368,12 @@ export class GameSimulation {
     if ((enemy.type === 'mine' || enemy.type === 'core') && source.kind !== 'device' && source.kind !== 'contact') this.detonateDevice(enemy);
     if (enemy.role === 'part' || enemy.type === 'core') return;
     if (enemy.type !== 'mine') this.state.score += Math.round(enemy.maxHp * 10 * difficultyConfig(this.state.difficulty).score);
-    if (enemy.role === 'boss' || enemy.role === 'miniboss') {
+    if (enemy.role === 'elite') {
+      for (const part of this.state.enemies) if (part.parentId === enemy.id) this.retirePart(part);
+      if (this.state.mode === 'story') this.handleCampaignActions(this.director.defeatElite(enemy.encounterId!));
+      else this.handleCampaignActions([{ type: 'eliteCleared', id: enemy.encounterId!, stage: enemy.elite!.stage }]);
+      if (!this.stepping) this.openUpgrade();
+    } else if (enemy.role === 'boss' || enemy.role === 'miniboss') {
       if (enemy.type === 'miniboss') this.state.minibossDefeated = true;
       this.state.bossStage = this.state.bossPending = false;
       for (const part of this.state.enemies) if (part.parentId === enemy.id) this.retirePart(part);
@@ -1216,6 +1382,9 @@ export class GameSimulation {
         this.handleCampaignActions(this.director.defeatEncounter(enemy.encounterId as EncounterId));
       } else {
         this.pendingEncounterCleanup = true;
+        const index = ENCOUNTERS.indexOf(enemy.encounterId as EncounterId);
+        this.gainXp(BALANCE.xp.bossRewards[Math.min(3, Math.max(0, index))]);
+        enqueueUpgrade(this.state.build, 'boss', `endless-boss:${this.state.wave}`, this.state.wave);
         this.state.wave = this.state.pendingWave || this.state.wave + 1;
         this.state.pendingWave = 0; this.state.waveTime = 0; this.state.spawnTimer = 1;
         this.emit({ type: 'wave', x: enemy.x, y: enemy.y, amount: this.state.wave });
@@ -1238,10 +1407,12 @@ export class GameSimulation {
     const cleanup = this.pendingCardClear;
     if (!cleanup) return;
     this.pendingCardClear = null;
+    this.modules.clearEncounter();
+    for (const source of cleanup.sources) this.attackBudget.cancel(source);
     let keep = 0;
     for (const b of this.state.bullets) {
       const old = b.owner === 'enemy' ? cleanup.sources.has(b.sourceId ?? -1) : (b.bornTick ?? 0) <= cleanup.tick;
-      if (old) this.bulletPool.release(b); else this.state.bullets[keep++] = b;
+      if (old) this.releaseBullet(b); else this.state.bullets[keep++] = b;
     }
     this.state.bullets.length = keep;
     this.state.beams.length = 0;
@@ -1253,6 +1424,7 @@ export class GameSimulation {
     const p = this.state.player;
     if (p.invincible > EPSILON || this.state.status !== 'playing') return;
     p.hp = Math.max(0, p.hp - damage); p.invincible = BALANCE.player.hitInvincible;
+    this.modules.onDamage(this.moduleContext());
     const resonance = p.level === BALANCE.xp.cap;
     const available = resonance ? this.state.build.resonanceXp : p.xp;
     const loss = Math.min(available, Math.floor((resonance ? RESONANCE.xpPerRank : xpNeeded(p.level)) * BALANCE.xp.loss));
@@ -1278,6 +1450,7 @@ export class GameSimulation {
   private dropLoot(enemy: Enemy): void {
     const drop = BALANCE.drops;
     this.addPickup('xp', enemy.x, enemy.y, BALANCE.xp.pickup);
+    if (enemy.lootCarrier === false) return;
     let type: PickupType = 'xp';
     this.mobKillsWithoutBlackHole++;
     if (this.random.next() < drop.blackHole || this.mobKillsWithoutBlackHole >= drop.blackHolePity) {
@@ -1347,7 +1520,7 @@ export class GameSimulation {
     }
     else if (pickup.type === 'blackHole') this.state.blackHoleTime += 3 * value;
     else if (pickup.type === 'miniBomb') {
-      consumed = Math.min(value, 4, Math.floor((BALANCE.limits.bullets - this.state.bullets.length) / 25));
+      consumed = Math.min(value, 4, Math.floor((BALANCE.limits.playerBullets - this.livePlayerBullets) / 25));
       if (consumed <= 0) return false;
       const count = 25 * consumed;
       for (let i = 0; i < count; i++) this.addBullet(p.x, p.y, i * TAU / count, 600, 'player', BALANCE.weapon.damage, 6, 0xffbb55, 'burst', 1, true, 1000);
@@ -1388,9 +1561,10 @@ export class GameSimulation {
 
   private clearCombat(): void {
     this.threats.clear();
+    this.attackBudget.reset(); this.modules.clearEncounter();
     this.state.player.markTargetId = null; this.state.player.markTime = 0;
     this.state.enemies.length = 0;
-    for (const b of this.state.bullets) this.bulletPool.release(b);
+    for (const b of this.state.bullets) this.releaseBullet(b);
     this.state.bullets.length = 0;
     this.state.indicators.length = 0;
     this.state.beams.length = 0;
@@ -1402,7 +1576,7 @@ export class GameSimulation {
 
   private maintainStressBullets(): void {
     const p = this.state.player;
-    while (this.state.bullets.length > 1200) this.bulletPool.release(this.state.bullets.pop()!);
+    while (this.state.bullets.length > 1200) this.releaseBullet(this.state.bullets.pop()!);
     while (this.state.bullets.length < 1200) {
       const angle = this.random.next() * TAU;
       this.addBullet(p.x + (this.random.next() - 0.5) * 1450, p.y + (this.random.next() - 0.5) * 780, angle, 240, 'enemy', 1, 6, this.state.bullets.length % 2 ? 0xff6584 : 0xffcb69);

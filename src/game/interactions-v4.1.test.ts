@@ -103,6 +103,8 @@ describe('v4.1 interaction ownership and collision', () => {
     heavy.friendlyDamage = 8; heavy.friendlyHits = 3; heavy.life = STEP / 2;
     sim.step(idle);
     const reused = internals.addBullet(2000, 2000, 0, 600, 'player', 2, 4, 0xffffff);
-    expect(reused).toBe(heavy); expect(reused.friendlyDamage).toBeUndefined(); expect(reused.friendlyHits).toBeUndefined();
+    expect(reused).not.toBe(heavy); expect(reused.friendlyDamage).toBeUndefined(); expect(reused.friendlyHits).toBeUndefined();
+    const hostile = internals.addBullet(2000, 2000, 0, 600, 'enemy', 1, 8, 0xffffff);
+    expect(hostile).toBe(heavy); expect(hostile.friendlyDamage).toBeUndefined(); expect(hostile.friendlyHits).toBeUndefined();
   });
 });

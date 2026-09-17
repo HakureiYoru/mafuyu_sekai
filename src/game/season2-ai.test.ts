@@ -56,6 +56,23 @@ function harness(type: EnemyType, difficulty: Difficulty = 'normal') {
 }
 
 describe('second-season ownership and shared warnings', () => {
+  it.each(['palisade', 'reprise'] as const)('%s keeps pursuing until visible rather than hovering outside the camera', type => {
+    const h = harness(type); h.permit(false); h.player.x = h.e.x; h.player.y = h.e.y + 600; h.player.vy = 300;
+    const before = h.player.y - h.e.y;
+    for (let tick = 0; tick < 30; tick++) { h.player.y += 300 * STEP; h.tick(); }
+    expect(h.player.y - h.e.y).toBeLessThan(before - 40);
+    expect(h.e.vy).toBeGreaterThan(300); expect(h.shots).toHaveLength(0);
+  });
+  it.each(difficulties)('%s locks a finite retreat interception and does not retarget a direction change during warning', difficulty => {
+    const h = harness('reprise', difficulty); h.player.x = h.e.x + 360; h.player.y = h.e.y; h.player.vx = 300;
+    h.tick();
+    expect(h.e.action?.kind).toBe('dash'); expect(h.e.action?.phase).toBe('warning');
+    const { targetX, targetY, angle } = h.e.action!;
+    expect(targetX - h.e.x).toBeGreaterThan(500); expect(targetX - h.e.x).toBeLessThanOrEqual(700);
+    h.player.vx = 0; h.player.vy = 300; h.player.y += 120; h.run(12);
+    expect(h.e.action).toMatchObject({ targetX, targetY, angle, phase: 'warning' });
+    expect(h.e.action!.remaining).toBeGreaterThan(0); expect(h.e.exposedUntil ?? 0).toBe(0);
+  });
   it('returns cached profiles but creates isolated finite per-enemy state', () => {
     expect(season2Attacks()).toBe(season2Attacks('normal'));
     expect(season2Attacks('hard')).toBe(season2Attacks('hard'));
@@ -275,6 +292,8 @@ describe('destructible parts and finite death derivatives', () => {
     const arm = h.enemies.find(e => e.type === 'arm' && e.season2!.heading === -1)!;
     arm.hp = 0; onSeason2Death(arm, h.ctx); onSeason2Death(arm, h.ctx);
     expect(h.e.season2!.lostArms).toEqual([-1]);
+    expect(h.e.exposedUntil).toBeCloseTo(h.ctx.elapsed + 2, 8);
+    expect(h.events.filter(event => event.text === 'core-exposed')).toHaveLength(1);
     const preview = season2Telegraph(h.e)!, angle = h.e.angle;
     expect(preview.points.every(point => (point.x - h.e.x) * -Math.sin(angle) + (point.y - h.e.y) * Math.cos(angle) >= 0)).toBe(true);
     h.until(() => h.shots.length > 0);
@@ -284,10 +303,11 @@ describe('destructible parts and finite death derivatives', () => {
     const h = harness('palisade'); h.tick(); h.run(50);
     for (const arm of h.enemies.filter(e => e.type === 'arm')) { arm.hp = 0; onSeason2Death(arm, h.ctx); }
     expect(h.e.state).toBe('recover'); h.run(20); expect(h.shots).toHaveLength(0);
-    h.until(() => h.e.state === 'charge'); expect(season2Telegraph(h.e)!.kind).toBe('fan');
+    h.until(() => h.e.state === 'charge'); expect(season2Telegraphs(h.e).some(cue => cue.kind === 'fan')).toBe(true);
     const start = h.ctx.elapsed; h.until(() => h.shots.length > 0);
     expect(h.ctx.elapsed - start).toBeGreaterThanOrEqual(season2Attacks().palisade.warning - 1e-8);
-    expect(h.shots).toHaveLength(3);
+    expect(h.shots).toHaveLength(5);
+    expect(h.events.some(event => event.text === 'action-sidestep' || event.text === 'action-dash')).toBe(true);
   });
   it('retires orphaned arms without manufacturing a death reward or another generation', () => {
     const h = harness('arm'); h.e.parentId = 999; h.tick();
@@ -296,15 +316,23 @@ describe('destructible parts and finite death derivatives', () => {
 });
 
 describe('REPRISE choreography and deterministic clocks', () => {
-  it.each(difficulties)('%s keeps a committed reprise locked and its attack occupied through the finite return leg', difficulty => {
+  it.each(['palisade', 'reprise', 'weaver', 'sampler', 'returner', 'core'] as const)('%s does not reveal a promised release before budget admission', type => {
+    const h = harness(type); h.ctx.reserveAttack = () => false; h.run(240);
+    expect(h.shots).toHaveLength(0); expect(h.hazards).toHaveLength(0);
+    expect(season2Telegraphs(h.e)).toEqual([]); expect(h.e.action).toBeUndefined();
+  });
+  it.each(difficulties)('%s keeps a committed return path locked while the body actively moves through its stationary beat', difficulty => {
     const h = harness('reprise', difficulty), cfg = season2Attacks(difficulty).reprise;
     h.tick(); const angle = h.e.angle;
     h.player.y += 170; h.until(() => h.shots.length > 0); const firstTime = h.ctx.elapsed;
     expect(h.shots).toHaveLength(cfg.fanCount); expect(h.e.angle).toBe(angle);
     expect(h.shots.every(shot => Math.abs(angleDelta(angle, shot.angle)) <= cfg.spread / 2 + 1e-8)).toBe(true);
-    h.permit(false); h.run(120); expect(h.e.state).toBe('volley');
-    h.until(() => h.e.state === 'recover');
-    expect(h.ctx.elapsed - firstTime).toBeCloseTo(cfg.outbound * 2 + cfg.pause, 7);
+    const first = { x: h.e.x, y: h.e.y }, program = structuredClone(h.shots[0].options!.program);
+    h.permit(false); h.run(120);
+    expect(Math.hypot(h.e.x - first.x, h.e.y - first.y)).toBeGreaterThan(200);
+    expect(h.ctx.elapsed - firstTime).toBeLessThan(cfg.outbound * 2 + cfg.pause);
+    expect(h.shots[0].options!.program).toEqual(program);
+    expect(h.events.some(event => event.text === 'action-sidestep')).toBe(true);
     expect(h.shots).toHaveLength(cfg.fanCount);
   });
   it('finishes a committed sequence before changing phase and announces a second return group on the next sequence', () => {

@@ -4,10 +4,11 @@ import { clamp } from './math';
 import { advanceProjectileMotion } from './projectile-motion';
 import { GameSimulation } from './simulation';
 import { advanceSpellCard, SPELL_CARDS, spellTelegraphs } from './spellcards';
+import { bossActionTelegraph } from './boss-actions';
 import type { Bullet, Difficulty, Enemy, InputAction, SeasonId } from './types';
 
 const ARENA = { x: 1200, y: 1550, width: 1600, height: 900 };
-const HORIZON = 0.9, SAMPLES = 5, INTERVAL = HORIZON / SAMPLES;
+const HORIZON = 1.2, SAMPLES = 8, INTERVAL = HORIZON / SAMPLES;
 const DIRECTIONS = Array.from({ length: 24 }, (_, i) => ({ x: Math.cos(i * Math.PI / 12), y: Math.sin(i * Math.PI / 12) }));
 const STARTS = [[2000, 2220], [1218, 1568], [2782, 1568], [1218, 2432], [2782, 2432], [2000, 1976]] as const;
 interface Forecast { radius: number; points: { x: number; y: number }[] }
@@ -36,8 +37,10 @@ function crossesBeam(ax: number, ay: number, bx: number, by: number, x: number, 
 function projectileForecast(bullet: Bullet): Forecast {
   const copy = { ...bullet }, points = [{ x: copy.x, y: copy.y }];
   for (let i = 0; i < SAMPLES; i++) {
-    const delta = advanceProjectileMotion(copy, INTERVAL);
-    copy.x += delta?.dx ?? copy.vx * INTERVAL; copy.y += delta?.dy ?? copy.vy * INTERVAL;
+    for (let remaining = INTERVAL; remaining > 1e-8;) {
+      const dt = Math.min(1 / 60, remaining), delta = advanceProjectileMotion(copy, dt);
+      copy.x += delta?.dx ?? copy.vx * dt; copy.y += delta?.dy ?? copy.vy * dt; remaining -= dt;
+    }
     points.push({ x: copy.x, y: copy.y });
   }
   return { radius: bullet.radius, points };
@@ -55,7 +58,7 @@ function start(season: SeasonId, difficulty: Difficulty, card: number, placement
 }
 
 /** Deterministic input-only route finder; uses visible committed attacks, never future AI decisions. */
-function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, senseDelay = 0.2): InputAction {
+function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, senseDelay = 0.2, orbitSide = 1): InputAction {
   const w = sim.state, p = w.player;
   if (p.dashTime > 0) return { ...previous, dash: false };
   const bullets = w.bullets.filter(b => b.owner === 'enemy' && Math.hypot(b.x - p.x, b.y - p.y) < 660).map(projectileForecast);
@@ -72,7 +75,23 @@ function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, sense
     }
   }
   const hazards = w.hazards.filter(h => h.active || h.warningDuration - h.warning >= senseDelay);
-  const goalAngle = Math.atan2(p.y - boss.y, p.x - boss.x) + 0.35;
+  const visibleAction = bossActionTelegraph(boss);
+  const action = visibleAction && (visibleAction.phase !== 'warning' || visibleAction.warning - visibleAction.remaining >= senseDelay)
+    ? visibleAction : null;
+  // The route planner learns the swept body path from the same telegraph the player sees, after 200 ms.
+  // It does not read the next combo, future aim or not-yet-announced destination.
+  const bodyPoints = Array.from({ length: SAMPLES + 1 }, (_, i) => {
+    const time = i * INTERVAL;
+    if (action && boss.action) {
+      const delay = action.phase === 'warning' ? action.remaining : 0;
+      const duration = action.phase === 'warning' ? boss.action.duration : action.phase === 'moving' ? action.remaining : 0;
+      const fraction = action.phase === 'recover' ? 0 : clamp((time - delay) / Math.max(1e-8, duration), 0, 1);
+      return { x: boss.x + (action.endX - boss.x) * fraction, y: boss.y + (action.endY - boss.y) * fraction };
+    }
+    return { x: clamp(boss.x + boss.vx * time, ARENA.x + boss.radius, ARENA.x + ARENA.width - boss.radius),
+      y: clamp(boss.y + boss.vy * time, ARENA.y + boss.radius, ARENA.y + ARENA.height - boss.radius) };
+  });
+  const goalAngle = Math.atan2(p.y - boss.y, p.x - boss.x) + orbitSide * 0.35;
   let goalX = clamp(boss.x + Math.cos(goalAngle) * 520, ARENA.x + 65, ARENA.x + ARENA.width - 65);
   let goalY = clamp(boss.y + Math.sin(goalAngle) * 520, ARENA.y + 65, ARENA.y + ARENA.height - 65);
   let gateTime = 2.5;
@@ -106,17 +125,19 @@ function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, sense
     if (center === undefined) continue;
     gateTime = arrival; goalX = horizontal ? p.x : center; goalY = horizontal ? center : p.y;
   }
-  const score = (x: number, y: number, dash: boolean): number => {
+  const score = (x: number, y: number, dash: boolean, focus = false): number => {
     const points = [{ x: p.x, y: p.y }];
-    let cost = dash ? 600 : 0;
+    let cost = dash ? 600 : focus ? 2 : 0;
     for (let i = 1; i <= SAMPLES; i++) {
-      const time = i * INTERVAL, distance = dash ? 1080 * Math.min(0.18, time) + 300 * Math.max(0, time - 0.18) : 300 * time;
+      const speed = focus ? BALANCE.player.focusSpeed : BALANCE.player.speed;
+      const time = i * INTERVAL, distance = dash ? 1080 * Math.min(0.18, time) + speed * Math.max(0, time - 0.18) : speed * time;
       const rawX = p.x + x * distance, rawY = p.y + y * distance;
       const point = { x: clamp(rawX, ARENA.x + 18, ARENA.x + ARENA.width - 18), y: clamp(rawY, ARENA.y + 18, ARENA.y + ARENA.height - 18) };
       points.push(point);
       cost += (Math.abs(rawX - point.x) + Math.abs(rawY - point.y)) * 5;
       if (dash && time <= 0.18 + 1e-8) continue;
-      const bodyDistance = Math.hypot(point.x - boss.x, point.y - boss.y) - boss.radius - 18;
+      const bodyDistance = minimumDistance(points[i - 1].x - bodyPoints[i - 1].x, points[i - 1].y - bodyPoints[i - 1].y,
+        point.x - bodyPoints[i].x, point.y - bodyPoints[i].y) - boss.radius - 18;
       cost += bodyDistance < 8 ? 1e7 : Math.exp(-bodyDistance / 35) * 150;
       for (const hazard of hazards) {
         const low = Math.max((i - 1) * INTERVAL, hazard.active ? 0 : hazard.warning), high = Math.min(time, hazard.warning + hazard.life);
@@ -142,27 +163,29 @@ function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, sense
     cost += (1 - (x * previous.moveX + y * previous.moveY)) * 2;
     return cost;
   };
-  let best = { x: 0, y: 0, dash: false, value: score(0, 0, false) };
-  for (const direction of DIRECTIONS) {
-    const value = score(direction.x, direction.y, false);
-    if (value < best.value) best = { ...direction, dash: false, value };
+  let best = { x: 0, y: 0, dash: false, focus: false, value: score(0, 0, false) };
+  for (const direction of DIRECTIONS) for (const focus of [false, true]) {
+    const value = score(direction.x, direction.y, false, focus);
+    if (value < best.value) best = { ...direction, dash: false, focus, value };
   }
   if (best.value > 1e5 && p.dashCooldown <= 0) for (const direction of DIRECTIONS) {
     const value = score(direction.x, direction.y, true);
-    if (value < best.value) best = { ...direction, dash: true, value };
+    if (value < best.value) best = { ...direction, dash: true, focus: false, value };
   }
-  return { moveX: best.x, moveY: best.y, dash: best.dash, bomb: false, shoot: false, focus: false, aimX: boss.x, aimY: boss.y };
+  return { moveX: best.x, moveY: best.y, dash: best.dash, bomb: false, shoot: false, focus: best.focus, aimX: boss.x, aimY: boss.y };
 }
 
-function runRoute(season: SeasonId, difficulty: Difficulty, card: number, placement: readonly [number, number], moving: boolean, seconds = 24) {
+function runRoute(season: SeasonId, difficulty: Difficulty, card: number, placement: readonly [number, number], moving: boolean, seconds = 24, orbitSide = 1) {
   const { sim, boss } = start(season, difficulty, card, placement), p = sim.state.player;
   let input: InputAction = { moveX: 0, moveY: 0, dash: false, bomb: false, shoot: false, aimX: boss.x, aimY: boss.y };
   let damage = 0, dashes = 0, shots = 0, distance = 0;
+  const damageLog: { time: number; source?: string; x: number; y: number; action?: string }[] = [];
   const cues = new Set<number>(), hazardIds = new Set<number>();
   for (let tick = 0; tick < seconds * 60 && sim.state.status === 'playing'; tick++) {
-    if (moving && tick % 6 === 0) input = steering(sim, boss, input);
+    if (moving && tick % 6 === 0) input = steering(sim, boss, input, 0.2, orbitSide);
     const x = p.x, y = p.y, events = sim.step(input);
     damage += events.filter(event => event.type === 'damage').length;
+    for (const event of events) if (event.type === 'damage') damageLog.push({ time: sim.state.elapsed, source: event.damageSource, x: p.x, y: p.y, action: boss.action?.phase });
     dashes += events.filter(event => event.type === 'dash').length;
     shots += events.filter(event => event.type === 'enemyShot').length;
     distance += Math.hypot(p.x - x, p.y - y);
@@ -170,14 +193,39 @@ function runRoute(season: SeasonId, difficulty: Difficulty, card: number, placem
     for (const hazard of sim.state.hazards) hazardIds.add(hazard.id);
   }
   return { damage, dashes, shots, distance, cues: cues.size, hazards: hazardIds.size, elapsed: sim.state.elapsed,
-    hp: p.hp, invincible: p.invincible, bombs: p.bombs, index: boss.spell!.shotIndex };
+    hp: p.hp, invincible: p.invincible, bombs: p.bombs, index: boss.spell!.shotIndex, damageLog, orbitSide };
+}
+
+/** Blind controls read only elapsed time / body position, never bullets, hazards or telegraphs. */
+function runBlindControl(season: SeasonId, difficulty: Difficulty, card: number, strategy: 'circle' | 'old-lane') {
+  const { sim, boss } = start(season, difficulty, card, [2000, 2320]), p = sim.state.player;
+  let damage = 0, distance = 0;
+  for (let tick = 0; tick < 24 * 60 && sim.state.status === 'playing'; tick++) {
+    const angle = Math.PI / 2 + sim.state.elapsed * BALANCE.player.speed / 320;
+    // The former broadly safe direction was below the emitter; this controller only follows that bearing.
+    const target = strategy === 'circle' ? { x: 2000 + Math.cos(angle) * 320, y: 2000 + Math.sin(angle) * 320 }
+      : { x: boss.x, y: clamp(boss.y + 450, ARENA.y + 18, ARENA.y + ARENA.height - 18) };
+    const dx = target.x - p.x, dy = target.y - p.y, length = Math.hypot(dx, dy);
+    const speed = Math.min(1, length / (BALANCE.player.speed / 60));
+    const x = p.x, y = p.y;
+    const events = sim.step({ moveX: length > 1e-8 ? dx / length * speed : 0, moveY: length > 1e-8 ? dy / length * speed : 0,
+      aimX: boss.x, aimY: boss.y, shoot: false, dash: false, bomb: false });
+    damage += events.filter(event => event.type === 'damage').length;
+    distance += Math.hypot(p.x - x, p.y - y);
+  }
+  return { damage, distance };
 }
 
 describe('complete committed spellcard routes in the fixed arena', () => {
   it.each((['s1', 's2'] as const).flatMap(season => (['normal', 'hard'] as const).flatMap(difficulty =>
     Array.from({ length: 6 }, (_, card) => ({ season, difficulty, card, name: SPELL_CARDS[season][difficulty][card].name }))))) (
     '$season $difficulty $name has a full input-only route from the ordinary start, corners and near-body range', ({ season, difficulty, card }) => {
-      const outcomes = STARTS.map(placement => runRoute(season, difficulty, card, placement, true));
+      // Search two fixed steering preferences. Each complete attempt independently uses only visible tells;
+      // selecting a successful recorded route never changes health, bullets, inputs or AI mid-run.
+      const outcomes = STARTS.map(placement => {
+        const clockwise = runRoute(season, difficulty, card, placement, true);
+        return clockwise.damage === 0 ? clockwise : runRoute(season, difficulty, card, placement, true, 24, -1);
+      });
       for (const outcome of outcomes) {
         expect(outcome.elapsed, JSON.stringify(outcomes)).toBeCloseTo(24, 6);
         expect(outcome.index).toBeGreaterThanOrEqual(5);
@@ -192,5 +240,12 @@ describe('complete committed spellcard routes in the fixed arena', () => {
     '$season card $card damages a stationary control under the same real simulation', ({ season, card }) => {
       const outcome = runRoute(season, 'normal', card, STARTS[0], false, 20);
       expect(outcome.damage).toBeGreaterThan(0); expect(outcome.dashes).toBe(0); expect(outcome.distance).toBe(0);
+    });
+  it.each((['s1', 's2'] as const).flatMap(season => (['normal', 'hard'] as const).flatMap(difficulty =>
+    (['circle', 'old-lane'] as const).map(strategy => ({ season, difficulty, strategy }))))) (
+    '$season $difficulty blind $strategy cannot solve the card set without reading attacks', ({ season, difficulty, strategy }) => {
+      const outcomes = Array.from({ length: 6 }, (_, card) => runBlindControl(season, difficulty, card, strategy));
+      expect(outcomes.filter(outcome => outcome.damage > 0).length, JSON.stringify(outcomes)).toBeGreaterThanOrEqual(3);
+      expect(outcomes.every(outcome => outcome.distance > 100), JSON.stringify(outcomes)).toBe(true);
     });
 });

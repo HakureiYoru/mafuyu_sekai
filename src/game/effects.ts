@@ -1,4 +1,4 @@
-import { Container, Sprite, Text, Texture } from 'pixi.js';
+import { BitmapFontManager, BitmapText, Container, Sprite, Text, Texture, type BitmapFont } from 'pixi.js';
 import { QUALITY } from './config';
 import { TAU } from './math';
 import { MODULES } from './upgrades';
@@ -9,8 +9,23 @@ interface Particle {
   sprite: Sprite; x: number; y: number; vx: number; vy: number; life: number; total: number;
   startSize: number; endSize: number; stretch: number; spin: number; opacity: number; damping: number; priority: number;
 }
-interface FloatLabel { label: Text; life: number; total: number; x: number; y: number; amount: number; pending: number; commit: number; target: number | null; priority: number; key: string | null }
+interface FloatLabel { label: Text | BitmapText; life: number; total: number; x: number; y: number; amount: number; pending: number; commit: number; target: number | null; priority: number; key: string | null }
 const damageText = (amount: number) => `${Number(amount.toFixed(1))}`;
+export const EFFECT_NUMBER_FONT = 'MafuyuCombatNumbers';
+export const EFFECT_NUMBER_CHARS = [...new Set(Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('') + '−血药恢复共鸣经验符卡击破子机接入第波炸弹已满额转为换补给')].join('');
+const numberCharacters = new Set(EFFECT_NUMBER_CHARS);
+let numberFont: BitmapFont | undefined, numberFontUsers = 0;
+/** Public Pixi font installation; one finite atlas shared by numeric labels and renderer instances. */
+export function retainEffectNumberFont(): () => void {
+  if (!numberFontUsers) numberFont = BitmapFontManager.install({ name: EFFECT_NUMBER_FONT, chars: EFFECT_NUMBER_CHARS,
+    style: { fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 26, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x111427, width: 4 } },
+    resolution: 1.5, padding: 4, skipKerning: true, dynamicFill: true });
+  numberFontUsers++;
+  let released = false;
+  return () => { if (released) return; released = true; if (--numberFontUsers === 0) { BitmapFontManager.uninstall(EFFECT_NUMBER_FONT); numberFont = undefined; } };
+}
+// Numeric event prefixes above are closed; future unknown characters cannot grow the atlas.
+const numberMessage = (message: string) => [...message].map(character => numberCharacters.has(character) ? character : '?').join('');
 
 /** All randomness and clocks here are cosmetic; none feed back into the simulation. */
 export class EffectSystem {
@@ -98,17 +113,30 @@ export class EffectSystem {
     this.add(x, y, this.textures.glow, 0x70ffdf, 0.22, 72, 25, 0, 0, 0.23);
   }
 
+  private createLabel(bitmap: boolean): Text | BitmapText {
+    const label = bitmap ? new BitmapText({ text: '', style: { fontFamily: EFFECT_NUMBER_FONT, fontSize: 19, fill: 0xffffff } })
+      : new Text({ text: '', style: { fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 20, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x111427, width: 4 } }, resolution: 1.5 });
+    label.anchor.set(0.5); this.labels.addChild(label); return label;
+  }
+  private setLabelColor(label: Text | BitmapText, color: number): void {
+    if (label instanceof BitmapText) label.tint = color;
+    else label.style.fill = color;
+  }
+
   private label(x: number, y: number, message: string, color: number, amount = 0, target: number | null = null, priority = amount > 0 ? 0 : 2, key: string | null = null) {
+    const bitmap = amount > 0 || /\d/.test(message);
+    if (bitmap) message = numberMessage(message);
     const existing = key !== null ? this.floats.find(float => float.key === key && float.life > 0.15)
       : target === null ? null : this.floats.find(float => float.target === target && float.life > 0.15);
     if (existing && amount > 0) {
       existing.pending += amount;
       existing.life = Math.min(1.1, existing.life + 0.1);
-      if (priority > existing.priority) { existing.priority = priority; existing.label.style.fill = color; }
+      if (priority > existing.priority) { existing.priority = priority; this.setLabelColor(existing.label, color); }
       return;
     }
     if (existing && key !== null) {
-      existing.label.text = message; existing.label.style.fill = color;
+      if ((existing.label instanceof BitmapText) !== bitmap) { existing.label.destroy(); existing.label = this.createLabel(bitmap); }
+      existing.label.text = message; this.setLabelColor(existing.label, color);
       existing.x = x; existing.y = y - 32; existing.life = existing.total = 0.85;
       return;
     }
@@ -118,19 +146,16 @@ export class EffectSystem {
       if (replace < 0) return;
       this.releaseLabel(replace);
     }
-    let float = this.floatFree.pop();
+    const reusable = this.floatFree.findIndex(item => (item.label instanceof BitmapText) === bitmap);
+    let float = reusable < 0 ? this.floatFree.pop() : this.floatFree.splice(reusable, 1)[0];
     if (!float) {
-      const label = new Text({ text: '', style: {
-        fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 20, fontWeight: '700',
-        fill: 0xffffff, stroke: { color: 0x111427, width: 4 },
-      }, resolution: 1.5 });
-      label.anchor.set(0.5);
-      this.labels.addChild(label);
+      const label = this.createLabel(bitmap);
       float = { label, life: 0, total: 0, x, y, amount: 0, pending: 0, commit: 0, target, priority, key };
     }
+    if ((float.label instanceof BitmapText) !== bitmap) { float.label.destroy(); float.label = this.createLabel(bitmap); }
     float.label.visible = true;
     float.label.text = message;
-    float.label.style.fill = color;
+    this.setLabelColor(float.label, color);
     float.label.style.fontSize = amount > 15 ? 26 : amount > 0 ? 19 : 21;
     Object.assign(float, { life: 0.85, total: 0.85, x: x + (this.random() - 0.5) * 10, y: y - 32, amount, pending: 0, commit: 0.1, target, priority, key });
     this.floats.push(float);
@@ -334,7 +359,7 @@ export class EffectSystem {
   }
 
   get count() { return this.active.length; }
-  get labelTextureCount() { return this.floats.length + this.floatFree.length; }
+  get labelTextureCount() { return this.labels.children.filter(label => label instanceof Text).length + (numberFont?.pages.length ?? Number(this.labels.children.some(label => label instanceof BitmapText))); }
   destroy() {
     this.particles.destroy({ children: true });
     this.labels.destroy({ children: true });

@@ -1,6 +1,7 @@
 import { clamp, normalize, TAU } from './math';
 import { difficultyConfig } from './difficulty';
 import type { AreaHazard, ArenaRect, Bullet, CombatEvent, Difficulty, Enemy, EnemyShotOptions, Player, SeasonId } from './types';
+import { beginBossAction, bossActionTarget, updateBossAction, type AttackBudgetContext } from './boss-actions';
 
 const EPSILON = 1e-8;
 export type SpellPattern = 'needles' | 'weave' | 'flower' | 'mirrors' | 'seals' | 'blank'
@@ -28,8 +29,9 @@ export interface SpellBrain {
   stage: 'intro' | 'active'; anchorIndex: number; targetX: number; targetY: number; partIds: number[];
   initialized: boolean; partsSpawned: boolean; cueSequence: number; holdUntil: number;
   gateCenter: number; gateDirection: 1 | -1; cues: SpellEmission[];
+  nextMotion: number; motionCycle: number; retreatX: number; retreatY: number;
 }
-export interface SpellBossContext {
+export interface SpellBossContext extends AttackBudgetContext {
   player: Player; arena: ArenaRect; difficulty: Difficulty; elapsed: number; enemies: Enemy[];
   shootAt(source: Enemy, x: number, y: number, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void;
   spawnHazard(hazard: Omit<AreaHazard, 'id'>): void;
@@ -43,7 +45,7 @@ const CARD_NAMES = {
   s2: ['断层·噤声切片', '斜织·破碎囚笼', '冷核·无声凝视', '逆流·回声噩梦', '深渊·内外坍缩', '25时·全域崩坏'],
 } as const;
 // Fixed campaign budgets: upgrades never cause enemies to scale with a player's actual build.
-const CARD_HP = { s1: [700, 750, 800, 850, 900, 1000], s2: [1500, 1700, 1800, 1900, 2100, 2200] } as const;
+const CARD_HP = { s1: [1200, 1300, 1400, 1500, 1700, 1900], s2: [2600, 2900, 3100, 3500, 3800, 4100] } as const;
 const CARD_PATTERNS: Record<SeasonId, readonly SpellPattern[]> = {
   s1: ['needles', 'weave', 'flower', 'mirrors', 'seals', 'blank'],
   s2: ['slices', 'diagonals', 'nodes', 'reprise', 'rings', 'partition'],
@@ -67,7 +69,7 @@ export const SPELL_BALANCE = {
 export function createSpellBrain(season: SeasonId, difficulty: Difficulty = 'normal'): SpellBrain {
   return { season, cardIndex: 0, age: 0, cycle: 0, shotIndex: 0, nextAttack: SPELL_CARDS[season][difficulty][0].intro,
     stage: 'intro', anchorIndex: 0, targetX: 0, targetY: 0, partIds: [], initialized: false, partsSpawned: false,
-    cueSequence: 0, holdUntil: 0, gateCenter: 0, gateDirection: 1, cues: [] };
+    cueSequence: 0, holdUntil: 0, gateCenter: 0, gateDirection: 1, cues: [], nextMotion: 2.4, motionCycle: 0, retreatX: 0, retreatY: 0 };
 }
 export function spellCardDefinition(enemy: Enemy, difficulty: Difficulty = 'normal'): SpellCardDefinition {
   const season = enemy.spell?.season ?? (enemy.archetypeId === 'lacuna' ? 's2' : 's1');
@@ -84,6 +86,7 @@ export function advanceSpellCard(enemy: Enemy, difficulty: Difficulty = 'normal'
   enemy.hp = enemy.maxHp = spellCardDefinition(enemy, difficulty).hp;
   enemy.state = 'phaseShift'; enemy.timer = spellCardDefinition(enemy, difficulty).intro;
   enemy.vx = enemy.vy = 0; enemy.cooldown = 0; enemy.attackIndex = 0; enemy.lowHpSpoken = false;
+  enemy.action = undefined; enemy.exposedUntil = 0;
   return true;
 }
 export function spellTelegraphs(enemy: Enemy): readonly SpellTelegraph[] { return enemy.spell?.cues ?? []; }
@@ -110,6 +113,7 @@ function announce(enemy: Enemy, ctx: SpellBossContext, text: string, x = enemy.x
 }
 function schedule(enemy: Enemy, source: Enemy, ctx: SpellBossContext, cue: Omit<SpellTelegraph, 'id' | 'sourceId' | 'remaining'>, shots: PlannedShot[]): void {
   const brain = enemy.spell!;
+  if (ctx.reserveAttack && !ctx.reserveAttack(enemy.id, shots.length, 0, cue.warning + 0.1)) return;
   brain.cues.push({ ...cue, id: ++brain.cueSequence, sourceId: source.id, remaining: cue.warning,
     fireAt: brain.age + cue.warning, shots });
   if (source.id === enemy.id && cue.kind !== 'wall') brain.holdUntil = Math.max(brain.holdUntil, brain.age + cue.warning);
@@ -197,6 +201,7 @@ function wall(enemy: Enemy, ctx: SpellBossContext, axis: 'x' | 'y', reverse = fa
 }
 function beam(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, angle: number, width = 42, duration = 0.45): void {
   const warning = SPELL_BALANCE[ctx.difficulty].laserWarning;
+  if (ctx.reserveAttack && !ctx.reserveAttack(enemy.id, 0, 1, 0.1)) return;
   ctx.spawnHazard({ kind: 'beam', x, y, angle, width, length: Math.hypot(ctx.arena.width, ctx.arena.height) + 40,
     radius: width / 2, warning, warningDuration: warning, life: duration, duration, sourceId: enemy.id, active: false, angularSpeed: 0 });
   enemy.spell!.holdUntil = Math.max(enemy.spell!.holdUntil, enemy.spell!.age + warning + duration);
@@ -204,6 +209,7 @@ function beam(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, angle: 
 }
 function seal(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, radius = 62, delay = 0): void {
   const warning = (ctx.difficulty === 'hard' ? 0.7 : 0.9) + delay;
+  if (ctx.reserveAttack && !ctx.reserveAttack(enemy.id, 0, 1, 0.1)) return;
   // Preserve the sampled centre at walls: moving it inward could cut off the escape after commitment.
   ctx.spawnHazard({ kind: 'bombard', x: clamp(x, ctx.arena.x, ctx.arena.x + ctx.arena.width),
     y: clamp(y, ctx.arena.y, ctx.arena.y + ctx.arena.height), radius, warning, warningDuration: warning,
@@ -228,14 +234,14 @@ function firePattern(enemy: Enemy, ctx: SpellBossContext): number {
   const speed = SPELL_BALANCE[ctx.difficulty].speed;
   switch (pattern) {
     case 'needles':
-      fan(enemy, enemy, ctx, enemy.x, enemy.y, toward, hard ? 13 : 11, 2.35, speed + 20);
+      fan(enemy, enemy, ctx, enemy.x, enemy.y, toward, hard ? 19 : 15, 2.35, speed + 20);
       if (hard && n % 3 === 2) ring(enemy, ctx, 22, n * 0.31, 140);
       return hard ? 1.15 : 1.4;
     case 'weave':
       wall(enemy, ctx, n % 2 ? 'x' : 'y', false, true);
       return hard ? 1.2 : 1.5;
     case 'flower':
-      ring(enemy, ctx, hard ? 46 : 38, n * (hard ? 0.22 : 0.18), hard ? 175 : 155, (n % 2 ? 1 : -1) * 0.17);
+      ring(enemy, ctx, hard ? 62 : 50, n * (hard ? 0.22 : 0.18), hard ? 175 : 155, (n % 2 ? 1 : -1) * 0.17);
       if (n % 2 === 1) fan(enemy, enemy, ctx, enemy.x, enemy.y, toward, hard ? 3 : 1, 0.5, 275,
         { shape: 'rice' }, SPELL_BALANCE[ctx.difficulty].warning + 0.4);
       return hard ? 1.1 : 1.35;
@@ -300,6 +306,7 @@ function firePattern(enemy: Enemy, ctx: SpellBossContext): number {
 
 function moveToAnchor(enemy: Enemy, dt: number, ctx: SpellBossContext): void {
   const b = enemy.spell!, a = ctx.arena, margin = enemy.radius + 24;
+  if (updateBossAction(enemy, dt, ctx)) return;
   if (b.age < b.holdUntil - EPSILON) { enemy.vx = enemy.vy = 0; return; }
   const targets = [0.5, 0.35, 0.65];
   b.targetX = clamp(a.x + a.width * targets[b.anchorIndex % targets.length], a.x + margin, a.x + a.width - margin);
@@ -311,6 +318,23 @@ function moveToAnchor(enemy: Enemy, dt: number, ctx: SpellBossContext): void {
   const bodyDistance = enemy.radius + ctx.player.radius + 36;
   if (Math.hypot(futureX - ctx.player.x, futureY - ctx.player.y) < bodyDistance) { enemy.vx = enemy.vy = 0; return; }
   enemy.vx = direction.x * speed; enemy.vy = direction.y * speed;
+}
+
+/** Three readable body actions accompany the card language: side-cut, pursuit lunge, then old-route retreat. */
+function considerBodyAction(enemy: Enemy, ctx: SpellBossContext): void {
+  const b = enemy.spell!, hard = ctx.difficulty === 'hard', a = ctx.arena;
+  if (enemy.action || b.age < b.nextMotion || b.age < b.holdUntil) return;
+  const index = (b.motionCycle + b.cardIndex) % 3, lacuna = b.season === 's2';
+  const previous = { x: enemy.x, y: enemy.y };
+  const target = index === 0 ? { x: ctx.player.x + (ctx.player.x < a.x + a.width / 2 ? 280 : -280),
+    y: clamp(ctx.player.y - 250, a.y + 210, a.y + a.height - 230) }
+    : index === 2 && b.retreatX ? { x: b.retreatX, y: b.retreatY }
+      : bossActionTarget(enemy, ctx.player, lacuna ? 470 : 400, index === 2 ? 0.8 : 0.25);
+  if (beginBossAction(enemy, { kind: index === 0 ? 'sidestep' : index === 2 ? 'retrace' : 'dash', ...target,
+    warning: hard ? 0.75 : 0.95, duration: lacuna ? 0.6 : 0.7, recovery: hard ? 0.6 : 0.8 }, ctx)) {
+    b.retreatX = previous.x; b.retreatY = previous.y; b.motionCycle++;
+    b.nextMotion = b.age + (hard ? 3.6 : 4.2);
+  } else b.nextMotion = b.age + 0.3;
 }
 
 /** Runs entirely on the simulation clock; does not integrate positions or apply player damage. */
@@ -342,6 +366,7 @@ export function updateSpellBoss(enemy: Enemy, dt: number, ctx: SpellBossContext)
     moveToAnchor(enemy, dt, ctx); return;
   }
   b.stage = 'active'; enemy.state = 'volley'; enemy.timer = 0;
+  considerBodyAction(enemy, ctx);
   if (definition.pattern === 'nodes' && !b.partsSpawned) {
     b.partsSpawned = true;
     for (const fraction of (ctx.difficulty === 'hard' ? [0.25, 0.5, 0.75] : [0.3, 0.7])) {

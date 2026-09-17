@@ -1,0 +1,199 @@
+{
+  "version": "6.0.0",
+  "method": "Unmodified frozen balance input and choice controller with additive wrappers around production gainXp and xpLoss events; normal HP, no forced equipment or XP.",
+  "balanceScriptSha256": "304b19b320302c239b9c84ff7b581b26418d91700e9ff742547e54695db9a1c8",
+  "auditScriptSha256": "4757a87db1dc11b1c32b320aedda0ef4ac1e61eb76a94e86d496ebd886ba14e3",
+  "cases": [
+    {
+      "seed": 60007,
+      "profile": "balanced",
+      "result": "complete",
+      "seconds": 798.817,
+      "choices": 21,
+      "choiceSources": {
+        "level": 9,
+        "elite": 5,
+        "boss": 4,
+        "resonance": 3
+      },
+      "ordinaryKills": 518,
+      "injuries": 7,
+      "xpPickups": 5180,
+      "earnedXp": 6950,
+      "xpLost": 1054,
+      "unspentResonanceXp": 126,
+      "earnedResonanceRanks": 3,
+      "bossTtk": [
+        {
+          "id": "s1:echo",
+          "seconds": 49.55
+        },
+        {
+          "id": "s2:palisade",
+          "seconds": 62.467
+        },
+        {
+          "id": "s1:mafuyu",
+          "seconds": 94.25
+        },
+        {
+          "id": "s2:reprise",
+          "seconds": 74.583
+        },
+        {
+          "id": "s2:final",
+          "seconds": 149.267
+        }
+      ]
+    },
+    {
+      "seed": 60005,
+      "profile": "mobility",
+      "result": "complete",
+      "seconds": 866.667,
+      "choices": 22,
+      "choiceSources": {
+        "level": 9,
+        "elite": 5,
+        "boss": 4,
+        "resonance": 4
+      },
+      "ordinaryKills": 524,
+      "injuries": 5,
+      "xpPickups": 5240,
+      "earnedXp": 6910,
+      "xpLost": 540,
+      "unspentResonanceXp": 0,
+      "earnedResonanceRanks": 4,
+      "bossTtk": [
+        {
+          "id": "s1:echo",
+          "seconds": 47.367
+        },
+        {
+          "id": "s2:palisade",
+          "seconds": 77.767
+        },
+        {
+          "id": "s1:mafuyu",
+          "seconds": 111.867
+        },
+        {
+          "id": "s2:reprise",
+          "seconds": 80.417
+        },
+        {
+          "id": "s2:final",
+          "seconds": 169.8
+        }
+      ]
+    },
+    {
+      "seed": 60001,
+      "profile": "main",
+      "result": "complete",
+      "seconds": 707.483,
+      "choices": 24,
+      "choiceSources": {
+        "level": 9,
+        "elite": 5,
+        "boss": 4,
+        "resonance": 6
+      },
+      "ordinaryKills": 598,
+      "injuries": 1,
+      "xpPickups": 5980,
+      "earnedXp": 7780,
+      "xpLost": 100,
+      "unspentResonanceXp": 110,
+      "earnedResonanceRanks": 6,
+      "bossTtk": [
+        {
+          "id": "s1:echo",
+          "seconds": 34.067
+        },
+        {
+          "id": "s2:palisade",
+          "seconds": 50.483
+        },
+        {
+          "id": "s1:mafuyu",
+          "seconds": 73.25
+        },
+        {
+          "id": "s2:reprise",
+          "seconds": 58.367
+        },
+        {
+          "id": "s2:final",
+          "seconds": 122.6
+        }
+      ]
+    },
+    {
+      "seed": 60009,
+      "profile": "balanced",
+      "result": "complete",
+      "seconds": 766.183,
+      "choices": 24,
+      "choiceSources": {
+        "level": 9,
+        "elite": 5,
+        "boss": 4,
+        "resonance": 6
+      },
+      "ordinaryKills": 600,
+      "injuries": 2,
+      "xpPickups": 6000,
+      "earnedXp": 7700,
+      "xpLost": 77,
+      "unspentResonanceXp": 53,
+      "earnedResonanceRanks": 6,
+      "bossTtk": [
+        {
+          "id": "s1:echo",
+          "seconds": 41.35
+        },
+        {
+          "id": "s2:palisade",
+          "seconds": 66.667
+        },
+        {
+          "id": "s1:mafuyu",
+          "seconds": 82.933
+        },
+        {
+          "id": "s2:reprise",
+          "seconds": 65.517
+        },
+        {
+          "id": "s2:final",
+          "seconds": 141.033
+        }
+      ]
+    }
+  ],
+  "sourceHashes": {
+    "src/game/simulation.ts": "b6a8c785ad503e9f59ffcabbfdf5de293c9e3495338244d16f7a044596dac090",
+    "src/game/config.ts": "4ab368798c2049c73f05dfda695e156990c44aa5e829b88726b20bccf056da49",
+    "src/game/settings.ts": "08bf787029169b72b549c654cbe0bef0690a9e3e435a69d4fd04f6d9299f3a37",
+    "src/game/difficulty.ts": "2ca910ecf2d33b56fc903ff5887b7179e02831b8d23445eabea8f6f5d7525bdd",
+    "src/game/miniboss-ai.ts": "15ead87e732ea8408ef2e315aabb08e3acffa7d9bd61cb29d31ad2ac5ddbe501",
+    "src/game/math.ts": "8333f8273e05c0ca7c4e2e9a102e104650178ab1187a3802ce298799090e1bef",
+    "src/game/boss-actions.ts": "04b82788fb267e5a6ee5ace62da9c1e2a8427290a7e43ace6ca0a4ca3d525926",
+    "src/game/pool.ts": "235f0b9fbf484d4bac3352af0dd815e36eed1770855c42c20ff7c73b36a46b0c",
+    "src/game/attack-budget.ts": "6e79f288209561c7c7cd4b4a4f034f95b728b81681e64e42912e33c2918652d8",
+    "src/game/module-combat.ts": "9fe036117a3aa92b41dff8a242851b42e6a2726b0992fc3a0894849d3ee5e72f",
+    "src/game/upgrades.ts": "b964b8d3da3ef6a23ed3c85576a486256fd3359222295af88a74055e8300a972",
+    "src/game/elite-ai.ts": "5d2074770656dd73fe40c3b7f5a29ab6629c6f69429a3ba7854983f7b87607aa",
+    "src/game/season2-ai.ts": "59fe858313ef6c09bff246e89a6ab4eb1e4c3f06092c17cfd7c39a3a47833d8b",
+    "src/game/enemy-ai.ts": "495e785d28e1e5d81d289c1f7644d82ff45f48e7dd50475e3cde64a968f943b4",
+    "src/game/threat-director.ts": "9ccd9416466a700de9d796289e96bba12eeab9a78610c5f8f1991c49798087ce",
+    "src/game/projectile-motion.ts": "0d74aba247cd13cb8c9ae746ee461223702c23eb59b1c93a1158a9f442e42aa6",
+    "src/game/campaign.ts": "7c882c0d4d8a433c976dada87e6f33cb0e1686cc307b4e626c242f8165906d19",
+    "src/game/spellcards.ts": "cdb4d62c9b3aa2a6e95860ee839c00aeafc1ec089184ac45853a7e955608aaba",
+    "src/game/fairness.test.ts": "51d889319a89f1a6dd83a713cda0ea2701eab1a8eb211343c400ded6e7659211"
+  },
+  "changedSources": [],
+  "status": "complete"
+}

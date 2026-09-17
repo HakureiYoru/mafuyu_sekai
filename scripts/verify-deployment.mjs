@@ -11,10 +11,10 @@ const proxy = process.env.MAFUYU_BROWSER_PROXY;
 const browser = await chromium.launch({ headless: true, channel: 'chromium', args: process.platform === 'win32' ? ['--use-angle=d3d11'] : [],
   ...(proxy ? { proxy: { server: proxy, bypass: '127.0.0.1,localhost' } } : {}) });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const report = { version, sha, url, checkedAt: new Date().toISOString(), fixture: 'Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.', errors: [], encounters: [], choices: [] };
+const report = { version, sha, url, checkedAt: new Date().toISOString(), fixture: 'Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five gate elites, five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.', errors: [], elites: [], encounters: [], choices: [] };
 page.on('pageerror', error => report.errors.push(error.message));
 async function choosePending() {
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 64; i++) {
     const choice = await page.evaluate(() => {
       const d = window.__MAFUYU_DEBUG__, b = d.state().build;
       return { phase: d.snapshot().phase, offer: b.offerId, choices: b.choices };
@@ -27,6 +27,20 @@ async function choosePending() {
     }, choice.offer);
   }
   throw new Error('Upgrade queue did not drain.');
+}
+async function defeatGateElite() {
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().enemies.some(enemy => enemy.role === 'elite' && enemy.hp > 0));
+  const result = await page.evaluate(() => {
+    const debug = window.__MAFUYU_DEBUG__, state = debug.state(), elite = state.enemies.find(enemy => enemy.role === 'elite' && enemy.hp > 0);
+    const result = { id: elite.encounterId, name: debug.snapshot().eliteName, hp: elite.maxHp,
+      progression: state.campaign.progression, gate: state.campaign.eliteGate, previouslyDefeated: state.campaign.defeatedElites.length };
+    debug.damageEnemy(elite.id, 1e8); return result;
+  });
+  assert.equal(result.gate, true, 'Advancing the timer must still leave the mandatory elite gate closed.');
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'upgrade');
+  const defeated = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().campaign.defeatedElites);
+  assert.ok(defeated.includes(result.id)); assert.equal(defeated.length, result.previouslyDefeated + 1);
+  report.elites.push(result); await choosePending();
 }
 try {
   const response = await page.goto(url + '/?debug=1', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -86,6 +100,7 @@ try {
   for (const [index, id] of encounters.entries()) {
     await choosePending();
     await page.evaluate(() => window.__MAFUYU_DEBUG__.advanceStage());
+    await defeatGateElite();
     await page.waitForFunction(id => window.__MAFUYU_DEBUG__.state().enemies.some(e => e.encounterId === id && ['boss', 'miniboss'].includes(e.role)), id);
     const encounter = { id, cards: [] };
     const cards = id === 's1:mafuyu' || id === 's2:final' ? 6 : 1;
@@ -111,15 +126,21 @@ try {
     }
   }
   await page.waitForFunction(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'complete');
-  report.saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mafuyu-sekai:profile:v2')));
-  assert.equal(report.saved.version, 2);
+  report.saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mafuyu-sekai:profile:v3')));
+  assert.equal(report.saved.version, 3);
+  assert.equal(report.elites.length, 5);
   assert.equal(Object.keys(report.saved.clears).length, 1);
   assert.equal(Object.values(report.saved.clears)[0].encounterId, 's2:final');
-  assert.ok(report.saved.bestScores.v5.normal.story > 0);
-  const savedText = await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v2'));
+  assert.equal(Object.values(report.saved.clears)[0].ruleset, 'v6');
+  assert.ok(report.saved.bestScores.v6.normal.story > 0);
+  report.build = await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.snapshot();
+    return { modules: s.modules.length, layers: Object.values(s.moduleRanks).reduce((sum, rank) => sum + rank, 0), evolutions: s.evolutions.length };
+  });
+  const savedText = await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v3'));
   await page.reload();
   await page.getByRole('button', { name: '开始游戏', exact: true }).waitFor({ timeout: 45000 });
-  assert.equal(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v2')), savedText);
+  assert.equal(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v3')), savedText);
   await page.getByRole('button', { name: '开始游戏', exact: true }).click();
   report.restarted = await page.evaluate(() => {
     const d = window.__MAFUYU_DEBUG__, s = d.state();

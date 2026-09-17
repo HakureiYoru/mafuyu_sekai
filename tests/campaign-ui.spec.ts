@@ -1,8 +1,9 @@
+import { defeatGateElite } from './campaign-helpers';
 import { expect, test, type Page } from '@playwright/test';
 import type { DebugControls } from '../src/game/runtime';
 
 declare global { interface Window { __MAFUYU_DEBUG__: DebugControls } }
-const profileKey = 'mafuyu-sekai:profile:v2';
+const profileKey = 'mafuyu-sekai:profile:v3';
 async function open(page: Page) {
   await page.goto('/?debug=1');
   await expect(page.getByRole('button', { name: '开始游戏' })).toBeVisible();
@@ -12,7 +13,7 @@ async function killEncounter(page: Page, type: 'miniboss' | 'palisade' | 'repris
   await page.evaluate(type => { const debug = window.__MAFUYU_DEBUG__, enemy = debug.state().enemies.find(enemy => enemy.type === type)!; debug.damageEnemy(enemy.id, 1e7); }, type);
 }
 async function resolveChoices(page: Page) {
-  for (let guard = 0; guard < 14; guard++) {
+  for (let guard = 0; guard < 64; guard++) {
     const phase = await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase);
     if (phase !== 'upgrade') return;
     await page.keyboard.press('1');
@@ -25,6 +26,7 @@ async function completeCampaign(page: Page) {
     await resolveChoices(page);
     await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(index + 1);
     await page.evaluate(() => window.__MAFUYU_DEBUG__.advanceStage());
+    await defeatGateElite(page);
     if (encounter === 'miniboss' || encounter === 'palisade' || encounter === 'reprise') await killEncounter(page, encounter);
     else for (let card = 0; card < 6; card++) {
       await expect.poll(() => page.evaluate(() => {
@@ -61,7 +63,7 @@ test('all five encounters continue one run, only LACUNA saves, and refresh start
   await open(page); await completeCampaign(page);
   const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), profileKey);
   expect(Object.values(saved.clears)).toHaveLength(1);
-  expect(Object.values(saved.clears)[0]).toMatchObject({ ruleset: 'v5', encounterId: 's2:final' });
+  expect(Object.values(saved.clears)[0]).toMatchObject({ ruleset: 'v6', encounterId: 's2:final' });
   expect(saved).not.toHaveProperty('carryover');
   const modules = await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().modules);
   await page.getByRole('button', { name: /继续.*无尽/ }).click();

@@ -5,6 +5,7 @@ import { GameAudio } from './audio';
 import { Dialogue } from './dialogue';
 import { GameSimulation } from './simulation';
 import { CAMPAIGN_STAGES } from './campaign';
+import { ELITE_GROUPS } from './elite-ai';
 import { PROFILE_KEY, PROFILE_BACKUP_KEY, SaveRepository } from './profile';
 import { SPELL_CARDS, spellCardDefinition } from './spellcards';
 import { MODULES, EVOLUTIONS } from './upgrades';
@@ -213,7 +214,8 @@ export class GameRuntime implements RuntimeControls {
         urgent ||= previousReady !== (player.dashCooldown <= 0) || previousOverheated !== player.overheated || previousWindow !== (player.perfectWindow > 0)
           || previousCharges !== this.simulation.dashCharges || previousMiniState !== previousMiniboss?.state;
         this.dialogue.update(dt); this.processEvents(events);
-        urgent ||= events.some(event => ['damage', 'dash', 'bomb', 'levelup', 'xpLoss', 'boss', 'complete', 'failure', 'support', 'card', 'upgrade', 'module', 'beam'].includes(event.type) || ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '') || event.type === 'attack' && event.enemyType === 'boss');
+        urgent ||= events.some(event => ['damage', 'dash', 'bomb', 'levelup', 'xpLoss', 'boss', 'complete', 'failure', 'support', 'card', 'upgrade', 'shieldBreak', 'interrupt'].includes(event.type)
+          || event.type === 'attack' && (event.text === 'arrival' || event.text === 'core-exposed' || event.text?.startsWith('elite-arrival:')));
         const status = this.simulation.state.status;
         if (status !== 'playing') {
           this.phase = status;
@@ -275,29 +277,31 @@ export class GameRuntime implements RuntimeControls {
     const state = this.simulation.state, player = state.player;
     const boss = state.enemies.find(enemy => enemy.role === 'boss' || enemy.type === 'boss');
     const miniboss = state.enemies.find(enemy => enemy.role === 'miniboss' || enemy.type === 'miniboss');
-    const profile = this.saves.getProfile(), legacy = this.saves.getLegacyHistory();
+    const profile = this.saves.getProfile(), legacy = this.saves.getLegacyHistory(), legacyV5 = this.saves.getLegacyV5History();
+    const elite = state.enemies.find(enemy => enemy.role === 'elite' && enemy.hp > 0);
     const card = boss?.spell ? spellCardDefinition(boss, state.difficulty) : null;
     const graphics = this.renderer?.getStats() ?? { particles: 0, textures: 0 };
     this.snapshot = {
       phase: this.phase, loading: this.progress, error: this.error, mode: state.mode,
-      score: state.score, bestScore: profile.bestScores.v5[state.difficulty][state.mode], historicalBestScore: Math.max(legacy.bestScores.s1[state.difficulty], legacy.bestScores.s2[state.difficulty]), difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
+      score: state.score, bestScore: profile.bestScores.v6[state.difficulty][state.mode], historicalBestScore: Math.max(legacy.bestScores.s1[state.difficulty], legacy.bestScores.s2[state.difficulty], legacyV5.bestScores[state.difficulty].story, legacyV5.bestScores[state.difficulty].endless), difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
       minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? `${ENEMIES[miniboss.type].label} · ${miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.type === 'palisade' ? '优先破坏侧臂，穿过弹墙间隙' : '留意停驻弹的原路折返'}` : '',
       waveBlocked: this.simulation.isWaveBlocked(),
       elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, hpReserve: player.hpReserve, bombs: player.bombs,
       level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level),
       moduleStates: this.simulation.moduleStates,
+      recentUpgrade: this.simulation.recentUpgrade, eliteName: elite?.elite ? ELITE_GROUPS[elite.elite.stage - 1][elite.elite.variant].name : '', eliteHp: elite?.hp ?? 0, eliteMaxHp: elite?.maxHp ?? 0,
       heat: player.heat, overheated: player.overheated, dashCooldown: player.dashCooldown, perfectWindow: player.perfectWindow,
       bossHp: boss?.hp ?? 0, bossMaxHp: boss?.maxHp ?? 0, bossStage: state.bossStage || state.bossPending,
       bossPhase: boss?.spell ? Math.floor(boss.spell.cardIndex / 2) + 1 : 1, bossAction: boss?.spell ? boss.spell.stage === 'intro' ? '符卡切换 · 留意下一轮预告' : `${keyLabel(this.settings.keybindings.focus)} 慢移 · 跟随弹幕变化换位` : '', focus: player.focus,
       companions: state.companions?.length ?? 0,
       comms: this.dialogue.getMessage(this.settings.reducedMotion), commsPrevious: this.dialogue.getPreviousMessage(), announcement: state.elapsed < this.announcementUntil ? this.announcement : '',
       settings: { ...this.settings }, stats: { ...this.stats, ...graphics, enemies: state.enemies.length, bullets: state.bullets.length, pickups: state.pickups.length, voices: this.audio.voiceCount },
-      saveStatus: this.saves.status === 'session-only' ? 'session' : Object.keys(profile.clears).length || Object.values(profile.bestScores.v5).some(scores => scores.story || scores.endless) ? 'saved' : 'empty',
+      saveStatus: this.saves.status === 'session-only' ? 'session' : Object.keys(profile.clears).length || Object.values(profile.bestScores.v6).some(scores => scores.story || scores.endless) ? 'saved' : 'empty',
       saveMessage: this.saves.error ?? this.saveMessage,
       stageName: CAMPAIGN_STAGES[state.wave - 1]?.name ?? '无尽的空白', stageCount: CAMPAIGN_STAGES.length,
       cardName: card?.name ?? '', cardIndex: boss?.spell ? boss.spell.cardIndex + 1 : 0, cardCount: boss?.spell ? SPELL_CARDS[boss.spell.season][state.difficulty].length : 0,
       moduleRanks: { ...state.build.ranks }, evolutions: [...state.build.evolutions], rerollsRemaining: state.build.rerollsRemaining, choiceSource: state.build.pendingRewards[0]?.source ?? null, upgradeOfferId: state.build.offerId,
-      arena: !!state.arena, modules: [...state.build.modules], upgradeChoices: [...state.build.choices], resonance: state.build.resonance, dashCharges: this.simulation.dashCharges,
+      arena: !!state.arena, modules: [...state.build.modules], upgradeChoices: [...state.build.choices], resonance: state.build.resonance, resonanceXp: state.build.resonanceXp, dashCharges: this.simulation.dashCharges,
     };
     this.host.parentElement?.setAttribute('data-in-run', String(['playing', 'paused', 'upgrade', 'failed', 'complete'].includes(this.phase)));
     for (const listener of this.listeners) listener();
@@ -322,6 +326,7 @@ export class GameRuntime implements RuntimeControls {
     (window as DebugWindow).__MAFUYU_DEBUG__ = {
       snapshot: () => this.getSnapshot(),
       state: () => this.simulation.state,
+      resources: () => this.simulation.resourceCounts,
       stress: () => { this.start(); this.practiceRun = true; this.simulation.debugStress(); this.renderer?.debugStress(); this.resetMetrics(); this.publish(); },
       scenario: (name: DebugScenario) => {
         this.start(); this.practiceRun = true;
@@ -376,12 +381,13 @@ export class GameRuntime implements RuntimeControls {
         const state = this.simulation.state;
         state.seasonId = season; state.player.level = 8;
         state.pickups.push({ id: 900001, type: 'support', x: state.player.x, y: state.player.y, value: 3, age: 0 });
-        state.build.modules = [...new Set(options?.modules ?? [])].filter(id => id in MODULES).slice(0, 6);
-        state.build.ranks = Object.fromEntries(state.build.modules.map(id => [id, options?.ranks?.[id] === 2 ? 2 : 1]));
+        state.build.modules = [...new Set(options?.modules ?? [])].filter(id => id in MODULES);
+        state.build.ranks = Object.fromEntries(state.build.modules.map(id => [id, Math.max(1, Math.floor(Number.isFinite(options?.ranks?.[id]) ? options!.ranks![id]! : 1))]));
         state.build.evolutions = [...new Set(options?.evolutions ?? [])].filter(id => {
           const recipe = EVOLUTIONS[id];
-          return recipe && state.build.ranks[recipe.primary] === 2 && state.build.modules.includes(recipe.partner);
-        }).slice(0, 2);
+          return recipe && (state.build.ranks[recipe.primary] ?? 0) >= 2 && state.build.modules.includes(recipe.partner);
+        });
+        this.simulation.refreshBuild();
         state.build.choiceIndex = state.build.modules.length;
         state.player.invincible = 3600;
         if (options?.cardIndex !== undefined || options?.encounter) {
@@ -401,13 +407,14 @@ export class GameRuntime implements RuntimeControls {
   }
 }
 export interface DebugControls {
+  resources(): GameSimulation['resourceCounts'];
   snapshot(): HudSnapshot; state(): WorldState; stress(): void; scenario(name: DebugScenario): void;
   lifecycle(): { rafActive: boolean; phase: GamePhase; listeners: number; disposed: boolean; contextLost: boolean };
   pause(): void; resume(): void; restart(): void; settings(settings: Partial<GameSettings>): void;
   difficulty(difficulty: Difficulty): void;
   start(options?: Partial<RunStartOptions>): void; upgrade(id: UpgradeChoiceId, offerId?: string): void; reroll(): void; menu(): void;
   advanceStage(): void; damageEnemy(id: number, amount: number): void;
-  practice(options?: { season?: SeasonId; mode?: 'story' | 'endless'; modules?: ModuleId[]; ranks?: Partial<Record<ModuleId, 1 | 2>>; evolutions?: EvolutionId[]; cardIndex?: number; encounter?: EnemyType }): void;
+  practice(options?: { season?: SeasonId; mode?: 'story' | 'endless'; modules?: ModuleId[]; ranks?: Partial<Record<ModuleId, number>>; evolutions?: EvolutionId[]; cardIndex?: number; encounter?: EnemyType }): void;
 }
 export type DebugScenario = 'boss' | 'boss-laser' | 'boss-nova' | 'boss-bombard' | 'miniboss' | 'miniboss-arrival' | 'enemy-tactics' | 'failed' | 'complete' | 'boss-warning' | 'arsenal';
 type DebugWindow = Window & { __MAFUYU_DEBUG__?: DebugControls };

@@ -4,6 +4,7 @@ import { FixedClock } from './clock';
 import { GameSimulation } from './simulation';
 import { enemyAttacks } from './enemy-ai';
 import { difficultyConfig } from './difficulty';
+import { threatProfile } from './threat-director';
 import type { CombatEvent, Difficulty, Enemy, InputAction } from './types';
 
 const difficulties = ['normal', 'hard'] as const;
@@ -12,6 +13,8 @@ const idle = (extra: Partial<InputAction> = {}): InputAction => ({ moveX: 0, mov
 function quiet(difficulty: Difficulty = 'normal', seed = 3301): GameSimulation {
   const sim = new GameSimulation(seed, difficulty);
   sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9;
+  // Main-boss fixtures use a completed light-elite gate; actual elite gates have separate integration tests.
+  sim.state.campaign.spawnedElites.push('elite:1:0'); sim.state.campaign.defeatedElites.push('elite:1:0');
   return sim;
 }
 
@@ -54,7 +57,7 @@ describe('difficulty through the simulation boundary', () => {
       expect(enemy.speed).toBeCloseTo(ENEMIES[type].speed * factor, 8);
     }
     const scaled = quiet(difficulty); scaled.state.campaign.progression = 240;
-    expect(scaled.spawnEnemy('sniper', 2500, 2000)!.hp).toBe(difficulty === 'hard' ? 81 : 54);
+    expect(scaled.spawnEnemy('sniper', 2500, 2000)!.hp).toBe(difficulty === 'hard' ? 125 : 83);
     const moving = quiet(difficulty), base = moving.spawnEnemy('basic', 2500, 2000)!;
     ticks(moving, 90);
     expect(Math.hypot(base.vx, base.vy)).toBeCloseTo(115 * factor, 2);
@@ -65,8 +68,8 @@ describe('difficulty through the simulation boundary', () => {
   it.each(difficulties)('%s applies the separate Boss HP multiplier to both bosses', difficulty => {
     const boss = quiet(difficulty).spawnEnemy('boss', 1000, 1000)!;
     const mini = quiet(difficulty).spawnEnemy('miniboss', 2500, 2000)!;
-    expect(boss.maxHp).toBe(difficulty === 'hard' ? 945 : 700);
-    expect(mini.maxHp).toBe(difficulty === 'hard' ? 1620 : 1200);
+    expect(boss.maxHp).toBe(difficulty === 'hard' ? 1620 : 1200);
+    expect(mini.maxHp).toBe(difficulty === 'hard' ? 2160 : 1600);
     expect(mini.speed).toBeCloseTo(difficulty === 'hard' ? 312 : 240);
     expect(mini.radius).toBe(64);
   });
@@ -188,7 +191,7 @@ describe('continuous campaign miniboss integration', () => {
   it.each(difficulties)('%s shares attack reservations with ordinary elites and reset releases those reservations', difficulty => {
     const sim = quiet(difficulty), mini = sim.spawnEnemy('miniboss', 1500, 2000)!;
     const blockers: Enemy[] = [];
-    for (let i = 0; i < difficultyConfig(difficulty).attackSlots; i++) {
+    for (let i = 0; i < threatProfile(difficulty, sim.state.campaign.progression).slots; i++) {
       const e = sim.spawnEnemy('sniper', 2320 + i * 85, 1780)!;
       e.state = 'aim'; e.timer = 5; e.cooldown = 0;
       e.tactics = { shotsLeft: 0, shotTimer: 0, sweepStart: 0, sweepIndex: 0, locked: true };

@@ -1,0 +1,2 @@
+# Provenance hashes cover the exact SVG bytes; keep them stable on Windows too.
+public/assets/support/*.svg text eol=lf

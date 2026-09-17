@@ -11,17 +11,17 @@ if (!Number.isFinite(seconds) || seconds < 5 || seconds > 1800) throw new Error(
 const url = 'http://127.0.0.1:5183';
 const output = 'docs/validation';
 const args = process.platform === 'win32' ? ['--use-angle=d3d11'] : [];
-const limits = { enemies: 180, mines: 70, hazards: 12, bullets: 4096, particles: 900, textures: 64, voices: 24, pickups: 20000, usedHeapBytes: 512 * 1024 * 1024 };
+const limits = { enemies: 180, mines: 70, hazards: 48, bullets: 4608, particles: 900, textures: 64, voices: 24, pickups: 20000, usedHeapBytes: 512 * 1024 * 1024 };
 const report = {
   version: JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version,
   measuredAt: new Date().toISOString(), status: 'running', requestedWallSeconds: seconds, difficulty,
-  scenario: 'Production preview; 1920×1080; medium quality; continuous-campaign endless practice at Lv10 with three support craft, six rank-II modules and two evolutions; real-time combat driven by DOM keyboard/pointer input every 100 ms. No extra simulation steps or clock acceleration. Practice never grants a persistent clear.',
+  scenario: 'Production preview; 1920×1080; medium quality; v6 endless practice at Lv10 with three support craft, all 36 rank-V modules and all 18 evolutions; real-time combat driven by DOM keyboard/pointer input every 100 ms. Real reward choices use Digit1, freezing and resuming normally. No extra simulation steps or clock acceleration. Practice never grants a persistent clear.',
   caveat: 'The player is invincible for this unattended stability run. Automated aim and movement do not validate human difficulty, fairness, or the 10–15 minute story balance.',
   launch: { channel: 'chromium', headless: true, args }, limits,
   measurement: { resourceIntervalSeconds: 30, progressIntervalSeconds: 60, forcedGcIntervalSeconds: 300,
     forcedGc: 'CDP HeapProfiler.collectGarbage at baseline, every five minutes, the final sample, and on a listener-threshold recheck; pauses are included in elapsed-time checks. Use the separate benchmark for frame-performance acceptance.',
     listenerGuard: 'The limit remains baseline plus 100 listeners. A raw count above it triggers an additional GC and a fresh heap/DOM/Performance sample; only the post-GC listener count is tested. Both samples are retained as evidence.',
-    pools: 'Private pool free/allocated counts are not exposed by the runtime debug API. Live pooled bullets/particles, reported texture/voice counts, and retained heap are recorded as observable proxies; pool internals are not claimed as measured.' },
+    pools: 'Runtime debug snapshots expose separate enemy/player bullet pool allocated/free counts, live counts, attack reservations, and bounded module actor counts. Particle, texture, voice, DOM and retained heap totals are sampled alongside them.' },
   samples: [], browserErrors: [], consoleErrors: [], violations: [], recovery: null,
 };
 const html = await readFile('dist/index.html', 'utf8');
@@ -65,7 +65,7 @@ async function sample(wallSeconds, forceGc = false) {
         player: { hp: state.player.hp, level: state.player.level, heat: state.player.heat, bombs: state.player.bombs, beamCharge: state.player.perfectWindow,
           markTime: state.player.markTime },
         stats: snapshot.stats, finite: bodies.every(body => Number.isFinite(body.x) && Number.isFinite(body.y)) && Number.isFinite(state.elapsed) && Number.isFinite(state.score),
-        bot: window.__MAFUYU_SOAK__?.summary(),
+        bot: window.__MAFUYU_SOAK__?.summary(), resources: debug.resources(),
       };
     }), resource('Runtime.getHeapUsage'), resource('Memory.getDOMCounters'), resource('Performance.getMetrics'),
   ]);
@@ -85,13 +85,13 @@ async function sample(wallSeconds, forceGc = false) {
   const row = { wallSeconds, gc, listenerRecheck, ...game, heap, dom, performanceMetrics: metrics.metrics ?? metrics };
   firstSample ??= row;
   report.samples.push(row);
-  check(game.phase === 'playing' && game.status === 'playing' && game.mode === 'endless', `Unexpected game phase/status at ${wallSeconds.toFixed(1)}s: ${game.phase}/${game.status}/${game.mode}`);
+  check(['playing', 'upgrade'].includes(game.phase) && ['playing', 'upgrade'].includes(game.status) && game.mode === 'endless', `Unexpected game phase/status at ${wallSeconds.toFixed(1)}s: ${game.phase}/${game.status}/${game.mode}`);
   check(game.difficulty === difficulty, 'Difficulty changed during the stability run.');
-  check(game.modules.length === 6, 'The endless run lost a module slot.');
-  check(game.evolutions.length === 2 && Object.values(game.ranks).every(rank => rank === 2), 'The endless build lost its ranks or evolutions.');
-  check(game.lifecycle.rafActive && game.canvasCount === 1, `Expected one active game RAF and one canvas at ${wallSeconds.toFixed(1)}s.`);
+  check(game.modules.length === 36 && game.evolutions.length === 18, 'The endless run lost part of its full build.');
+  check(game.evolutions.length === 18 && Object.values(game.ranks).every(rank => rank >= 5), 'The endless build lost its ranks or evolutions.');
+  check(game.lifecycle.rafActive === (game.phase === 'playing') && game.canvasCount === 1, `Game RAF did not match the phase or canvas count at ${wallSeconds.toFixed(1)}s.`);
   check(game.finite, `Non-finite game state at ${wallSeconds.toFixed(1)}s.`);
-  check(game.companions === 3 && game.beams <= 3, `Support craft or beam count invalid at ${wallSeconds.toFixed(1)}s.`);
+  check(game.companions === 3 && game.beams <= 64 && game.resources.modules.actors <= 192, `Support craft or beam count invalid at ${wallSeconds.toFixed(1)}s.`);
   for (const key of ['enemies', 'mines', 'hazards', 'bullets', 'pickups']) check(game[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   for (const key of ['particles', 'textures', 'voices']) check(game.stats[key] <= limits[key], `${key} exceeded ${limits[key]}.`);
   if (typeof heap.usedSize === 'number') check(heap.usedSize <= limits.usedHeapBytes, 'Observed JS heap exceeded 512 MiB.');
@@ -119,8 +119,9 @@ try {
   await page.getByRole('button', { name: '开始游戏' }).waitFor();
   await page.evaluate(({ difficulty }) => {
     window.__MAFUYU_DEBUG__.difficulty(difficulty);
-    const modules = ['wingShots', 'rearSpark', 'chain', 'slow', 'doubleDash', 'dashEcho'];
-    window.__MAFUYU_DEBUG__.practice({ mode: 'endless', modules, ranks: Object.fromEntries(modules.map(id => [id, 2])), evolutions: ['spiralBloom', 'echoTrail'] });
+    const modules = ['piercing','wingShots','precision','shatter','chain','prism','droneHoming','droneBurst','slow','division','intercept','orbitBlade','doubleDash','vent','reserveAmmo','graze','revive','magnet','ricochet','rearSpark','crossOrbit','returnWing','brakeField','dashEcho','pulseChamber','anchorStars','crescentMagazine','beamCircuit','droneSpotlight','droneNotes','dronePlectrum','droneConduit','decoyEcho','slipstream','dashLane','counterPulse'];
+    const evolutions = ['needleArray','spiralBloom','forkNetwork','triangleAssault','huntingReturn','echoTrail','sonicBreak','starCarpet','lunarCut','choralBeam','stageSpotlight','staticGarden','stringEcho','triangleHall','livingSpeaker','headwindFlame','echoHighway','counterCurtain'];
+    window.__MAFUYU_DEBUG__.practice({ mode: 'endless', modules, ranks: Object.fromEntries(modules.map(id => [id, 5])), evolutions });
     const state = window.__MAFUYU_DEBUG__.state();
     state.player.level = 10; state.player.xp = 0;
     if (!state.companions.length) state.pickups.push({ id: 900001, type: 'support', value: 3, x: state.player.x, y: state.player.y, age: 0 });
@@ -130,7 +131,7 @@ try {
   await page.evaluate(() => {
     const debug = window.__MAFUYU_DEBUG__, canvas = document.querySelector('#game-host canvas');
     debug.state().player.invincible = 3600;
-    const held = new Set(), counts = { updates: 0, keyDowns: 0, pointerMoves: 0, dashes: 0, beamsObserved: 0, droneBulletsObserved: 0 };
+    const held = new Set(), counts = { updates: 0, keyDowns: 0, pointerMoves: 0, dashes: 0, choices: 0, upgradeWallMs: 0, phaseTransitions: 0, beamsObserved: 0, droneBulletsObserved: 0 };
     const transitions = [];
     let shooting = false, previousPhase = 'playing', lastDash = -10, lastBeamId = 0, stopped = false;
     const key = (code, down) => {
@@ -146,7 +147,8 @@ try {
       if (stopped) return;
       counts.updates++;
       const state = debug.state(), phase = debug.snapshot().phase, player = state.player;
-      if (phase !== previousPhase) { transitions.push({ phase, elapsed: state.elapsed }); previousPhase = phase; }
+      if (phase !== previousPhase) { transitions.push({ phase, elapsed: state.elapsed }); if (transitions.length > 32) transitions.shift(); counts.phaseTransitions++; previousPhase = phase; }
+      if (phase === 'upgrade') { release(); key('Digit1', true); key('Digit1', false); counts.choices++; counts.upgradeWallMs += 100; return; }
       if (phase !== 'playing') { release(); return; }
       for (const beam of state.beams) if (beam.id > lastBeamId) { lastBeamId = beam.id; counts.beamsObserved++; }
       counts.droneBulletsObserved = Math.max(counts.droneBulletsObserved, state.bullets.filter(bullet => bullet.kind === 'drone').length);
@@ -160,6 +162,7 @@ try {
       else if (target) { dx = target.x - player.x; dy = target.y - player.y; }
       else { dx = Math.cos(state.elapsed * 0.5); dy = Math.sin(state.elapsed * 0.5); }
       const length = Math.hypot(dx, dy) || 1;
+      key('ShiftLeft', Math.floor(state.elapsed / 3) % 2 === 0);
       key('KeyA', dx / length < -0.22); key('KeyD', dx / length > 0.22);
       key('KeyW', dy / length < -0.22); key('KeyS', dy / length > 0.22);
       const rect = canvas.getBoundingClientRect();
@@ -187,7 +190,7 @@ try {
     await delay(Math.min(1000, Math.max(1, seconds * 1000 - (performance.now() - began))));
     const wall = (performance.now() - began) / 1000;
     const phase = await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase);
-    if (phase !== 'playing') throw new Error(`Game unexpectedly entered ${phase} after ${wall.toFixed(1)} wall seconds.`);
+    if (!['playing', 'upgrade'].includes(phase)) throw new Error(`Game unexpectedly entered ${phase} after ${wall.toFixed(1)} wall seconds.`);
     if (wall >= nextSample) {
       await sample(wall, wall >= nextGc);
       nextSample += 30;
@@ -205,11 +208,13 @@ try {
   report.wallSeconds = (performance.now() - began) / 1000;
   report.simulatedSeconds = final.elapsed - baseline.elapsed;
   report.simulatedTicks = final.tick - baseline.tick;
-  const minimumSimulated = seconds >= 1800 ? seconds - 20 : Math.max(seconds * 0.9, seconds - 2);
+  const choiceSeconds = final.bot.upgradeWallMs / 1000;
+  const minimumSimulated = seconds >= 1800 ? seconds - choiceSeconds - 20 : Math.max(seconds * 0.9 - choiceSeconds, seconds - choiceSeconds - 2);
+  report.choiceWallSeconds = choiceSeconds;
   report.minimumSimulatedSeconds = minimumSimulated;
   check(report.simulatedSeconds >= minimumSimulated, `Simulation advanced only ${report.simulatedSeconds.toFixed(2)}s; expected at least ${minimumSimulated}s.`);
   check(Math.abs(report.simulatedTicks / 60 - report.simulatedSeconds) < 0.02, 'Tick count disagrees with the fixed 60 Hz simulation elapsed time.');
-  check(final.bot.transitions.length === 0, 'The bot observed an unexpected phase transition during the run.');
+  check(final.bot.transitions.every(item => ['playing', 'upgrade'].includes(item.phase)), 'The bot observed an unexpected phase transition during the run.');
   check(final.bot.pointerMoves > seconds * 5 && final.bot.dashes > 0, 'The input bot did not drive the game throughout the run.');
   check(final.bot.beamsObserved > 0 && final.bot.droneBulletsObserved > 0, 'The run did not exercise support projectiles and automatic post-dash beams.');
   const retained = report.samples.filter(row => row.gc && !row.gc.unavailable && typeof row.heap.usedSize === 'number');
