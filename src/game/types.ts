@@ -107,7 +107,12 @@ export interface CombatEvent extends Vec2 {
 }
 export interface ModuleState { id: ModuleId; status: 'ready' | 'active' | 'cooldown' | 'consumed'; remaining: number }
 export interface GameSettings { quality: Quality; masterVolume: number; musicVolume: number; sfxVolume: number; screenShake: number; reducedMotion: boolean; damageNumbers: 'all' | 'important' | 'off'; keybindings: KeyBindings }
-export interface CommsMessage { id: number; speaker: string; text: string; color: string; avatar: 'player' | 'enemy' }
+export type CommsMood = 'happy' | 'cheer' | 'surprised' | 'hurt' | 'cold' | 'annoyed' | 'shadow' | 'rage';
+export type CommsGesture = 'none' | 'hop' | 'flinch' | 'tilt' | 'tremble';
+export interface CommsMessage {
+  id: number; conversationId: string | null; speaker: string; text: string; fullText: string;
+  color: string; avatar: 'player' | 'enemy'; mood: CommsMood; gesture: CommsGesture;
+}
 export interface PerformanceStats { fps: number; frameP95: number; frameP99: number; updateMs: number; renderMs: number; enemies: number; bullets: number; particles: number; pickups: number; voices: number; textures: number }
 export interface HudSnapshot {
   phase: GamePhase; loading: number; error: string | null; mode: 'story' | 'endless'; score: number; bestScore: number;
@@ -115,7 +120,7 @@ export interface HudSnapshot {
   bombs: number; level: number; xp: number; xpNeeded: number; heat: number;
   moduleStates: readonly ModuleState[];
   overheated: boolean; dashCooldown: number; perfectWindow: number; bossHp: number; bossMaxHp: number;
-  bossStage: boolean; bossPhase: number; bossAction: string; focus: boolean; companions: number; comms: CommsMessage | null; announcement: string; settings: GameSettings; stats: PerformanceStats;
+  bossStage: boolean; bossPhase: number; bossAction: string; focus: boolean; companions: number; comms: CommsMessage | null; commsPrevious: CommsMessage | null; announcement: string; settings: GameSettings; stats: PerformanceStats;
   difficulty: Difficulty; minibossHp: number; minibossMaxHp: number; minibossAction: string; waveBlocked: boolean;
   saveStatus: 'saved' | 'session' | 'empty'; saveMessage: string;
   stageName: string; stageCount: number; cardName: string; cardIndex: number; cardCount: number; arena: boolean;

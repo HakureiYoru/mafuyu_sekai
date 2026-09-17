@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "created": "2026-09-17",
+  "method": "OpenAI built-in imagegen; each pose generated separately. Packaging only: proportional 512x768 resize and WebP encoding, alpha preserved.",
+  "rights": "Project-specific fan artwork depicting Project SEKAI characters. Not official assets; original character rights remain with their respective owners. No third-party animation pack is redistributed.",
+  "totalBytes": 488016,
+  "assets": [
+    {
+      "id": "emu-happy",
+      "file": "emu-happy.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 68844,
+      "sha256": "a0a796e7811c1bf4251ec877def9f8e95b836008637b9ed7a4783f5de011620f",
+      "sourceFile": "exec-584745ca-a060-4865-a4c0-420057f386fa.png",
+      "sourceSha256": "54e0484b68f276bbd5bd6be156213aec080bbc8616d82fbeb0f6babe1443a6c4",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5175685882568359,
+      "references": [
+        "public/assets/images/player.png",
+        "public/assets/images/enemy.png"
+      ],
+      "prompt": "Edit this exact sprite to REMOVE THE ENTIRE BACKGROUND. Keep this exact happy full-body Emu character and every costume/head/detail/pose unchanged. Output must be a transparent PNG cutout with actual alpha=0 pixels everywhere outside her crisp outline. REMOVE the black backdrop, all pink glows, all blurred aura, all gradients, all cast shadow and every environmental pixel. Do NOT draw a new colored background or any checkerboard. No glow around her. A clean isolated game sprite on genuine transparent alpha only, not an illustration with a backdrop. Preserve portrait 2:3 canvas, unchanged proportions and feet baseline. No words.",
+      "baseGenerationPrompt": "Create ONE production game sprite, not a sheet: a newly illustrated full-body super-deformed chibi Otori Emu from Project SEKAI, HAPPY IDLE pose. The first attached image is her identity/head reference; second is the companion character style reference only and must NOT appear. Pink bob hair, purple-pink eyes, joyful open simple smile. Approximately two heads tall with a very large recognizable round head, tiny fully drawn body, rounded mitten hands and boots. Original simplified pink-and-white Wonderlands x Showtime stage outfit: pink puff-sleeved dress, white apron/bib with a small yellow bow, white frills, pink shoes. Childlike cartoon proportions with modest fully clothed outfit. Dark plum clean medium outlines and soft cel shading matching the reference, professionally polished Japanese mobile-game SD sprite. Facing slightly to viewer's RIGHT (will stand on the left side of game). Both arms relaxed, friendly happy idle stance, both feet planted on same level. Portrait 2:3 canvas. Entire character, including hair and shoes, inside central 84% of the canvas; fixed foot baseline 93% height, head near 8%. TRUE transparent alpha background with no solid backdrop, no checkerboard painted into pixels, no shadow on ground. No other characters, no words, symbols, bubble, border, watermark or panel. This is the first of a consistent eight-pose sprite set. Output a single clean transparent PNG sprite.",
+      "baseGenerationFile": "exec-5ba3608e-cc5e-48eb-85d9-15262391bb6e.png"
+    },
+    {
+      "id": "mafuyu-cold",
+      "file": "mafuyu-cold.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 53238,
+      "sha256": "259d4f7c51ec62fb97d870ad941216b6b4bd504b8eb1a0836120bb0e4ca7338d",
+      "sourceFile": "exec-bfc8b6bc-fe08-4b3f-913f-31211946749e.png",
+      "sourceSha256": "a564d28058972cea0ec9ba1ed71b61edea4be7b49ac86c6ef8efd9f727785903",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5394407908121744,
+      "references": [
+        "public/assets/images/enemy.png",
+        "emu-happy"
+      ],
+      "prompt": "Create ONE transparent full-body game sprite of Asahina Mafuyu from Project SEKAI, COLD EMPTY IDLE pose. Image 1 is Mafuyu identity reference; image 2 is the completed Emu sprite and sets the EXACT matching illustration style, outlines, simplified two-head-tall body proportions and scale. Do not include Emu. Mafuyu has deep muted purple hair tied in her recognizable high side ponytail with small yellow tie, purple eyes. Replace the smile from the head reference with emotionally empty half-lidded eyes, a small flat closed mouth, no blush, no smile: quiet, dark, withdrawn, unsettling rather than cute-happy. Outfit: dark charcoal/navy hooded sweatshirt with small lavender lining and drawstrings, modest dark pleated skirt, opaque charcoal tights, dark low boots. Tiny hands loosely down; whole body inclined slightly towards viewer's LEFT because she stands on the right and looks towards Emu. Clean plum outlines and soft cel shading consistent with Emu. Portrait 2:3 canvas, entire body with uncut hair and feet inside central 84%, head top near8%, feet baseline93%, about two heads tall. Genuine transparent-alpha PNG cutout. Alpha=0 outside silhouette, no ground shadow, no aura or glow, no backdrop, no text, no frame, no props, no extra characters."
+    },
+    {
+      "id": "emu-cheer",
+      "file": "emu-cheer.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 70250,
+      "sha256": "3644b14eee970b35350e9e79e609940c3fe680c40764f5d7820573d86ab568aa",
+      "sourceFile": "exec-36fe8981-a2e5-49fd-8db8-e39cf0e2705b.png",
+      "sourceSha256": "d2caf3f917b3618896a4a914e7b135625303d128955506e3b56450f75acb8433",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5246041615804037,
+      "references": [
+        "emu-happy"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: CHEER / WONDERHOY! Both tiny hands lifted high to the sides of her head, elbows up, open happy shouting mouth, bright wide excited eyes. Energetic triumphant pose; feet still planted at the same baseline for runtime hopping. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    },
+    {
+      "id": "emu-surprised",
+      "file": "emu-surprised.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 66574,
+      "sha256": "cb603d630799345258c095ea961dc1e68014f0938bb75990a04d982075703ff2",
+      "sourceFile": "exec-a45fa484-e72d-4e6e-8a9e-a354fd3c07a1.png",
+      "sourceSha256": "90fd02ac481f579f8169b01ac2b7825790717e903796b6dd2f95db93a0ef0efc",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5232283274332682,
+      "references": [
+        "emu-happy"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: STARTLED / SCARED. Round widened eyes with small pupils, small open O-shaped mouth, shoulders raised and tiny hands held close to cheeks in surprise; leaning slightly away while still facing viewer's right. Funny frightened reaction, not happiness. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    },
+    {
+      "id": "emu-hurt",
+      "file": "emu-hurt.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 67238,
+      "sha256": "404dcdcb45af78665474b345dd6e58e6e9dc1a9010a3a8334a6290406e23a604",
+      "sourceFile": "exec-e48d76a2-f24f-45ed-b916-a5f0cc7c8869.png",
+      "sourceSha256": "558f23e2e654f4cecc7e5543915c494a73f4108443867100e8391bbdb5d6ae7a",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5219631195068359,
+      "references": [
+        "emu-happy"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: HURT / DEJECTED. Drooping shoulders, eyebrows raised in the middle, teary glossy eyes and tiny wobbly downturned mouth, hands clasped close to chest, knees slightly inward. Lovable comic 'owww' reaction; no physical wounds, blood or bandages; outfit intact. She is not smiling. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    },
+    {
+      "id": "mafuyu-annoyed",
+      "file": "mafuyu-annoyed.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 54106,
+      "sha256": "66aae9cbfdcb717c9a7ac9b56ec905b78018f39424f5431ef194f7af1fad420e",
+      "sourceFile": "exec-e38505bc-8002-4a8d-905f-1e1a04153340.png",
+      "sourceSha256": "6e4296f77255a3897673df093754b32ddd64b48f8772f0b1db850248795779e0",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.54803466796875,
+      "references": [
+        "mafuyu-cold"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: ANNOYED SIDE-EYE. Her purple eyes glance sharply to viewer's left with lowered brows, small tense frown, arms folded loosely in front of her sweatshirt. Head slightly angled, restrained irritation, absolutely no cheerful smile. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    },
+    {
+      "id": "mafuyu-shadow",
+      "file": "mafuyu-shadow.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 51390,
+      "sha256": "43ea16cb30bc008d3b0f44326063d0eb017634bdbf5fe448e35a0fb66dbf80cd",
+      "sourceFile": "exec-24f812c1-9e32-479d-86fc-53bbf3078f31.png",
+      "sourceSha256": "59e16cbbfc3e0630adced69eb45910432eb817364cd64d292d4f404e401e7286",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5446612040201823,
+      "references": [
+        "mafuyu-cold"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: DARK SHADOWED FACE. Head tilted slightly down; upper face and eye area under a clearly defined cool violet shadow from her bangs, narrow dull purple eyes with no sparkle or cheerful highlights, small flat mouth; arms hanging straight down with tiny fists. Quiet, emotionally hollow and menacing suppressed anger; not smiling, not crying. Shadow belongs INSIDE face only. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    },
+    {
+      "id": "mafuyu-rage",
+      "file": "mafuyu-rage.webp",
+      "width": 512,
+      "height": 768,
+      "bytes": 56376,
+      "sha256": "5c6b60876850a80537b65705a198833582332c4da9382f403e984ec367664b3b",
+      "sourceFile": "exec-e025f6fe-f08c-4d9d-b839-0b24f70e652b.png",
+      "sourceSha256": "94737c4963cd7db6c6599ca9ab68c4de566e75bc9d2d9a212819225b3ed949e8",
+      "sourceDimensions": [
+        1024,
+        1536
+      ],
+      "transparentRatio": 0.5082378387451172,
+      "references": [
+        "mafuyu-cold"
+      ],
+      "prompt": "Create a single alternate pose sprite of the EXACT attached full-body chibi character. Keep identical hair, costume details, colors, two-head-tall proportions, dark plum outlines, soft cel shading and portrait2:3 canvas. Change only pose and expression: RAGE / SHOUTING SHUT UP. Sharply lowered angry eyebrows, narrowed intense purple eyes with tiny pale highlights rather than happy sparkles, mouth clearly OPEN in furious shouting, tiny fists clenched and lifted beside waist. Dark shadow under bangs across upper eyes enhances threatening agitated expression. Lean slightly forward towards viewer's LEFT. Genuine furious expression, NOT a cheerful open-mouth smile, NOT cute laughing. Keep entire body visible, same size and fixed foot baseline at93% canvas height, no cropped hair/hands/shoes. Output TRUE transparent alpha PNG, alpha=0 outside the crisp character silhouette. No backdrop, no cast shadow, no glow or aura, no extra icons/text/symbols/bubble/characters. This must match the original as a game animation pose, not a new costume or redesign."
+    }
+  ]
+}

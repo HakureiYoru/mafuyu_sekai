@@ -13,3 +13,16 @@ for (const asset of support.assets) {
   await readFile(new URL(`../public/assets/support/${asset.licenseFile}`, import.meta.url));
 }
 console.log(`All ${support.assets.length} support assets match their provenance records and include licenses.`);
+const comms = JSON.parse(await readFile(new URL('../public/assets/comms/manifest.json', import.meta.url), 'utf8'));
+let commsBytes = 0;
+if (comms.assets.length !== 8) throw new Error('Expected eight full-body communication poses.');
+for (const asset of comms.assets) {
+  const data = await readFile(new URL(`../public/assets/comms/${asset.file}`, import.meta.url));
+  const actual = createHash('sha256').update(data).digest('hex');
+  if (actual !== asset.sha256 || data.length !== asset.bytes) throw new Error(`Communication asset changed: ${asset.file}`);
+  if (data.toString('ascii', 0, 4) !== 'RIFF' || data.toString('ascii', 8, 12) !== 'WEBP') throw new Error(`Invalid WebP: ${asset.file}`);
+  if (!asset.prompt || !asset.sourceSha256 || !asset.references?.length) throw new Error(`Missing generation record: ${asset.file}`);
+  commsBytes += data.length;
+}
+if (commsBytes !== comms.totalBytes || commsBytes > 2_000_000) throw new Error('Communication asset download budget exceeded.');
+console.log(`All 8 communication sprites match their generation records (${commsBytes} bytes, below 2 MB).`);

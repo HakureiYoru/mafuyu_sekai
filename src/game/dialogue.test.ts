@@ -1,166 +1,236 @@
 import { describe, expect, it } from 'vitest';
 import { Dialogue } from './dialogue';
 import dialogueData from './data/dialogue.json';
+import { CONVERSATIONS } from './data/conversations';
 import type { CombatEvent, EnemyType } from './types';
 
-describe('continuous campaign communications', () => {
-  it('opens without inherited-season instructions and preserves paused dialogue time', () => {
-    const dialogue = new Dialogue(); dialogue.start();
-    const line = dialogue.getMessage(true)!.text;
-    expect(line).not.toMatch(/第一季|继承|选好模块/);
-    expect(dialogue.getMessage(true)?.text).toBe(line);
-    dialogue.update(2);
-    expect(dialogue.getMessage(true)?.speaker).toBe('MAFUYU');
-    dialogue.update(6);
-    expect(dialogue.getMessage(true)).toBeNull();
+const event = (type: CombatEvent['type'], extra: Partial<CombatEvent> = {}): CombatEvent => ({ type, x: 0, y: 0, ...extra });
+
+describe('two-character combat conversations', () => {
+  it('authors 24 short exchanges with alternating characters and all eight expressions', () => {
+    expect(CONVERSATIONS).toHaveLength(24);
+    expect(new Set(CONVERSATIONS.map(item => item.id)).size).toBe(24);
+    const counts: Record<string, number> = {};
+    for (const conversation of CONVERSATIONS) {
+      counts[conversation.category] = (counts[conversation.category] ?? 0) + 1;
+      expect(conversation.lines.length).toBeGreaterThanOrEqual(2);
+      expect(conversation.lines.length).toBeLessThanOrEqual(3);
+      conversation.lines.forEach((line, i) => {
+        expect(line.text.length).toBeLessThanOrEqual(24);
+        expect(line.speaker === 'EMU' ? ['happy', 'cheer', 'surprised', 'hurt'] : ['cold', 'annoyed', 'shadow', 'rage']).toContain(line.mood);
+        if (i) expect(line.speaker).not.toBe(conversation.lines[i - 1].speaker);
+      });
+    }
+    expect(counts).toEqual({ opening: 2, wonderhoy: 6, damage: 3, heal: 2, upgrade: 3,
+      echo: 1, palisade: 1, mafuyu: 1, reprise: 1, lacuna: 1, failure: 1, complete: 1, endless: 1 });
+    expect(new Set(CONVERSATIONS.flatMap(item => item.lines.map(line => line.mood))).size).toBe(8);
   });
-  it('names encounters by their identity and resets to a fresh campaign', () => {
-    const dialogue = new Dialogue(); dialogue.start();
-    dialogue.handle([{ type: 'attack', text: 'arrival', enemyType: 'palisade', x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)?.text).toContain('PALISADE');
-    dialogue.handle([{ type: 'boss', encounterId: 's2:final', x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)?.text).toContain('LACUNA');
-    dialogue.handle([{ type: 'card', text: '内外环交替', x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)?.text).toContain('内外环交替');
-    dialogue.handle([{ type: 'complete', seasonId: 's2', x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
-    dialogue.start(); dialogue.handle([{ type: 'complete', x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
-  });
-  it('keeps all authored lines short with correct character portraits and score placeholders', () => {
+  it('preserves all 223 original supplement lines and their unique ids', () => {
     const lines = Object.values(dialogueData).flat();
+    expect(lines).toHaveLength(223);
     expect(new Set(lines.map(line => line.id)).size).toBe(lines.length);
-    expect(lines.every(line => line.text.length <= 48)).toBe(true);
-    expect(lines.every(line => ['EMU', 'MAFUYU'].includes(line.sender))).toBe(true);
+    expect(lines.every(line => line.text.length <= 48 && ['EMU', 'MAFUYU'].includes(line.sender))).toBe(true);
+  });
+  it('opens in-character, types at simulation speed, and preserves the complete previous sentence', () => {
     const dialogue = new Dialogue(); dialogue.start();
-    expect(dialogue.getMessage(true)).toMatchObject({ speaker: 'EMU', avatar: 'player' });
-    dialogue.handle([{ type: 'failure', x: 0, y: 0 }], 12345);
-    expect(dialogue.getMessage(true)?.text).toContain('12345');
-    expect(dialogue.getMessage(true)?.text).not.toContain('{score}');
+    const opening = dialogue.getMessage(true)!;
+    expect(opening).toMatchObject({ speaker: 'EMU', avatar: 'player', mood: 'cheer', gesture: 'hop', fullText: '学姐！Wonderhoy！！' });
+    expect(opening.text).not.toMatch(/第一季|继承|选好模块/);
+    expect(dialogue.getMessage()?.text).toBe('学');
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    dialogue.update(0.2);
+    expect(dialogue.getMessage()?.text).toBe(opening.fullText.slice(0, 7));
+    expect(dialogue.getMessage()?.id).toBe(opening.id);
+    expect(dialogue.getMessage()?.gesture).toBe('hop');
+    dialogue.update(1.61);
+    expect(dialogue.getMessage()).toMatchObject({ speaker: 'MAFUYU', avatar: 'enemy', mood: 'shadow', conversationId: opening.conversationId });
+    expect(dialogue.getPreviousMessage()).toEqual(opening);
+    dialogue.update(5);
+    expect(dialogue.getMessage()).toBeNull();
+    expect(dialogue.getPreviousMessage()).toBeNull();
+  });
+  it('does not advance typing, poses, or the previous sentence without simulation updates', () => {
+    const dialogue = new Dialogue(); dialogue.start(); dialogue.update(1.9);
+    const message = dialogue.getMessage(), previous = dialogue.getPreviousMessage();
+    for (let i = 0; i < 100; i++) {
+      expect(dialogue.getMessage()).toEqual(message);
+      expect(dialogue.getPreviousMessage()).toEqual(previous);
+    }
+    expect(dialogue.getMessage(true)?.text).toBe(message?.fullText);
+    expect(dialogue.getMessage(true)?.id).toBe(message?.id);
+  });
+  it('waits for full text plus 1.4 seconds before switching even a longer sentence', () => {
+    const dialogue = new Dialogue();
+    dialogue.handle([event('boss', { encounterId: 's2:final' })], 0);
+    const message = dialogue.getMessage(true)!;
+    const duration = Math.max(1.8, message.text.length / 35 + 1.4);
+    dialogue.update(duration - 0.001);
+    expect(dialogue.getMessage()?.id).toBe(message.id);
+    expect(dialogue.getMessage()?.text).toBe(message.fullText);
+    dialogue.update(0.002);
+    expect(dialogue.getMessage()?.id).not.toBe(message.id);
+    expect(dialogue.getPreviousMessage()).toEqual(message);
+  });
+  it.each([30, 60, 120, 144])('has the same conversation state after 2.5 simulated seconds at %i Hz', hz => {
+    const dialogue = new Dialogue(); dialogue.start();
+    for (let i = 0; i < hz * 2.5; i++) dialogue.update(1 / hz);
+    expect(dialogue.getMessage()?.text).toBe('……这里不需要你的声音。');
+    expect(dialogue.getPreviousMessage()?.text).toBe('学姐！Wonderhoy！！');
+    expect(dialogue.getMessage()?.id).toBe(3);
   });
   it.each([
     ['s1:echo', 'miniboss', 'ECHO'],
     ['s2:palisade', 'palisade', 'PALISADE'],
+    ['s1:mafuyu', 'boss', 'MAFUYU'],
     ['s2:reprise', 'reprise', 'REPRISE'],
     ['s2:final', 'boss', 'LACUNA'],
-  ] as const)('announces %s without a generic mob line replacing the entrance', (encounterId, enemyType, name) => {
+  ] as const)('announces %s with its own identity and deduplicates warning/arrival', (encounterId, enemyType, name) => {
     const dialogue = new Dialogue(); dialogue.start();
-    dialogue.handle([{ type: 'attack', text: 'arrival', encounterId, enemyType, x: 0, y: 0 }], 0);
-    const entrance = dialogue.getMessage(true);
-    expect(entrance?.text).toContain(name);
+    dialogue.handle([event('attack', { text: 'arrival', encounterId, enemyType })], 0);
+    const entrance = dialogue.getMessage(true)!;
+    expect(entrance.text).toContain(name);
+    expect(dialogue.getPreviousMessage()).toBeNull();
     dialogue.update(2);
-    dialogue.handle([{ type: enemyType === 'boss' ? 'boss' : 'spawn', encounterId, enemyType, x: 0, y: 0 }], 0);
-    expect(dialogue.getMessage(true)).toEqual(entrance);
-    dialogue.update(4);
+    const next = dialogue.getMessage(true);
+    dialogue.handle([event(enemyType === 'boss' ? 'boss' : 'spawn', { encounterId, enemyType })], 0);
+    expect(dialogue.getMessage(true)).toEqual(next);
+    expect(dialogue.getPreviousMessage()).toEqual(entrance);
+    dialogue.update(6);
     expect(dialogue.getMessage(true)).toBeNull();
   });
-  it('translates card completion and encounter completion instead of displaying event codes', () => {
+  it('keeps an entrance over incidental card and upgrade events in the same batch', () => {
+    const dialogue = new Dialogue();
+    dialogue.handle([
+      event('card', { text: '测试符卡' }), event('levelup', { amount: 3 }),
+      event('attack', { text: 'arrival', encounterId: 's1:mafuyu', enemyType: 'boss' }), event('bomb'),
+    ], 0);
+    expect(dialogue.getMessage(true)?.text).toContain('MAFUYU');
+    dialogue.update(0.5);
+    dialogue.handle([event('card', { text: '下一张符卡' }), event('bomb')], 0);
+    expect(dialogue.getMessage(true)?.text).toBe('「下一张符卡」');
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    dialogue.update(8);
+    expect(dialogue.getMessage()).toBeNull();
+  });
+  it('translates card and encounter completion rather than showing raw event codes', () => {
     const dialogue = new Dialogue(); dialogue.start();
-    dialogue.handle([{ type: 'card', text: 'cleared', encounterId: 's1:mafuyu', enemyType: 'boss', x: 0, y: 0 }], 0);
+    dialogue.handle([event('card', { text: 'cleared', encounterId: 's1:mafuyu', enemyType: 'boss' })], 0);
     expect(dialogue.getMessage(true)?.text).toBe(dialogueData.CARD_CLEARED[0].text);
-    dialogue.handle([{ type: 'attack', text: 'encounterCleared', encounterId: 's1:mafuyu', x: 0, y: 0 }], 0);
+    dialogue.handle([event('attack', { text: 'encounterCleared', encounterId: 's1:mafuyu' })], 0);
     expect(dialogue.getMessage(true)?.text).toBe(dialogueData.ENCOUNTER_CLEARED[0].text);
   });
-  it('does not give mines, cores, parts, or defeated bosses ordinary-mob dialogue', () => {
+  it('does not let mines, cores, parts, or defeated bosses generate ordinary-mob chatter', () => {
     const dialogue = new Dialogue(); dialogue.start();
     const opening = dialogue.getMessage(true);
     const types: EnemyType[] = ['mine', 'core', 'arm', 'node', 'miniboss', 'palisade', 'reprise', 'boss'];
-    const events = types.flatMap(enemyType => [
-      { type: 'spawn', enemyType, x: 0, y: 0 },
-      { type: 'kill', enemyType, x: 0, y: 0 },
-    ]) as CombatEvent[];
-    dialogue.handle(events, 0);
+    dialogue.handle(types.flatMap(enemyType => [event('spawn', { enemyType }), event('kill', { enemyType })]), 0);
     expect(dialogue.getMessage(true)).toEqual(opening);
-    dialogue.update(2);
-    dialogue.update(6);
-    expect(dialogue.getMessage(true)).toBeNull();
+    dialogue.update(10);
+    expect(dialogue.getMessage()).toBeNull();
   });
-  it('keeps max-level dialogue out of lower-level upgrades and uses it at level ten', () => {
-    const dialogue = new Dialogue(); dialogue.start();
-    const ordinary = dialogueData.LEVEL_UP_EVENT.filter(line => !line.maxed).map(line => line.text);
-    for (let i = 0; i < 9; i++) {
-      dialogue.handle([{ type: 'levelup', amount: 5, x: 0, y: 0 }], 0);
-      expect(ordinary).toContain(dialogue.getMessage(true)?.text);
+  it('reserves max-level exchange for level ten and rotates the two earlier upgrade exchanges', () => {
+    const dialogue = new Dialogue();
+    const seen = new Set<string>();
+    for (let i = 0; i < 4; i++) {
+      dialogue.handle([event('levelup', { amount: 5 })], 0);
+      seen.add(dialogue.getMessage(true)!.fullText);
+      expect(dialogue.getMessage(true)?.text).not.toContain('满级');
     }
-    dialogue.handle([{ type: 'levelup', amount: 10, x: 0, y: 0 }], 0);
-    expect(dialogueData.LEVEL_UP_EVENT.filter(line => line.maxed).map(line => line.text)).toContain(dialogue.getMessage(true)?.text);
+    expect(seen.size).toBe(2);
+    dialogue.handle([event('levelup', { amount: 10 })], 0);
+    expect(dialogue.getMessage(true)?.text).toContain('满级');
   });
   it.each([
     ['miniboss', 'ECHO_ATTACK'], ['palisade', 'PALISADE_ATTACK'], ['reprise', 'REPRISE_ATTACK'],
-  ] as const)('keeps %s mechanics out of the final-boss six-card banter', (enemyType, group) => {
-    const dialogue = new Dialogue(); dialogue.start(); dialogue.update(2); dialogue.update(6);
-    dialogue.handle([{ type: 'attack', enemyType, text: 'windup', x: 0, y: 0 }], 0);
+  ] as const)('keeps %s legacy mechanics out of six-card banter', (enemyType, group) => {
+    const dialogue = new Dialogue();
+    dialogue.handle([event('attack', { enemyType, text: 'windup' })], 0);
     expect(dialogue.getMessage(true)?.text).toBe(dialogueData[group][0].text);
+    expect(dialogue.getMessage()?.conversationId).toBeNull();
   });
-  it('answers repeated Wonderhoy shouts with short, increasingly angry replies', () => {
-    const dialogue = new Dialogue();
-    for (let i = 0; i < 10; i++) {
-      dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
-      expect(dialogue.getMessage(true)).toMatchObject({ speaker: 'EMU', avatar: 'player' });
-      expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
-      dialogue.update(1.61);
-      expect(dialogue.getMessage(true)).toMatchObject({ speaker: 'MAFUYU', avatar: 'enemy' });
-      expect(dialogue.getMessage(true)?.text).toBe(dialogueData.WONDERHOY_REPLY[Math.min(i, dialogueData.WONDERHOY_REPLY.length - 1)].text);
-      dialogue.update(6);
-      expect(dialogue.getMessage(true)).toBeNull();
+  it('rotates six Wonderhoy conversations without duplicate automatic replies', () => {
+    const dialogue = new Dialogue(), seen = new Set<string>();
+    const conversations = CONVERSATIONS.filter(item => item.category === 'wonderhoy');
+    for (const conversation of conversations) {
+      dialogue.handle([event('bomb')], 0);
+      const id = dialogue.getMessage()!.conversationId!;
+      seen.add(id.split(':')[0]);
+      for (let i = 0; i < conversation.lines.length; i++) {
+        const line = conversation.lines[i];
+        expect(dialogue.getMessage(true)).toMatchObject({ speaker: line.speaker, text: line.text, conversationId: id });
+        if (i) expect(dialogue.getPreviousMessage()?.text).toBe(conversation.lines[i - 1].text);
+        dialogue.update(Math.max(1.8, line.text.length / 35 + 1.4) + 0.001);
+      }
+      expect(dialogue.getMessage()).toBeNull();
+      expect(dialogue.getPreviousMessage()).toBeNull();
+      dialogue.update(12);
     }
+    expect(seen.size).toBe(6);
   });
-  it.each(['damage', 'boss', 'card', 'failure'] as const)('drops an unspoken shout reply when %s interrupts', type => {
+  it('applies a global 12-second spacing to ordinary new conversations across event types', () => {
     const dialogue = new Dialogue();
-    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
-    dialogue.update(0.5);
-    dialogue.handle([{ type, encounterId: 's2:final', text: type === 'card' ? '测试符卡' : undefined, x: 0, y: 0 }], 20);
+    dialogue.handle([event('bomb')], 0);
+    dialogue.update(11.99);
+    dialogue.handle([event('pickup', { pickupType: 'hp' }), event('bomb')], 0);
+    expect(dialogue.getMessage()).toBeNull();
+    dialogue.update(0.011);
+    dialogue.handle([event('pickup', { pickupType: 'hp' })], 0);
+    expect(dialogue.getMessage()?.conversationId).toMatch(/^heal-/);
+  });
+  it.each(['damage', 'boss', 'card'] as const)('drops all unspoken conversation turns when %s interrupts', type => {
+    const dialogue = new Dialogue();
+    dialogue.handle([event('bomb')], 0); dialogue.update(0.5);
+    const interrupted = dialogue.getMessage()?.conversationId;
+    dialogue.handle([event(type, { encounterId: 's2:final', text: type === 'card' ? '测试符卡' : undefined })], 20);
+    expect(dialogue.getMessage()?.conversationId).not.toBe(interrupted);
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    dialogue.update(10);
+    expect(dialogue.getMessage()).toBeNull();
+    expect(dialogue.getPreviousMessage()).toBeNull();
+  });
+  it('drops bombs during damage instead of replaying stale chatter afterwards', () => {
+    const dialogue = new Dialogue();
+    dialogue.handle([event('damage')], 0);
     const important = dialogue.getMessage(true);
-    if (type !== 'failure') {
-      dialogue.update(2);
-      expect(dialogue.getMessage(true)).toEqual(important);
-    }
-    dialogue.update(6);
-    expect(dialogue.getMessage(true)).toBeNull();
+    for (let i = 0; i < 100; i++) dialogue.handle([event('bomb')], 0);
+    expect(dialogue.getMessage(true)).toEqual(important);
+    dialogue.update(20);
+    expect(dialogue.getMessage()).toBeNull();
+    expect(dialogue.getPreviousMessage()).toBeNull();
   });
-  it('lets damage and boss notices finish before a later bomb shout', () => {
-    for (const event of [{ type: 'damage' }, { type: 'boss', encounterId: 's2:final' }] as const) {
-      const dialogue = new Dialogue();
-      dialogue.handle([{ ...event, x: 0, y: 0 }], 0);
-      const important = dialogue.getMessage(true);
-      dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
-      expect(dialogue.getMessage(true)).toEqual(important);
-      dialogue.update(6);
-      expect(dialogue.getMessage(true)?.speaker).toBe('EMU');
-      expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
-      dialogue.update(2);
-      expect(dialogue.getMessage(true)?.speaker).toBe('MAFUYU');
-    }
+  it.each(['complete', 'failure'] as const)('shows both full terminal %s lines immediately and keeps repeated settlement idempotent', type => {
+    const dialogue = new Dialogue(); dialogue.handle([event('bomb')], 0);
+    const batch = [event(type), event('bomb'), event('levelup', { amount: 10 }), event('pickup', { pickupType: 'hp' })];
+    dialogue.handle(batch, 2468);
+    const current = dialogue.getMessage()!, previous = dialogue.getPreviousMessage()!;
+    expect(current.text).toBe(current.fullText);
+    expect(previous.text).toBe(previous.fullText);
+    expect(current.conversationId).toBe(previous.conversationId);
+    expect(current.speaker).not.toBe(previous.speaker);
+    if (type === 'failure') expect(previous.text).toContain('2468');
+    else expect(current.text).toContain('Wonderhoy');
+    dialogue.handle(batch, 9876); dialogue.update(100);
+    expect(dialogue.getMessage()).toEqual(current);
+    expect(dialogue.getPreviousMessage()).toEqual(previous);
+    dialogue.startEndless();
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    expect(dialogue.getMessage()?.conversationId).not.toBe(current.conversationId);
+    expect(dialogue.getMessage(true)?.text).toBe('还要玩！Wonderhoy！！');
+    dialogue.update(10);
+    expect(dialogue.getMessage()).toBeNull();
   });
-  it.each([
-    ['complete', 'COMPLETE_EVENT'], ['failure', 'FAILURE_EVENT'],
-  ] as const)('keeps the full %s line despite later settlement events and discards all pending banter', (type, group) => {
-    const dialogue = new Dialogue();
-    dialogue.handle([{ type: 'damage', x: 0, y: 0 }, { type: 'bomb', x: 0, y: 0 }], 0);
-    dialogue.handle([
-      { type, x: 0, y: 0 },
-      { type: 'bomb', x: 0, y: 0 },
-      { type: 'levelup', amount: 10, x: 0, y: 0 },
-      { type: 'pickup', pickupType: 'hp', x: 0, y: 0 },
-    ], 2468);
-    expect(dialogue.getMessage()?.text).toBe(dialogueData[group][0].text.replaceAll('{score}', '2468'));
-    expect(dialogue.getMessage()).toEqual(dialogue.getMessage(true));
-    // Continuing after the result must not resurrect a queued shout or reply.
-    dialogue.update(1 / 60);
-    expect(dialogue.getMessage(true)).toBeNull();
-    dialogue.update(8);
-    expect(dialogue.getMessage(true)).toBeNull();
-  });
-  it('bounds queued replies during event bursts and removes them on reset', () => {
-    const dialogue = new Dialogue();
-    dialogue.handle([{ type: 'damage', x: 0, y: 0 }], 0);
-    for (let i = 0; i < 50; i++) dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
-    for (let i = 0; i < 4; i++) dialogue.update(6);
-    expect(dialogue.getMessage(true)).toBeNull();
-    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
-    dialogue.reset(); dialogue.update(10);
-    expect(dialogue.getMessage(true)).toBeNull();
-    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0); dialogue.update(2);
-    expect(dialogue.getMessage(true)?.text).toBe(dialogueData.WONDERHOY_REPLY[0].text);
+  it('clears both characters on reset and starts a distinct conversation instance on retry', () => {
+    const dialogue = new Dialogue(); dialogue.start(); dialogue.update(2);
+    const old = dialogue.getMessage()!;
+    expect(dialogue.getPreviousMessage()).not.toBeNull();
+    dialogue.reset(); dialogue.update(50);
+    expect(dialogue.getMessage()).toBeNull();
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    dialogue.start();
+    expect(dialogue.getMessage()?.id).not.toBe(old.id);
+    expect(dialogue.getMessage()?.conversationId).not.toBe(old.conversationId);
+    expect(dialogue.getPreviousMessage()).toBeNull();
+    dialogue.update(20);
+    expect(dialogue.getMessage()).toBeNull();
   });
 });

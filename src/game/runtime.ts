@@ -141,7 +141,7 @@ export class GameRuntime implements RuntimeControls {
   };
   continueEndless = () => {
     if (this.phase !== 'complete') return;
-    this.simulation.continueEndless(); this.renderer?.resetEffects(); this.input.clear(); this.simulation.clearInput();
+    this.simulation.continueEndless(); this.renderer?.resetEffects(); this.input.clear(); this.simulation.clearInput(); this.dialogue.startEndless();
     this.phase = this.simulation.state.status;
     if (this.phase === 'playing') this.audio.play(); else this.audio.pause();
     this.announce('无尽开始 / Wonderhoy 还没停'); this.renderer?.render(this.simulation.state, 1, 0); this.publish(); this.schedule();
@@ -290,7 +290,7 @@ export class GameRuntime implements RuntimeControls {
       bossHp: boss?.hp ?? 0, bossMaxHp: boss?.maxHp ?? 0, bossStage: state.bossStage || state.bossPending,
       bossPhase: boss?.spell ? Math.floor(boss.spell.cardIndex / 2) + 1 : 1, bossAction: boss?.spell ? boss.spell.stage === 'intro' ? '符卡切换 · 留意下一轮预告' : `${keyLabel(this.settings.keybindings.focus)} 慢移 · 跟随弹幕变化换位` : '', focus: player.focus,
       companions: state.companions?.length ?? 0,
-      comms: this.dialogue.getMessage(this.settings.reducedMotion), announcement: state.elapsed < this.announcementUntil ? this.announcement : '',
+      comms: this.dialogue.getMessage(this.settings.reducedMotion), commsPrevious: this.dialogue.getPreviousMessage(), announcement: state.elapsed < this.announcementUntil ? this.announcement : '',
       settings: { ...this.settings }, stats: { ...this.stats, ...graphics, enemies: state.enemies.length, bullets: state.bullets.length, pickups: state.pickups.length, voices: this.audio.voiceCount },
       saveStatus: this.saves.status === 'session-only' ? 'session' : Object.keys(profile.clears).length || Object.values(profile.bestScores.v5).some(scores => scores.story || scores.endless) ? 'saved' : 'empty',
       saveMessage: this.saves.error ?? this.saveMessage,

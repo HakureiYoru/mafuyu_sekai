@@ -53,6 +53,35 @@ try {
     return { level: s.player.level, xp: s.player.xp, companions: s.companions.length, modules: s.build.modules.length };
   });
   assert.deepEqual(fresh, { level: 1, xp: 0, companions: 0, modules: 0 });
+  // Verify the deployed decorative assets and the actual two-character exchange.
+  const commsManifest = JSON.parse(await readFile('public/assets/comms/manifest.json', 'utf8'));
+  report.commsAssets = await page.evaluate(async assets => Promise.all(assets.map(async asset => {
+    const response = await fetch(`/assets/comms/${asset.file}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Communication sprite request failed: ${asset.file}`);
+    const data = await response.arrayBuffer();
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    return { file: asset.file, bytes: data.byteLength, sha256: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') };
+  })), commsManifest.assets);
+  for (const asset of report.commsAssets) {
+    const expected = commsManifest.assets.find(item => item.file === asset.file);
+    assert.equal(asset.sha256, expected.sha256); assert.equal(asset.bytes, expected.bytes);
+  }
+  await page.waitForFunction(() => {
+    const d = window.__MAFUYU_DEBUG__, s = d.snapshot();
+    return s.comms?.speaker === 'MAFUYU' && s.comms.text === s.comms.fullText && s.commsPrevious?.speaker === 'EMU';
+  });
+  await page.locator('.comms-sprite').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  report.comms = await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.snapshot();
+    return { layout: document.querySelector('[data-testid="comms-root"]')?.getAttribute('data-layout'),
+      current: s.comms, previous: s.commsPrevious,
+      images: [...document.querySelectorAll('.comms-sprite')].map(image => ({ src: image.getAttribute('src'), width: image.naturalWidth, fallback: image.getAttribute('data-fallback') })) };
+  });
+  assert.equal(report.comms.layout, 'sides');
+  assert.equal(report.comms.images.length, 2);
+  assert.ok(report.comms.images.every(image => image.width === 512 && image.fallback === 'false'));
+  await mkdir('.tmp', { recursive: true });
+  await page.screenshot({ path: `.tmp/deployment-comms-v${version}.png`, style: '[aria-label="性能信息"] { visibility: hidden !important; }' });
   const encounters = ['s1:echo', 's2:palisade', 's1:mafuyu', 's2:reprise', 's2:final'];
   for (const [index, id] of encounters.entries()) {
     await choosePending();

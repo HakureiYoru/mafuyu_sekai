@@ -6,6 +6,7 @@ import changelog from 'virtual:changelog';
 import { MODULES, EVOLUTIONS, choiceView, buildModuleViews } from './game/upgrades';
 import { BINDING_LABELS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, rebindKey } from './game/settings';
 import type { BindingAction } from './game/settings';
+import { BattleComms, useCommsPlacement } from './components/BattleComms';
 
 type IconName = 'play' | 'pause' | 'settings' | 'arrow' | 'close' | 'sound' | 'spark' | 'restart';
 
@@ -100,12 +101,14 @@ function Menu({ runtime, snapshot: s, openSettings, openChangelog }: { runtime: 
 
 function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; runtime: RuntimeControls; openSettings: () => void }) {
   const [commsCollapsed, setCommsCollapsed] = useState(false);
+  const hud = useRef<HTMLDivElement>(null);
+  const commsPlacement = useCommsPlacement(hud);
   const perfect = s.perfectWindow > 0;
   const bossHp = s.bossMaxHp > 0 ? s.bossHp : s.minibossHp;
   const bossMax = s.bossMaxHp || s.minibossMaxHp;
   const key = (action: BindingAction) => keyLabel(s.settings.keybindings[action]);
   const activeModules = s.moduleStates.filter(module => module.status === 'active' || module.status === 'cooldown' || module.status === 'consumed').slice(0, 3);
-  return <div className={`hud battle-hud ${s.phase !== 'playing' ? 'hud-inactive' : ''}`} aria-label="战斗状态">
+  return <div ref={hud} className={`hud battle-hud ${s.phase !== 'playing' ? 'hud-inactive' : ''}`} data-comms-layout={commsPlacement.layout} aria-label="战斗状态">
     <div className="battle-top">
       <div className="stage-summary"><div><span className="status-dot" /><strong>{s.mode === 'endless' ? '无尽' : '战役'} · {s.difficulty === 'hard' ? '困难' : '普通'}</strong><span>{s.mode === 'endless' ? '∞' : `${Math.floor(s.progression / 360 * 100)}%`}</span></div><span className="stage-title">{s.stageName}{s.waveBlocked ? ' · 击败首领后继续' : ''}</span><Meter value={s.waveProgress} label="战役推进进度" /></div>
       <div className="encounter-summary">
@@ -115,7 +118,7 @@ function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; ru
     </div>
     <div className="battle-bottom">
       <div className="battle-player"><div className="compact-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><strong>LV. {String(s.level).padStart(2, '0')}</strong><span>{s.hp} / {s.maxHp} HP</span><span className="support-status" aria-label="子机支援">子机 {s.companions} / {BALANCE.companion.max}</span></div><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><div className="compact-growth"><span>{s.level >= 10 ? `共鸣 ${s.resonance} / 4 · 伤害 +${s.resonance * 5}%` : '武器成长'}</span><span>{s.level >= 10 ? 'MAX' : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= 10 ? 1 : s.xp} max={s.level >= 10 ? 1 : s.xpNeeded} className="meter-violet" label="武器成长" /></div>
-      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '战斗通讯'}<span>{s.comms?.speaker === 'EMU' ? '凤笑梦' : s.comms?.speaker === 'MAFUYU' ? '朝比奈真冬' : 'SEKAI'} {commsCollapsed ? '+' : '−'}</span></button>{!commsCollapsed && <p>{s.comms?.text || s.announcement || '……'}</p>}<div className="module-summary" aria-label="已装配模块">{s.modules.length} / 6 模块 · {s.evolutions.length} / 2 进化</div><div className="module-slots" aria-label="六个模块栏位">{Array.from({ length: 6 }, (_, i) => {
+      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-label={commsCollapsed ? '展开战斗通讯' : '收起战斗通讯'} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '战斗通讯'}<span aria-hidden="true">{commsCollapsed ? '+' : '−'}</span></button><BattleComms snapshot={s} placement={commsPlacement} portalHost={hud} collapsed={commsCollapsed} /><div className="module-summary" aria-label="已装配模块">{s.modules.length} / 6 模块 · {s.evolutions.length} / 2 进化</div><div className="module-slots" aria-label="六个模块栏位">{Array.from({ length: 6 }, (_, i) => {
         const id = s.modules[i], evolved = id && s.evolutions.map(key => EVOLUTIONS[key]).find(item => item.primary === id);
         return <span key={i} className={evolved ? 'is-evolved' : id ? 'is-equipped' : ''} title={id ? evolved?.name ?? MODULES[id].name : '空模块栏位'}>{id ? <>{evolved?.name ?? MODULES[id].name}<b>{evolved ? '✦' : (s.moduleRanks[id] ?? 1) === 2 ? 'II' : 'I'}</b></> : '—'}</span>;
       })}</div><div className="module-live" aria-label="模块即时状态">{activeModules.map(module => <span key={module.id} className={`module-${module.status}`}>{MODULES[module.id].name} · {module.status === 'consumed' ? '已用尽' : module.status === 'active' ? '生效中' : `${module.remaining.toFixed(1)}s`}</span>)}</div></div>
