@@ -18,7 +18,7 @@ function enemy(type: EnemyType, id = 1, x = 2000, y = 2000): Enemy {
 function harness(type: EnemyType, difficulty: Difficulty = 'normal') {
   const e = enemy(type), enemies = [e];
   const player: Player = { x: 2420, y: 2000, prevX: 2420, prevY: 2000, vx: 0, vy: 0, radius: 7,
-    hp: 5, maxHp: 5, bombs: 0, level: 4, xp: 0, heat: 0, angle: Math.PI, invincible: 0, commandTargetId: null, commandTime: 0, commandCooldown: 0,
+    hp: 5, maxHp: 5, hpReserve: 0, bombs: 0, level: 4, xp: 0, heat: 0, angle: Math.PI, invincible: 0, commandTargetId: null, commandTime: 0, commandCooldown: 0,
     dashTime: 0, dashCooldown: 0, dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0, specialCooldown: 0,
     idleTime: 0, heatLock: 0, overheated: false, focus: false };
   const shots: { sourceId: number; x: number; y: number; angle: number; speed: number; radius: number; options?: EnemyShotOptions; time: number }[] = [];

@@ -565,8 +565,7 @@ export class GameRenderer {
       visual.glow.width = isXp ? 40 : 90; visual.glow.height = visual.glow.width;
       visual.glow.visible = !isXp || this.settings.quality !== 'low';
       if (!isXp) {
-        const eligible = pickup.type === 'hp' ? state.player.hp < state.player.maxHp
-          : pickup.type === 'coolant' ? state.player.heat > 0 : true;
+        const eligible = pickup.type === 'coolant' ? state.player.heat > 0 : true;
         const distance = (pickup.x - state.player.x) ** 2 + (pickup.y - state.player.y) ** 2;
         if (eligible && distance < nearestDistance) { nearest = pickup; nearestDistance = distance; }
       }
@@ -577,7 +576,8 @@ export class GameRenderer {
     this.pickupHint.visible = nearest !== null;
     if (nearest && nearest.type !== 'xp') {
       this.pickupHint.text = nearest.type === 'support' && state.companions.length >= BALANCE.companion.max
-        ? '子机已满 · 转为经验' : PICKUP_NAMES[nearest.type];
+        ? '子机已满 · 转为经验' : nearest.type === 'hp' && state.player.hp >= state.player.maxHp
+          ? '血药 · 收入备用库存' : PICKUP_NAMES[nearest.type];
       this.pickupHint.position.set(nearest.x, nearest.y + 43);
     }
   }

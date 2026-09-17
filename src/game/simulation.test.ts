@@ -250,20 +250,23 @@ describe('progression, drops, and lifecycle', () => {
     ticks(sim, 30);
     expect(sim.state.pickups).toHaveLength(0); expect(p.xp).toBe(40);
   });
-  it('retains stacked refill rewards when full and redeems one dose per refill', () => {
+  it('stores full-health medicine while keeping coolant available for later refills', () => {
     const sim = quiet(), p = sim.state.player;
     sim.state.pickups.push({ id: 20002, type: 'coolant', value: 3, age: 0, x: p.x, y: p.y },
       { id: 20003, type: 'hp', value: 3, age: 0, x: p.x, y: p.y });
-    expect(sim.step(idle()).filter(e => e.type === 'pickup')).toHaveLength(0);
-    expect(sim.state.pickups.map(item => item.value)).toEqual([3, 3]);
+    expect(sim.step(idle()).filter(e => e.type === 'pickup')).toHaveLength(1);
+    expect(p.hpReserve).toBe(3);
+    expect(sim.state.pickups.map(item => item.value)).toEqual([3]);
     p.heat = 80; p.overheated = true; p.heatLock = 1; p.hp = 4;
     const events = sim.step(idle()).filter(e => e.type === 'pickup');
-    expect(events.map(e => e.amount)).toEqual([1, 1]);
+    expect(events.map(e => e.amount)).toEqual([1]);
     expect(p).toMatchObject({ heat: 0, overheated: false, heatLock: 0, hp: 5 });
-    expect(sim.state.pickups.map(item => item.value)).toEqual([2, 2]);
+    expect(p.hpReserve).toBe(2);
+    expect(sim.state.pickups.map(item => item.value)).toEqual([2]);
     expect(sim.step(idle()).filter(e => e.type === 'pickup')).toHaveLength(0);
     p.heat = 30; p.hp = 3;
     sim.step(idle());
+    expect(p).toMatchObject({ hp: 5, hpReserve: 0 });
     expect(sim.state.pickups.map(item => [item.type, item.value])).toEqual([['coolant', 1]]);
     p.heat = 30;
     sim.step(idle());
@@ -344,10 +347,12 @@ describe('progression, drops, and lifecycle', () => {
       { id: 889, type: 'hp', value: 3, age: 0, x: 1500, y: 1500 }, { id: 890, type: 'coolant', value: 2, age: 0, x: 1500, y: 1500 });
     const boss = sim.spawnEnemy('boss', 0, 0, 's2:final')!;
     expect(p.level).toBe(4); expect(p.xp).toBe(10);
-    expect(sim.state.pickups.map(item => [item.type, item.value, item.x, item.y])).toEqual([['hp', 3, p.x, p.y], ['coolant', 2, p.x, p.y]]);
+    expect(p.hpReserve).toBe(3);
+    expect(sim.state.pickups.map(item => [item.type, item.value, item.x, item.y])).toEqual([['coolant', 2, p.x, p.y]]);
     sim.step(idle()); finishChoices(sim);
     expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim); sim.continueEndless();
-    expect(sim.state.pickups.map(item => [item.type, item.value])).toEqual([['hp', 3], ['coolant', 2]]);
+    expect(p.hpReserve).toBe(3);
+    expect(sim.state.pickups.map(item => [item.type, item.value])).toEqual([['coolant', 2]]);
   });
   it('locks a short spell laser throughout its full visible warning and removes it after its duration', () => {
     const sim = quiet(); const boss = sim.spawnEnemy('boss', 0, 0)!;

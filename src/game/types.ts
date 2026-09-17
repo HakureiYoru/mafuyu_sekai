@@ -29,7 +29,7 @@ export interface Vec2 { x: number; y: number }
 export interface MovingBody extends Vec2 { prevX: number; prevY: number; vx: number; vy: number; radius: number }
 export interface InputAction { moveX: number; moveY: number; aimX: number; aimY: number; shoot: boolean; dash: boolean; bomb: boolean; focus?: boolean }
 export interface Player extends MovingBody {
-  hp: number; maxHp: number; bombs: number; level: number; xp: number; heat: number;
+  hp: number; maxHp: number; hpReserve: number; bombs: number; level: number; xp: number; heat: number;
   commandTargetId: number | null; commandTime: number; commandCooldown: number;
   markTargetId?: number | null; markTime?: number;
   angle: number; invincible: number; dashTime: number; dashCooldown: number; dashVx: number; dashVy: number;
@@ -97,7 +97,7 @@ export interface WorldState {
   playerAreas: PlayerArea[];
   seasonId: SeasonId; campaign: CampaignProgress; build: PlayerBuild; arena: ArenaRect | null;
 }
-export type CombatEventType = 'shot' | 'enemyShot' | 'hit' | 'kill' | 'dash' | 'bomb' | 'damage' | 'pickup' | 'levelup' | 'leveldown' | 'wave' | 'boss' | 'bossLow' | 'complete' | 'failure' | 'spawn' | 'attack' | 'beam' | 'support' | 'upgrade' | 'card' | 'interrupt' | 'shieldBreak' | 'command' | 'module' | 'xpLoss';
+export type CombatEventType = 'shot' | 'enemyShot' | 'hit' | 'kill' | 'dash' | 'bomb' | 'damage' | 'pickup' | 'heal' | 'levelup' | 'leveldown' | 'wave' | 'boss' | 'bossLow' | 'complete' | 'failure' | 'spawn' | 'attack' | 'beam' | 'support' | 'upgrade' | 'card' | 'interrupt' | 'shieldBreak' | 'command' | 'module' | 'xpLoss';
 export interface CombatEvent extends Vec2 {
   damageSource?: string;
   hitResult?: 'body' | 'shield' | 'weakpoint' | 'part'; moduleId?: ModuleId;
@@ -116,7 +116,7 @@ export interface CommsMessage {
 export interface PerformanceStats { fps: number; frameP95: number; frameP99: number; updateMs: number; renderMs: number; enemies: number; bullets: number; particles: number; pickups: number; voices: number; textures: number }
 export interface HudSnapshot {
   phase: GamePhase; loading: number; error: string | null; mode: 'story' | 'endless'; score: number; bestScore: number;
-  wave: number; waveProgress: number; elapsed: number; kills: number; hp: number; maxHp: number;
+  wave: number; waveProgress: number; elapsed: number; kills: number; hp: number; maxHp: number; hpReserve: number;
   bombs: number; level: number; xp: number; xpNeeded: number; heat: number;
   moduleStates: readonly ModuleState[];
   overheated: boolean; dashCooldown: number; perfectWindow: number; bossHp: number; bossMaxHp: number;

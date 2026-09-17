@@ -283,7 +283,7 @@ export class GameRuntime implements RuntimeControls {
       score: state.score, bestScore: profile.bestScores.v5[state.difficulty][state.mode], historicalBestScore: Math.max(legacy.bestScores.s1[state.difficulty], legacy.bestScores.s2[state.difficulty]), difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
       minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? `${ENEMIES[miniboss.type].label} · ${miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.type === 'palisade' ? '优先破坏侧臂，穿过弹墙间隙' : '留意停驻弹的原路折返'}` : '',
       waveBlocked: this.simulation.isWaveBlocked(),
-      elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, bombs: player.bombs,
+      elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, hpReserve: player.hpReserve, bombs: player.bombs,
       level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level),
       moduleStates: this.simulation.moduleStates,
       heat: player.heat, overheated: player.overheated, dashCooldown: player.dashCooldown, perfectWindow: player.perfectWindow,

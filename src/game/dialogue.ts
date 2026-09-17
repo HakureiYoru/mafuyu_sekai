@@ -118,7 +118,7 @@ export class Dialogue {
     // No queued event log: lines that cannot be spoken now are already out of date.
     for (const event of events) {
       if (event.type === 'bomb') this.converse('wonderhoy');
-      else if (event.type === 'pickup' && event.pickupType === 'hp') this.converse('heal');
+      else if (event.type === 'heal') this.converse('heal');
       else if (event.type === 'xpLoss') this.say('LEVEL_DOWN_EVENT');
       else if (event.type === 'attack' && isBoss(event.enemyType)) this.say(attackGroup(event.enemyType));
       else if (event.enemyType && families[event.enemyType]) {

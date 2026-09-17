@@ -171,10 +171,12 @@ describe('two-character combat conversations', () => {
     const dialogue = new Dialogue();
     dialogue.handle([event('bomb')], 0);
     dialogue.update(11.99);
-    dialogue.handle([event('pickup', { pickupType: 'hp' }), event('bomb')], 0);
+    dialogue.handle([event('heal', { amount: 1 }), event('bomb')], 0);
     expect(dialogue.getMessage()).toBeNull();
     dialogue.update(0.011);
     dialogue.handle([event('pickup', { pickupType: 'hp' })], 0);
+    expect(dialogue.getMessage()).toBeNull();
+    dialogue.handle([event('heal', { amount: 1 })], 0);
     expect(dialogue.getMessage()?.conversationId).toMatch(/^heal-/);
   });
   it.each(['damage', 'boss', 'card'] as const)('drops all unspoken conversation turns when %s interrupts', type => {

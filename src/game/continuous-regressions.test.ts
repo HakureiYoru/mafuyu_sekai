@@ -24,7 +24,7 @@ describe('v5 continuous run boundary regressions', () => {
     expect(sim.chooseUpgrade(choice, offer)).toBe(false);
     expect(w.elapsed).toBe(frozen.elapsed); expect(w.hazards).toEqual(frozen.hazards); expect(w.playerAreas).toEqual(frozen.playerAreas);
   });
-  it('clears live units before redeeming ground rewards and preserves unusable supplies beside the player', () => {
+  it('clears live units before settling rewards, stores medicine, and preserves unused coolant', () => {
     const sim = quiet(), w = sim.state, p = w.player;
     w.waveTime = 90 - STEP; sim.step(idle);
     for (let i = 0; i < 96; i++) sim.step(idle);
@@ -37,7 +37,8 @@ describe('v5 continuous run boundary regressions', () => {
     sim.damageEnemy(boss, boss.hp);
     expect(w.kills).toBe(kills + 1); expect(w.enemies).not.toContain(extra); expect(w.enemies).toHaveLength(0);
     expect(p.level).toBe(2); expect(p.xp).toBe(80); // Boss120 + bomb overflow30 + existing30 - Lv2 threshold100.
-    expect(w.pickups.map(item => [item.type, item.value, item.x, item.y])).toEqual([['hp', 3, p.x, p.y], ['coolant', 2, p.x, p.y]]);
+    expect(p.hpReserve).toBe(3);
+    expect(w.pickups.map(item => [item.type, item.value, item.x, item.y])).toEqual([['coolant', 2, p.x, p.y]]);
     expect(w.bullets).toHaveLength(25); expect(w.bullets.every(bullet => bullet.owner === 'player')).toBe(true);
     expect(w.status).toBe('upgrade'); expect(w.campaign.defeatedEncounters).toEqual(['s1:echo']);
   });

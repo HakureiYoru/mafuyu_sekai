@@ -212,9 +212,13 @@ export class EffectSystem {
       case 'pickup':
         this.burst(x, y, color, event.pickupType === 'xp' ? 3 : 10, 110, 3);
         if (event.pickupType !== 'xp' && event.pickupType !== 'support') {
-          const names = { hp: '生命恢复', bomb: '炸弹 +1', supply: '技能补给', coolant: '快速冷却', miniBomb: '微型爆破', blackHole: '黑洞引力', xp: '' };
+          const names = { hp: `血药 +${event.amount ?? 1}`, bomb: '炸弹 +1', supply: '技能补给', coolant: '快速冷却', miniBomb: '微型爆破', blackHole: '黑洞引力', xp: '' };
           this.label(x, y, event.text ?? names[event.pickupType ?? 'xp'], color);
         }
+        break;
+      case 'heal':
+        this.burst(x, y, color, 8, 100, 3);
+        this.label(x, y - 24, `恢复 +${event.amount ?? 1} HP`, color);
         break;
       case 'levelup':
         this.ring(x, y, 0x8cfbdd, 40, 420, 0.8);

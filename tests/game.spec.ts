@@ -26,6 +26,31 @@ test('assets load, menu enters the complete game, and production UI hides debug 
   expect(errors).toEqual([]);
 });
 
+test('medicine leaves the playfield, updates reserve HUD, and waits through pause before healing', async ({ page }) => {
+  await play(page);
+  await page.evaluate(() => {
+    const state = window.__MAFUYU_DEBUG__.state(), p = state.player;
+    state.spawnTimer = 3600;
+    state.enemies.length = 0;
+    state.pickups.push({ id: 990001, type: 'hp', value: 4, x: p.x, y: p.y, age: 0 });
+  });
+  await expect(page.getByLabel('备用血药')).toHaveText('血药 ×4');
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().pickups.some(item => item.type === 'hp'))).toBe(false);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('paused');
+  await page.evaluate(() => { window.__MAFUYU_DEBUG__.state().player.hp = 3; });
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => {
+    const p = window.__MAFUYU_DEBUG__.state().player;
+    return { hp: p.hp, reserve: p.hpReserve };
+  })).toEqual({ hp: 3, reserve: 4 });
+  await page.getByRole('button', { name: /继续游戏/ }).click();
+  await expect(page.getByLabel('备用血药')).toHaveText('血药 ×2');
+  await expect(page.getByRole('meter', { name: '生命', exact: true })).toHaveAttribute('aria-valuenow', '5');
+  await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
+  await expect(page.getByLabel('备用血药')).toHaveText('血药 ×0');
+});
+
 test('aim mapping, first shot, stationary dash, single bomb and focus recovery', async ({ page }) => {
   await play(page);
   const bounds = (await page.locator('#game-host').boundingBox())!;

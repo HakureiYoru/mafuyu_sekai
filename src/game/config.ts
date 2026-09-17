@@ -14,7 +14,7 @@ export const BALANCE = {
   special: { level: 4, cooldown: 3, windup: 0.3, damage: 10, speed: 600, range: 220 },
   xp: { pickup: 10, thresholds: [100, 160, 230, 310, 400, 500, 620, 750, 900], loss: 0.25, cap: 10, bossRewards: [120, 180, 220, 240] },
   spawn: { warning: 0.8, waveDuration: 40, endlessBossInterval: 10 },
-  drops: { supply: 0.0375, minelayerSupply: 0.075, coolant: 0.2, bomb: 0.05, miniBomb: 0.08, hp: 0.1, blackHole: 0.002 },
+  drops: { supply: 0.0375, minelayerSupply: 0.075, coolant: 0.2, bomb: 0.05, miniBomb: 0.08, hp: 0.1, blackHole: 0.01, blackHolePity: 80 },
   bomb: { size: 750, damage: 80, invincible: 2 },
   limits: { enemies: 180, mines: 70, bullets: 4096, playerReserve: 512, pickupCells: 80 },
 } as const;

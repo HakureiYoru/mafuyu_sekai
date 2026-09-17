@@ -47,6 +47,7 @@ export class GameSimulation {
   private stressMode = false;
   private enemyCount = 0;
   private mineCount = 0;
+  private mobKillsWithoutBlackHole = 0;
   private maxEnemyRadius = 0;
   private maxEnemyMotion = 0;
   private readonly byId = new Map<number, Enemy>();
@@ -100,6 +101,7 @@ export class GameSimulation {
     this.specialWindup = 0;
     this.specialTarget = null;
     this.enemyCount = this.mineCount = 0;
+    this.mobKillsWithoutBlackHole = 0;
     this.stressMode = false;
     this.focusTime = this.shatterTimer = this.burstTimer = this.burstHits = this.ventTimer = this.reserveTimer = this.interceptTimer = this.grazeWindow = this.grazeCount = this.magnetTimer = this.magnetTime = 0;
     this.dashStock = 1; this.doubleDashActive = this.reviveUsed = false; this.bladeTimes.clear(); this.pendingCardClear = null;
@@ -108,7 +110,7 @@ export class GameSimulation {
     this.threats.reset();
     const x = WORLD.width / 2, y = WORLD.height / 2;
     const player: Player = { x, y, prevX: x, prevY: y, vx: 0, vy: 0, radius: BALANCE.player.radius,
-      hp: BALANCE.player.hp, maxHp: BALANCE.player.hp, bombs: BALANCE.player.bombs, level: 1, xp: 0,
+      hp: BALANCE.player.hp, maxHp: BALANCE.player.hp, hpReserve: 0, bombs: BALANCE.player.bombs, level: 1, xp: 0,
       heat: 0, angle: -Math.PI / 2, invincible: 1, dashTime: 0, dashCooldown: 0,
       commandTargetId: null, commandTime: 0, commandCooldown: 0, markTargetId: null, markTime: 0,
       dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0, specialCooldown: 0, idleTime: 0,
@@ -154,6 +156,7 @@ export class GameSimulation {
     this.stepping = true;
     this.shotFeedback.clear();
     const world = this.state;
+    this.useHpReserve();
     world.tick++;
     world.elapsed += dt;
     this.threats.update(world.elapsed, world.enemies);
@@ -1257,15 +1260,30 @@ export class GameSimulation {
     else p.xp -= loss;
     this.emit({ type: 'damage', x: p.x, y: p.y, amount: damage, damageSource: source, color: 0xff6584 });
     if (loss > 0) this.emit({ type: 'xpLoss', x: p.x, y: p.y, amount: loss, text: resonance ? '共鸣经验' : '经验' });
+    this.useHpReserve();
     if (p.hp <= 0 && this.has('revive') && !this.reviveUsed) { this.reviveUsed = true; p.hp = this.value('revive', MODULE_VALUES.revive.hp); p.invincible = this.value('revive', MODULE_VALUES.revive.invincible); this.moduleEvent('revive'); }
     if (p.hp <= 0) { this.state.status = 'failed'; p.perfectWindow = 0; p.markTargetId = null; p.markTime = 0; this.clearInput(); this.emit({ type: 'failure', x: p.x, y: p.y, amount: this.state.score }); }
+  }
+
+  /** Stored medicine heals living players; lethal hits still use the existing revive rules. */
+  private useHpReserve(): void {
+    const p = this.state.player;
+    if (p.hp <= 0) return;
+    const restored = Math.min(p.hpReserve, Math.max(0, p.maxHp - p.hp));
+    if (restored <= 0) return;
+    p.hp += restored; p.hpReserve -= restored;
+    this.emit({ type: 'heal', x: p.x, y: p.y, amount: restored, color: PICKUP_COLORS.hp });
   }
 
   private dropLoot(enemy: Enemy): void {
     const drop = BALANCE.drops;
     this.addPickup('xp', enemy.x, enemy.y, BALANCE.xp.pickup);
     let type: PickupType = 'xp';
-    if (this.random.next() < drop.blackHole) type = 'blackHole';
+    this.mobKillsWithoutBlackHole++;
+    if (this.random.next() < drop.blackHole || this.mobKillsWithoutBlackHole >= drop.blackHolePity) {
+      type = 'blackHole';
+      this.mobKillsWithoutBlackHole = 0;
+    }
     else if (this.random.next() < (enemy.type === 'minelayer' ? drop.minelayerSupply : drop.supply)) type = 'supply';
     else if (['dasher', 'sniper', 'weaver', 'sampler', 'repairer'].includes(enemy.type) && this.random.next() < drop.coolant) type = 'coolant';
     else if (this.random.next() < drop.bomb) type = 'bomb';
@@ -1314,9 +1332,8 @@ export class GameSimulation {
       for (let i = 0; i < deployed; i++) this.deployCompanion();
       this.gainXp((units - deployed) * BALANCE.companion.surplusXp);
     } else if (pickup.type === 'hp') {
-      consumed = Math.min(value, p.maxHp - p.hp);
-      if (consumed <= 0) return false;
-      p.hp += consumed;
+      p.hpReserve += value;
+      this.useHpReserve();
     }
     else if (pickup.type === 'bomb') {
       const accepted = Math.min(value, Math.max(0, BALANCE.player.maxBombs - p.bombs));

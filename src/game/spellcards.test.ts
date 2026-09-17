@@ -11,7 +11,7 @@ const ARENA = { x: 1200, y: 1550, width: 1600, height: 900 };
 const STEP = 1 / 60;
 function harness(season: SeasonId = 's1', difficulty: Difficulty = 'normal', card = 0) {
   const player: Player = { x: 2000, y: 2220, prevX: 2000, prevY: 2220, vx: 0, vy: 0, radius: 18,
-    hp: 5, maxHp: 5, bombs: 3, level: 7, xp: 0, heat: 0, angle: 0, invincible: 0,
+    hp: 5, maxHp: 5, hpReserve: 0, bombs: 3, level: 7, xp: 0, heat: 0, angle: 0, invincible: 0,
     commandTargetId: null, commandTime: 0, commandCooldown: 0,
     dashTime: 0, dashCooldown: 0, dashVx: 0, dashVy: 0, perfectWindow: 0, shotCooldown: 0,
     specialCooldown: 0, idleTime: 0, heatLock: 0, overheated: false, focus: false };

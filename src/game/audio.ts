@@ -138,7 +138,7 @@ export class GameAudio {
       else if (event.type === 'dash') this.sound('dash', 0.6, 3, 0.1);
       else if (event.type === 'bomb') this.sound('bomb', 0.8, 4, 0.2);
       else if (event.type === 'damage') { if (this.sound('damage', 0.8, 5, 0.1)) this.duckMusic(); }
-      else if (event.type === 'pickup') this.sound('pickup', 0.4, 1, 0.12);
+      else if (event.type === 'pickup' || event.type === 'heal') this.sound('pickup', 0.4, 1, 0.12);
       else if (event.type === 'levelup' || event.type === 'complete') this.sound('levelup', 0.65, 4, 0.1);
       else if (event.type === 'card' && event.text === 'cleared') this.sound('card-clear', 0.7, 4, 0.15);
       else if (event.type === 'boss' || event.type === 'card') { if (this.sound('warning', 0.7, 5, 0.2)) this.duckMusic(); }
