@@ -46,16 +46,15 @@ describe('difficulty through the simulation boundary', () => {
   it.each(difficulties)('%s applies ordinary HP and movement multipliers once and keeps mines at one HP', difficulty => {
     const factor = difficulty === 'hard' ? 1.3 : 1;
     const expectedHp = difficulty === 'hard'
-      ? { basic: 9, dasher: 27, sniper: 42, sprayer: 90, minelayer: 54, mine: 1 }
-      : { basic: 6, dasher: 18, sniper: 28, sprayer: 60, minelayer: 36, mine: 1 };
+      ? { basic: 9, dasher: 21, sniper: 27, sprayer: 48, minelayer: 36, mine: 1 }
+      : { basic: 6, dasher: 14, sniper: 18, sprayer: 32, minelayer: 24, mine: 1 };
     for (const type of ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine'] as const) {
       const sim = quiet(difficulty), enemy = sim.spawnEnemy(type, 2400, 1700)!;
       expect(enemy.hp).toBe(expectedHp[type]); expect(enemy.maxHp).toBe(expectedHp[type]);
       expect(enemy.speed).toBeCloseTo(ENEMIES[type].speed * factor, 8);
     }
-    const scaled = quiet(difficulty); scaled.state.wave = 3;
-    // Scale the unrounded per-wave HP, then round once; multiplying already-rounded HP would give 59 on hard.
-    expect(scaled.spawnEnemy('sniper', 2500, 2000)!.hp).toBe(difficulty === 'hard' ? 58 : 39);
+    const scaled = quiet(difficulty); scaled.state.campaign.progression = 240;
+    expect(scaled.spawnEnemy('sniper', 2500, 2000)!.hp).toBe(difficulty === 'hard' ? 81 : 54);
     const moving = quiet(difficulty), base = moving.spawnEnemy('basic', 2500, 2000)!;
     ticks(moving, 90);
     expect(Math.hypot(base.vx, base.vy)).toBeCloseTo(115 * factor, 2);
@@ -90,7 +89,7 @@ describe('difficulty through the simulation boundary', () => {
   it.each(difficulties)('%s gives identical combat and miniboss results at 30/60/120/144 Hz rendering', difficulty => {
     function run(hz: number) {
       const sim = quiet(difficulty, 3391), clock = new FixedClock(), events: CombatEvent[] = [];
-      sim.state.wave = 3; sim.state.waveTime = 7; sim.state.spawnTimer = 0;
+      sim.state.waveTime = 89; sim.state.spawnTimer = 0;
       const sniper = sim.spawnEnemy('sniper', 2490, 1780)!; sniper.cooldown = 0;
       for (let frame = 0; frame <= hz * 8; frame++) {
         clock.advance(frame * 1000 / hz, dt => {
@@ -110,13 +109,13 @@ describe('difficulty through the simulation boundary', () => {
 
   it('preserves a selected difficulty on reset and endless, but clears old difficulty entities on an explicit change', () => {
     const sim = quiet('hard'); const oldBullet = firstShot(sim).bullet;
-    sim.state.wave = 3; sim.state.waveTime = MINIBOSS_ENCOUNTER.time;
+    sim.state.waveTime = 90 - STEP;
     sim.step(idle()); expect(sim.state.indicators.some(i => i.type === 'miniboss')).toBe(true);
     sim.reset();
     expect(sim.state.difficulty).toBe('hard'); expect(sim.state.minibossSpawned).toBe(false);
     expect(sim.state.enemies).toHaveLength(0); expect(sim.state.bullets).toHaveLength(0); expect(sim.state.indicators).toHaveLength(0);
     expect(sim.spawnEnemy('basic', 2400, 2000)!.hp).toBe(9);
-    const boss = sim.spawnEnemy('boss', 2000, 2000)!;
+    const boss = sim.spawnEnemy('boss', 2000, 2000, 's2:final')!;
     for (let card = 0; card < 6; card++) {
       for (let tick = 0; tick < 50; tick++) sim.step(idle());
       expect(boss.spell?.cardIndex).toBe(card); sim.damageEnemy(boss, boss.hp);
@@ -137,10 +136,10 @@ describe('difficulty through the simulation boundary', () => {
   });
 });
 
-describe('mid-wave miniboss integration', () => {
-  it.each(difficulties)('%s queues ECHO once at third-wave second eight while waves and ordinary spawns continue', difficulty => {
-    const sim = quiet(difficulty); sim.state.wave = 3; sim.state.spawnTimer = 0;
-    const events = ticks(sim, 479);
+describe('continuous campaign miniboss integration', () => {
+  it.each(difficulties)('%s queues ECHO once at 90 seconds and holds progression while limited adds continue', difficulty => {
+    const sim = quiet(difficulty); sim.state.waveTime = 89; sim.state.spawnTimer = 0;
+    const events = ticks(sim, 59);
     expect(sim.state.minibossSpawned).toBe(false);
     expect(sim.state.indicators.some(i => i.type === 'miniboss')).toBe(false);
     events.push(...sim.step(idle()));
@@ -148,40 +147,42 @@ describe('mid-wave miniboss integration', () => {
     expect(sim.state.indicators.filter(i => i.type === 'miniboss')).toHaveLength(1);
     expect(sim.state.bossStage).toBe(false); expect(sim.state.bossPending).toBe(false);
     const started = sim.state.waveTime;
-    events.push(...ticks(sim, Math.ceil(MINIBOSS_ENCOUNTER.warning / STEP) + 90));
+    events.push(...ticks(sim, 8 * 60));
     expect(sim.state.enemies.filter(e => e.type === 'miniboss')).toHaveLength(1);
-    expect(sim.state.waveTime).toBeGreaterThan(started + MINIBOSS_ENCOUNTER.warning);
+    expect(sim.state.waveTime).toBe(started);
+    expect(sim.state.campaign.progression).toBe(90);
     expect(events.filter(e => e.type === 'attack' && e.enemyType === 'miniboss' && e.text === 'arrival')).toHaveLength(1);
     expect(events.filter(e => e.type === 'spawn' && e.enemyType === 'miniboss')).toHaveLength(1);
-    expect(events.filter(e => e.type === 'spawn' && e.enemyType !== 'miniboss').length).toBeGreaterThan(3);
+    expect(events.filter(e => e.type === 'spawn' && e.enemyType !== 'miniboss').length).toBeGreaterThan(0);
     const mini = sim.state.enemies.find(e => e.type === 'miniboss')!;
-    sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-    sim.step(idle()); expect(sim.state.wave).toBe(3); expect(sim.state.enemies).toContain(mini);
+    sim.step(idle()); expect(sim.state.wave).toBe(1); expect(sim.state.enemies).toContain(mini);
     expect(sim.isWaveBlocked()).toBe(true);
-    sim.damageEnemy(mini, mini.hp); sim.step(idle()); expect(sim.state.wave).toBe(4);
+    sim.damageEnemy(mini, mini.hp); sim.step(idle()); expect(sim.state.wave).toBe(2);
+    while (sim.state.status === 'upgrade') sim.chooseUpgrade(sim.state.build.choices[0]);
     expect(sim.state.bossStage).toBe(false);
     events.push(...ticks(sim, 60));
     expect(events.filter(e => e.type === 'attack' && e.enemyType === 'miniboss' && e.text === 'arrival')).toHaveLength(1);
   });
 
-  it.each(difficulties)('%s gives the exact reward bundle without completing the run or clearing other enemies and bullets', difficulty => {
+  it.each(difficulties)('%s settles the first boss without rewarding leftover enemies or completing the run', difficulty => {
     const sim = quiet(difficulty), { shooter, bullet } = firstShot(sim);
     const ordinary = sim.spawnEnemy('basic', 2500, 2400)!;
     const mini = sim.spawnEnemy('miniboss', 1300, 2000)!;
-    const waveTime = sim.state.waveTime;
+    sim.state.player.hp = 2; sim.state.player.bombs = 3; sim.state.player.heat = 90; sim.state.player.dashCooldown = 2;
     sim.damageEnemy(mini, mini.hp);
-    expect(sim.state).toMatchObject({ status: 'playing', bossStage: false, bossPending: false, minibossSpawned: true });
-    expect(sim.state.waveTime).toBe(waveTime);
-    expect(sim.state.enemies).toContain(ordinary); expect(sim.state.enemies).toContain(shooter);
-    expect(sim.state.bullets).toContain(bullet);
-    const rewards = Object.fromEntries(sim.state.pickups.map(p => [p.type, p.value]));
-    expect(rewards).toEqual({ xp: difficulty === 'hard' ? 360 : 260, hp: difficulty === 'hard' ? 2 : 1, supply: 1, coolant: 1, support: 1 });
+    expect(sim.state).toMatchObject({ status: 'upgrade', wave: 2, bossStage: false, bossPending: false, minibossSpawned: true });
+    expect(sim.state.player).toMatchObject({ hp: 4, bombs: 4, heat: 0, dashCooldown: 0, level: 2, xp: 20 });
+    expect(sim.state.companions).toHaveLength(1);
+    expect(sim.state.enemies).not.toContain(ordinary); expect(sim.state.enemies).not.toContain(shooter);
+    expect(sim.state.bullets).not.toContain(bullet);
+    expect(sim.state.score).toBe(Math.round(mini.maxHp * 10 * difficultyConfig(difficulty).score));
+    expect(sim.state.build.pendingRewards.map(reward => reward.source)).toEqual(['level', 'boss']);
     const before = structuredClone(sim.state.pickups);
     sim.damageEnemy(mini, 9999); expect(sim.state.pickups).toEqual(before); expect(sim.state.kills).toBe(1);
     const events = sim.step(idle());
     expect(events.some(e => e.type === 'complete' || e.type === 'boss')).toBe(false);
     expect(sim.state.enemies.some(e => e.id === mini.id)).toBe(false);
-    expect(sim.state.enemies).toContain(ordinary); expect(sim.state.bullets).toContain(bullet);
+    expect(sim.state.enemies).toHaveLength(0); expect(sim.state.bullets).toHaveLength(0);
   });
 
   it.each(difficulties)('%s shares attack reservations with ordinary elites and reset releases those reservations', difficulty => {
@@ -205,11 +206,12 @@ describe('mid-wave miniboss integration', () => {
   });
 
   it('retains a full-cap miniboss appointment across retries and spawns it once a place opens', () => {
-    const sim = quiet('hard'); sim.state.wave = 3; sim.state.waveTime = MINIBOSS_ENCOUNTER.time;
+    const sim = quiet('hard'); sim.state.waveTime = 90 - STEP;
+    const events = sim.step(idle());
     for (let i = 0; i < BALANCE.limits.enemies; i++) {
       expect(sim.spawnEnemy('basic', 150 + (i % 18) * 100, 150 + Math.floor(i / 18) * 100)).not.toBeNull();
     }
-    const events = ticks(sim, Math.ceil(MINIBOSS_ENCOUNTER.warning / STEP) + 65);
+    events.push(...ticks(sim, Math.ceil(MINIBOSS_ENCOUNTER.warning / STEP) + 65));
     expect(sim.state.enemies).toHaveLength(BALANCE.limits.enemies);
     expect(sim.state.enemies.some(e => e.type === 'miniboss')).toBe(false);
     const appointment = sim.state.indicators.filter(i => i.type === 'miniboss');
@@ -225,7 +227,7 @@ describe('mid-wave miniboss integration', () => {
   });
 
   it('clears an unspawned appointment on restart and does not schedule the encounter in endless', () => {
-    const sim = quiet('hard'); sim.state.wave = 3; sim.state.waveTime = MINIBOSS_ENCOUNTER.time;
+    const sim = quiet('hard'); sim.state.waveTime = 90 - STEP;
     sim.step(idle()); expect(sim.state.indicators.some(i => i.type === 'miniboss')).toBe(true);
     sim.reset(); sim.state.spawnTimer = 1e9; sim.state.player.invincible = 1e9;
     ticks(sim, 120);

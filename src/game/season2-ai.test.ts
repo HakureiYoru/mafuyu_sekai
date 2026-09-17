@@ -191,7 +191,7 @@ describe('distinct ordinary enemy solutions', () => {
     const h = harness('repairer'), target = enemy('shield', 2, 2200, 2000); target.hp = 5; h.enemies.push(target);
     h.tick(); expect(h.e.season2!.targetId).toBe(target.id);
     h.until(() => h.events.some(event => event.text === 'repair'));
-    expect(target.hp).toBe(23); expect(h.e.season2!.healedIds).toEqual([2]);
+    expect(target.hp).toBe(5 + Math.ceil(target.maxHp * 0.2)); expect(h.e.season2!.healedIds).toEqual([2]);
     target.hp = 1; h.run(600); expect(target.hp).toBe(1);
     expect(h.events.filter(event => event.text === 'repair')).toHaveLength(1);
   });

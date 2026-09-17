@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, STEP, xpNeeded } from './config';
+import { BALANCE, ENEMIES, STEP, xpNeeded } from './config';
 import { FixedClock } from './clock';
 import { beamGeometry, pointInBeam, SeededRandom, segmentCircleHit, SpatialGrid } from './math';
 import { ObjectPool } from './pool';
 import { GameSimulation } from './simulation';
 import { SPELL_CARDS } from './spellcards';
+import { CAMPAIGN_STAGES, ENCOUNTERS } from './campaign';
+import { MODULES } from './upgrades';
 import type { Bullet, EnemyType, InputAction, PickupType } from './types';
 
 const idle = (extra: Partial<InputAction> = {}): InputAction => ({ moveX: 0, moveY: 0, aimX: 3500, aimY: 2000, shoot: false, dash: false, bomb: false, ...extra });
@@ -12,6 +14,12 @@ function ticks(sim: GameSimulation, count: number, input = idle()) {
   const events = [];
   for (let i = 0; i < count; i++) events.push(...sim.step(input));
   return events;
+}
+function finishChoices(sim: GameSimulation) {
+  while (sim.state.status === 'upgrade') {
+    const choice = sim.state.build.choices.find(id => id in MODULES && MODULES[id as keyof typeof MODULES].branch !== 'drone') ?? sim.state.build.choices[0];
+    expect(sim.chooseUpgrade(choice, sim.state.build.offerId ?? undefined)).toBe(true);
+  }
 }
 function quiet(seed = 12345): GameSimulation {
   const sim = new GameSimulation(seed);
@@ -45,7 +53,7 @@ describe('deterministic fixed-step combat', () => {
       }
       return { x: sim.state.player.x, y: sim.state.player.y, shots, cooldown: sim.state.player.dashCooldown, wave: sim.state.wave, tick: sim.state.tick };
     });
-    expect(results[0].wave).toBe(2);
+    expect(results[0].wave).toBe(1);
     expect(results.every(result => JSON.stringify(result) === JSON.stringify(results[0]))).toBe(true);
   });
   it('normalizes diagonals and responds on the first tick without an overheat movement penalty', () => {
@@ -75,7 +83,7 @@ describe('deterministic fixed-step combat', () => {
     expect(sim.state.player.y).toBe(2000);
     expect(sim.state.player.dashTime).toBe(0);
     expect(sim.state.player.perfectWindow).toBeCloseTo(BALANCE.dash.window);
-    const events = sim.step(idle({ beam: true }));
+    const events = sim.step(idle({ shoot: true }));
     expect(events.find(e => e.type === 'beam')?.amount).toBe(BALANCE.dash.damage);
     expect(sim.state.beams[0]).toMatchObject({ length: 2400, width: 88, life: 0.32 });
     expect(sim.state.bullets).toHaveLength(0);
@@ -104,7 +112,7 @@ describe('deterministic fixed-step combat', () => {
     const sim = quiet();
     sim.state.player.perfectWindow = BALANCE.dash.window;
     sim.state.player.shotCooldown = 0.15;
-    const events = sim.step(idle({ beam: true }));
+    const events = sim.step(idle({ shoot: true }));
     expect(events.filter(e => e.type === 'beam' && e.amount === 40)).toHaveLength(1);
     expect(sim.state.player.perfectWindow).toBe(0);
   });
@@ -158,10 +166,10 @@ describe('swept collision, hazards, and pools', () => {
     sim.state.bullets.push(shot);
     const hits = sim.step(idle()).filter(e => e.type === 'hit');
     expect(hits.map(e => e.targetId)).toEqual([nearer.id, farther.id]);
-    expect(nearer.hp).toBe(40); expect(farther.hp).toBe(40);
+    expect(nearer.hp).toBe(ENEMIES.sprayer.hp - 20); expect(farther.hp).toBe(ENEMIES.sprayer.hp - 20);
     shot.x = shot.prevX = nearer.x; shot.vx = 0;
     ticks(sim, 5);
-    expect(nearer.hp).toBe(40);
+    expect(nearer.hp).toBe(ENEMIES.sprayer.hp - 20);
     expect(shot.hitIds.size).toBe(2);
   });
   it('allows full-world sprayer range and recycles only at the world edge', () => {
@@ -213,9 +221,10 @@ describe('swept collision, hazards, and pools', () => {
 describe('progression, drops, and lifecycle', () => {
   it('keeps XP overflow across multiple level gains and caps damage XP loss without lowering the gained level', () => {
     const sim = quiet(); const p = sim.state.player;
-    sim.state.pickups.push({ id: 10001, type: 'xp', x: p.x, y: p.y, value: 380, age: 0 });
+    sim.state.pickups.push({ id: 10001, type: 'xp', x: p.x, y: p.y, value: 280, age: 0 });
     sim.step(idle());
     expect(p.level).toBe(3); expect(p.xp).toBe(20);
+    finishChoices(sim);
     p.invincible = 0;
     sim.state.bullets.push(bullet({ owner: 'enemy', x: p.x, y: p.y, vx: 0, speed: 0 }));
     sim.step(idle());
@@ -234,7 +243,7 @@ describe('progression, drops, and lifecycle', () => {
     const events = sim.step(idle());
     expect(events.filter(e => e.type === 'pickup')).toHaveLength(7);
     expect(p).toMatchObject({ hp: 3, heat: 0, overheated: false, bombs: 4, xp: 10 });
-    expect(p.dashCooldown).toBeCloseTo(1 - STEP); expect(p.commandCooldown).toBeCloseTo(1 - STEP);
+    expect(p.dashCooldown).toBeCloseTo(1 - STEP);
     expect(sim.state.blackHoleTime).toBe(3);
     expect(sim.state.bullets.filter(b => b.kind === 'burst')).toHaveLength(25);
     sim.state.pickups.push({ id: 12000, x: 100, y: 100, type: 'xp', value: 30, age: 0 });
@@ -273,7 +282,7 @@ describe('progression, drops, and lifecycle', () => {
     const sim = quiet(), p = sim.state.player; p.dashCooldown = 2.5; p.commandCooldown = 0.5; p.xp = 0;
     sim.state.pickups.push({ id: 20006, type: 'supply', value: 4, age: 0, x: p.x, y: p.y });
     const events = sim.step(idle());
-    expect(p.dashCooldown).toBe(0); expect(p.commandCooldown).toBe(0); expect(p.xp).toBe(20);
+    expect(p.dashCooldown).toBe(0); expect(p.xp).toBe(20);
     expect(events.find(e => e.type === 'pickup' && e.pickupType === 'supply')?.amount).toBe(4);
     expect(sim.state.pickups).toHaveLength(0);
   });
@@ -299,45 +308,46 @@ describe('progression, drops, and lifecycle', () => {
     const xp = sim.state.pickups.filter(p => p.type === 'xp');
     expect(xp).toHaveLength(1);
     expect(xp[0].value).toBeGreaterThan(100);
-    expect(sim.state.pickups.reduce((count, pickup) => count + (pickup.type === 'xp' ? pickup.value / 10 : pickup.value), 0)).toBe(100);
+    expect(xp[0].value).toBe(1000);
+    expect(sim.state.pickups.some(pickup => pickup.type !== 'xp')).toBe(true);
   });
   it('introduces all enemy types with wave balance and keeps mine health at one in endless', () => {
-    const sim = quiet(); sim.state.wave = 5;
-    expect(sim.spawnEnemy('basic', 100, 100)!.hp).toBe(14);
-    expect(sim.spawnEnemy('dasher', 100, 100)!.hp).toBe(Math.ceil(18 * 1.72));
+    const sim = quiet(); sim.state.wave = 5; sim.state.campaign.progression = 360;
+    expect(sim.spawnEnemy('basic', 100, 100)!.hp).toBe(24);
+    expect(sim.spawnEnemy('dasher', 100, 100)!.hp).toBe(56);
     const types: EnemyType[] = ['sniper', 'sprayer', 'minelayer', 'mine'];
     for (const type of types) expect(sim.spawnEnemy(type, 100, 100)!.type).toBe(type);
     sim.reset('endless'); sim.state.wave = 50;
     expect(sim.spawnEnemy('mine', 100, 100)!.hp).toBe(1);
   });
-  it('advances five configured waves, enters Boss safely, and continues at endless wave six', () => {
+  it('gates all five encounters and continues at endless wave six only after the final six-card Boss', () => {
     const sim = quiet();
-    for (let i = 0; i < BALANCE.spawn.storyWaves * BALANCE.spawn.waveDuration / STEP; i++) {
-      sim.step(idle());
-      const mini = sim.state.enemies.find(e => e.type === 'miniboss');
-      if (mini) sim.damageEnemy(mini, mini.hp);
+    for (let index = 0; index < CAMPAIGN_STAGES.length; index++) {
+      sim.state.waveTime = CAMPAIGN_STAGES[index].duration - STEP;
+      sim.step(idle()); ticks(sim, 120);
+      const encounter = sim.state.enemies.find(e => e.role === 'miniboss' || e.role === 'boss')!;
+      expect(encounter.encounterId).toBe(ENCOUNTERS[index]);
+      if (encounter.type === 'boss') {
+        expect(Math.hypot(sim.state.player.x - encounter.x, sim.state.player.y - encounter.y)).toBeGreaterThan(350);
+        expect(sim.state.player.heat).toBe(0); defeatFinal(sim);
+      } else sim.damageEnemy(encounter, 1e9);
+      if (index < 4) { expect(sim.state.status).toBe('upgrade'); finishChoices(sim); expect(sim.state.status).toBe('playing'); }
     }
-    expect(sim.state.wave).toBe(5); expect(sim.state.bossPending).toBe(true);
-    ticks(sim, 120);
-    const boss = sim.state.enemies.find(e => e.type === 'boss')!;
-    expect(boss.hp).toBe(700); expect(boss.radius).toBe(160);
-    expect(Math.hypot(sim.state.player.x - boss.x, sim.state.player.y - boss.y)).toBeGreaterThan(350);
-    expect(sim.state.player.heat).toBe(0); expect(sim.state.bossStage).toBe(true);
-    defeatFinal(sim);
-    expect(sim.state.status).toBe('complete');
+    expect(sim.state.status).toBe('complete'); expect(sim.state.campaign.progression).toBe(360);
     sim.continueEndless();
     expect(sim.state).toMatchObject({ status: 'playing', mode: 'endless', wave: 6, bossStage: false, bossPending: false });
     expect(sim.state.player.hp).toBe(5);
   });
-  it('preserves dropped XP and valuable pickups when entering Boss or continuing endless', () => {
-    const sim = quiet();
-    sim.state.pickups.push({ id: 888, type: 'xp', value: 500, age: 0, x: 1000, y: 1000 }, { id: 889, type: 'blackHole', value: 1, age: 0, x: 1500, y: 1500 });
-    const expected = structuredClone(sim.state.pickups);
-    const boss = sim.spawnEnemy('boss', 0, 0)!;
-    expect(sim.state.pickups).toEqual(expected);
-    expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim);
-    sim.continueEndless();
-    expect(sim.state.pickups.map(pickup => ({ ...pickup, age: 0 }))).toEqual(expected);
+  it('settles existing XP before Boss entry and preserves unusable resources inside the arena', () => {
+    const sim = quiet(), p = sim.state.player;
+    sim.state.pickups.push({ id: 888, type: 'xp', value: 500, age: 0, x: 1000, y: 1000 },
+      { id: 889, type: 'hp', value: 3, age: 0, x: 1500, y: 1500 }, { id: 890, type: 'coolant', value: 2, age: 0, x: 1500, y: 1500 });
+    const boss = sim.spawnEnemy('boss', 0, 0, 's2:final')!;
+    expect(p.level).toBe(4); expect(p.xp).toBe(10);
+    expect(sim.state.pickups.map(item => [item.type, item.value, item.x, item.y])).toEqual([['hp', 3, p.x, p.y], ['coolant', 2, p.x, p.y]]);
+    sim.step(idle()); finishChoices(sim);
+    expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim); sim.continueEndless();
+    expect(sim.state.pickups.map(item => [item.type, item.value])).toEqual([['hp', 3], ['coolant', 2]]);
   });
   it('locks a short spell laser throughout its full visible warning and removes it after its duration', () => {
     const sim = quiet(); const boss = sim.spawnEnemy('boss', 0, 0)!;
@@ -370,7 +380,7 @@ describe('progression, drops, and lifecycle', () => {
     expect(sim.step(idle())).toHaveLength(0);
   });
   it('stops later bullet damage once the winning Boss shot has made completion terminal', () => {
-    const sim = quiet(), boss = sim.spawnEnemy('boss', 0, 0)!, p = sim.state.player;
+    const sim = quiet(), boss = sim.spawnEnemy('boss', 0, 0, 's2:final')!, p = sim.state.player;
     boss.hp = 2; boss.spell!.cardIndex = 5; boss.spell!.stage = 'active'; boss.spell!.age = 1; boss.spell!.nextAttack = 999; p.hp = 1; p.invincible = 0;
     sim.state.bullets.push(bullet({ x: boss.x, y: boss.y, vx: 0, speed: 0, damage: 2 }),
       bullet({ owner: 'enemy', x: p.x, y: p.y, vx: 0, speed: 0 }));
@@ -411,14 +421,16 @@ describe('progression, drops, and lifecycle', () => {
       sim.reset();
     }
   });
-  it('queues every tenth endless wave behind its Boss', () => {
-    const sim = quiet(); sim.reset('endless'); sim.state.wave = 10; sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-    sim.state.player.invincible = 1e9; sim.state.spawnTimer = 1e9;
-    ticks(sim, 121);
-    expect(sim.state.pendingWave).toBe(11);
-    const boss = sim.state.enemies.find(e => e.type === 'boss')!;
-    expect(boss.spell!.cardIndex).toBe(0); defeatFinal(sim);
-    expect(sim.state).toMatchObject({ wave: 11, bossStage: false, pendingWave: 0, mode: 'endless', status: 'playing' });
+  it('rotates all five encounters at endless gates without resetting the build', () => {
+    const sim = quiet(); sim.reset('endless'); sim.state.player.invincible = 1e9;
+    for (let index = 0; index < 5; index++) {
+      sim.state.wave = (index + 1) * 10; sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
+      sim.step(idle()); ticks(sim, 121);
+      const enemy = sim.state.enemies.find(e => e.role === 'boss' || e.role === 'miniboss')!;
+      expect(enemy.encounterId).toBe(ENCOUNTERS[index]);
+      if (enemy.type === 'boss') defeatFinal(sim); else sim.damageEnemy(enemy, 1e9);
+      expect(sim.state).toMatchObject({ wave: (index + 1) * 10 + 1, bossStage: false, pendingWave: 0, mode: 'endless', status: 'playing' });
+    }
   });
   it('builds an identical bounded stress scene and enforces enemy/mine caps', () => {
     const a = new GameSimulation(1), b = new GameSimulation(2);
@@ -451,44 +463,30 @@ describe('support companions and instantaneous dash beam', () => {
   const collectSupport = (sim: GameSimulation, value = 1) => {
     const p = sim.state.player;
     sim.state.pickups.push({ id: 70000 + sim.state.tick, type: 'support', value, x: p.x, y: p.y, age: 0 });
-    return sim.step(idle());
+    const events = sim.step(idle()); finishChoices(sim); return events;
   };
 
-  it('guarantees a nearby support supply on waves 2, 3, and 4, exactly once each', () => {
+  it('guarantees a nearby support at progression 45 exactly once, and clears it on reset', () => {
     const sim = quiet(), p = sim.state.player;
-    p.x = p.y = p.radius;
-    for (const wave of [2, 3, 4]) {
-      if (wave === 4) {
-        sim.state.waveTime = 12; const mini = sim.spawnEnemy('miniboss', 3000, 2000)!;
-        sim.damageEnemy(mini, mini.hp);
-      }
-      sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-      const events = sim.step(idle({ aimX: 3500, aimY: p.y }));
-      expect(sim.state.wave).toBe(wave);
-      expect(events.filter(e => e.type === 'support' && e.text === 'arrival')).toHaveLength(1);
-      const supply = sim.state.pickups.find(item => item.type === 'support' && Math.hypot(item.x - p.x, item.y - p.y) <= 72)!;
-      expect(Math.hypot(supply.x - p.x, supply.y - p.y)).toBeLessThanOrEqual(72);
-      expect(supply.x).toBeGreaterThanOrEqual(0); expect(supply.y).toBeGreaterThanOrEqual(0);
-      const pickupEvents = ticks(sim, 20);
-      expect(pickupEvents.filter(e => e.type === 'support' && e.text === 'deployed')).toHaveLength(1);
-      expect(pickupEvents.some(e => e.type === 'support' && e.text === 'arrival')).toBe(false);
-      expect(sim.state.companions).toHaveLength(wave - 1);
-    }
-    sim.state.waveTime = BALANCE.spawn.waveDuration - STEP;
-    expect(sim.step(idle()).some(e => e.type === 'support' && e.text === 'arrival')).toBe(false);
-    sim.debugStress(); ticks(sim, 120);
-    expect(sim.state.companions).toHaveLength(0);
-    expect(sim.state.pickups.some(pickup => pickup.type === 'support')).toBe(false);
+    sim.state.waveTime = 45 - STEP;
+    const events = sim.step(idle());
+    expect(events.filter(e => e.type === 'support' && e.text === 'arrival')).toHaveLength(1);
+    const supply = sim.state.pickups.find(item => item.type === 'support')!;
+    expect(Math.hypot(supply.x - p.x, supply.y - p.y)).toBeLessThanOrEqual(72);
+    const picked = ticks(sim, 45);
+    expect(picked.filter(e => e.type === 'support' && e.text === 'deployed')).toHaveLength(1);
+    expect(sim.state.companions).toHaveLength(1);
+    expect(ticks(sim, 60).some(e => e.type === 'support' && e.text === 'arrival')).toBe(false);
+    sim.reset(); expect(sim.state.companions).toHaveLength(0); expect(sim.state.pickups).toHaveLength(0);
   });
-
   it('caps companions at three and converts every surplus module to XP with level overflow', () => {
     const sim = quiet();
     const deployed = collectSupport(sim, 5).filter(e => e.type === 'support' && e.text === 'deployed');
     expect(deployed.map(event => event.amount)).toEqual([1, 2, 3]);
-    expect(sim.state.companions).toHaveLength(3); expect(sim.state.player.xp).toBe(60);
+    expect(sim.state.companions).toHaveLength(3); expect(sim.state.player.level).toBe(2); expect(sim.state.player.xp).toBe(20);
     collectSupport(sim, 4);
     expect(sim.state.companions).toHaveLength(3);
-    expect(sim.state.player.level).toBe(2); expect(sim.state.player.xp).toBe(40);
+    expect(sim.state.player.level).toBe(3); expect(sim.state.player.xp).toBe(100);
     const before = sim.state.player.xp;
     for (const value of [0, -2, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(collectSupport(sim, value).some(event => event.type === 'support')).toBe(false);
@@ -504,7 +502,7 @@ describe('support companions and instantaneous dash beam', () => {
     sim.step(idle());
     expect(p.hp).toBe(4); expect(p.level).toBe(3); expect(p.xp).toBe(0);
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
-    const boss = sim.spawnEnemy('boss', 0, 0)!;
+    const boss = sim.spawnEnemy('boss', 0, 0, 's2:final')!;
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
     expect(boss.spell?.cardIndex).toBe(0); defeatFinal(sim); sim.continueEndless();
     expect(sim.state.companions.map(companion => companion.id)).toEqual(ids);
@@ -577,7 +575,7 @@ describe('support companions and instantaneous dash beam', () => {
       bullet({ id: 902, owner: 'enemy', x: 1800, y: 2200, vx: 0 }),
       bullet({ id: 903, owner: 'player', x: 1800, y: 2020, vx: 0 }));
     p.perfectWindow = BALANCE.dash.window;
-    const events = sim.step(idle({ beam: true }));
+    const events = sim.step(idle({ shoot: true }));
     expect(events.filter(e => e.type === 'beam')).toHaveLength(1);
     expect(enemies.map(enemy => enemy.hp)).toEqual([960, 960, 1000, 1000]);
     expect(sim.state.bullets.map(b => b.id)).toEqual([902, 903]);
@@ -588,38 +586,36 @@ describe('support companions and instantaneous dash beam', () => {
     sim.step(idle()); expect(sim.state.beams).toHaveLength(0);
   });
 
-  it('allows a manual beam while overheated, adds no heat, and cannot repeat without a new reward', () => {
+  it('allows the dash beam while overheated, adds no heat, and cannot repeat without a new reward', () => {
     const sim = quiet(), p = sim.state.player;
     p.perfectWindow = BALANCE.dash.window; p.shotCooldown = 0.15; p.overheated = true; p.heat = 100; p.heatLock = 1.2;
-    const events = sim.step(idle({ beam: true, shoot: true }));
+    const events = sim.step(idle({ shoot: true }));
     expect(events.filter(e => e.type === 'beam')).toHaveLength(1);
     expect(p).toMatchObject({ heat: 100, overheated: true, perfectWindow: 0 });
     expect(sim.state.bullets).toHaveLength(0);
-    expect(ticks(sim, 10, idle({ beam: true, shoot: true })).filter(e => e.type === 'beam' || e.type === 'shot')).toHaveLength(0);
+    expect(ticks(sim, 10, idle({ shoot: true })).filter(e => e.type === 'beam' || e.type === 'shot')).toHaveLength(0);
     p.overheated = false; p.heat = 0; p.heatLock = 0; p.shotCooldown = 0;
     expect(sim.step(idle({ shoot: true })).filter(e => e.type === 'shot')).toHaveLength(1);
   });
 
-  it('keeps a manual beam charge during ordinary fire and clears visual beams on reset or terminal completion', () => {
+  it('automatically consumes the dash beam on held LMB and clears visuals on reset or final completion', () => {
     const sim = quiet(), p = sim.state.player;
     p.perfectWindow = BALANCE.dash.window;
-    expect(sim.step(idle({ shoot: true })).some(event => event.type === 'beam')).toBe(false);
-    expect(p.perfectWindow).toBeGreaterThan(0);
-    sim.step(idle({ beam: true })); expect(sim.state.beams).toHaveLength(1);
+    expect(sim.step(idle({ shoot: true })).some(event => event.type === 'beam')).toBe(true);
+    expect(p.perfectWindow).toBe(0); expect(sim.state.beams).toHaveLength(1);
     sim.reset(); expect(sim.state.beams).toHaveLength(0);
-    const boss = sim.spawnEnemy('boss', 0, 0)!;
+    const boss = sim.spawnEnemy('boss', 0, 0, 's2:final')!;
     boss.hp = 40; boss.spell!.cardIndex = 5; boss.spell!.stage = 'active'; boss.spell!.age = 1;
     sim.state.player.perfectWindow = BALANCE.dash.window;
-    const events = sim.step(idle({ beam: true, aimX: boss.x, aimY: boss.y }));
+    const events = sim.step(idle({ shoot: true, aimX: boss.x, aimY: boss.y }));
     expect(events.filter(event => event.type === 'complete' || event.type === 'failure').map(event => event.type)).toEqual(['complete']);
     expect(sim.state.beams).toHaveLength(0);
   });
-
   it('limits a beam cast to 180 different targets even in the oversized stress fixture', () => {
     const sim = quiet(); sim.debugStress();
     const p = sim.state.player; p.x = 500; p.y = 2000; p.perfectWindow = BALANCE.dash.window;
     sim.state.enemies.forEach((enemy, i) => { enemy.x = enemy.prevX = 800 + i * 5; enemy.y = enemy.prevY = 2000; });
-    sim.step(idle({ beam: true, aimX: 3500, aimY: 2000 }));
+    sim.step(idle({ shoot: true, aimX: 3500, aimY: 2000 }));
     expect(sim.state.enemies.filter(enemy => enemy.hp < enemy.maxHp)).toHaveLength(180);
   });
 
@@ -642,7 +638,7 @@ describe('support companions and instantaneous dash beam', () => {
       const clock = new FixedClock(); let beams = 0, drones = 0;
       for (let frame = 0; frame <= hz * 8; frame++) clock.advance(frame * 1000 / hz, dt => {
         const tick = sim.state.tick;
-        const events = sim.step(idle({ shoot: true, dash: tick % 200 === 0, beam: tick % 200 === 12, aimX: enemy.x, aimY: enemy.y }), dt);
+        const events = sim.step(idle({ shoot: true, dash: tick % 200 === 0, aimX: enemy.x, aimY: enemy.y }), dt);
         beams += events.filter(e => e.type === 'beam').length;
         drones += events.filter(e => e.type === 'shot' && e.text === 'drone').length;
       });
@@ -668,7 +664,7 @@ describe('long-session stability', () => {
       const moveX = boss ? boss.x + Math.cos(t * 0.3) * 600 - p.x : Math.cos(t * 0.16);
       const moveY = boss ? boss.y + Math.sin(t * 0.3) * 240 - p.y : Math.sin(t * 0.16);
       const events = sim.step(idle({ moveX, moveY, aimX: target?.x ?? 2000, aimY: target?.y ?? 2000,
-        shoot: !p.overheated && p.heat < 80, dash: tick % 200 === 0, beam: tick % 200 === 12, bomb: tick % 1800 === 0 }));
+        shoot: !p.overheated && p.heat < 80, dash: tick % 200 === 0, bomb: tick % 1800 === 0 }));
       for (const event of events) {
         if (event.type === 'beam') beamCasts++;
         if (event.type === 'shot' && event.text === 'drone') droneShots++;

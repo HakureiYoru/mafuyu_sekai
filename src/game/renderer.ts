@@ -8,7 +8,6 @@ import type { Season2Telegraph } from './season2-ai';
 import { spellCardDefinition, spellReturnPreview, spellTelegraphs } from './spellcards';
 import type { SpellReturnPath } from './spellcards';
 import { beamGeometry, clamp, lerp, TAU } from './math';
-import { keyLabel } from './settings';
 import type { CombatEvent, Enemy, EnemyBulletShape, EnemyType, GameSettings, Pickup, PickupType, WorldState } from './types';
 
 type AssetKey = keyof typeof ASSET_URLS;
@@ -440,7 +439,7 @@ export class GameRenderer {
   private renderArena(state: WorldState) {
     const graph = this.arenaMarks.clear(), arena = state.arena;
     if (!arena) return;
-    const color = state.seasonId === 's2' ? 0xb8a9da : 0x948bc1;
+    const color = state.campaign.activeEncounter === 's2:final' ? 0xb8a9da : 0x948bc1;
     graph.rect(arena.x, arena.y, arena.width, arena.height).fill({ color: 0x191326, alpha: 0.15 }).stroke({ color, width: 4, alpha: 0.75 });
     graph.rect(arena.x + 14, arena.y + 14, arena.width - 28, arena.height - 28).stroke({ color, width: 1, alpha: 0.22 });
     for (const sideX of [0, 1]) for (const sideY of [0, 1]) {
@@ -615,6 +614,24 @@ export class GameRenderer {
   private renderCombatMarks(state: WorldState, alpha: number) {
     const graph = this.combatMarks.clear();
     this.commandHint.visible = false;
+    // Friendly module areas use the simulation geometry and stay below hostile shots.
+    for (const area of state.playerAreas ?? []) {
+      const waiting = area.warning > 0;
+      const fade = waiting ? 1 : clamp(area.life / area.duration, 0, 1);
+      const color = area.kind === 'brake' ? 0x88d9ff : 0x96ffe1;
+      if (area.kind === 'trail') {
+        const endX = area.endX ?? area.x, endY = area.endY ?? area.y, width = area.width ?? 64;
+        graph.moveTo(area.x, area.y).lineTo(endX, endY).stroke({ color, width, alpha: 0.09 * fade });
+        graph.circle(area.x, area.y, width / 2).fill({ color, alpha: 0.06 * fade });
+        graph.circle(endX, endY, width / 2).fill({ color, alpha: 0.06 * fade });
+        graph.moveTo(area.x, area.y).lineTo(endX, endY).stroke({ color: 0xc6fff1, width: 2, alpha: 0.6 * fade });
+      } else {
+        graph.circle(area.x, area.y, area.radius).fill({ color, alpha: (waiting ? 0.035 : 0.07) * fade })
+          .stroke({ color, width: 1.5, alpha: (waiting ? 0.4 : 0.55) * fade });
+        if (waiting) graph.arc(area.x, area.y, area.radius * 0.86, -Math.PI / 2,
+          -Math.PI / 2 + TAU * clamp(1 - area.warning / area.warningDuration, 0, 1)).stroke({ color: 0xbffff0, width: 2, alpha: 0.65 });
+      }
+    }
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0 || (enemy.disabledUntil ?? 0) > state.elapsed) continue;
       const weak = enemy.weakpoint;
@@ -627,7 +644,7 @@ export class GameRenderer {
         graph.arc(weak.x, weak.y, weak.radius + 5, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(weak.hp / weak.maxHp, 0, 1))
           .stroke({ color: 0xffd596, width: 3, alpha: 0.9 });
       }
-      if (state.player.commandTime <= 0 || state.player.commandTargetId !== enemy.id) continue;
+      if ((state.player.markTime ?? 0) <= 0 || state.player.markTargetId !== enemy.id) continue;
       const x = lerp(enemy.prevX, enemy.x, alpha), y = lerp(enemy.prevY, enemy.y, alpha), radius = enemy.radius + 20;
       if (!this.visible(x, y, radius)) continue;
       for (const signX of [-1, 1]) for (const signY of [-1, 1]) {
@@ -635,10 +652,10 @@ export class GameRenderer {
         graph.moveTo(cx - signX * 13, cy).lineTo(cx, cy).lineTo(cx, cy - signY * 13).stroke({ color: 0x091722, width: 7 });
         graph.moveTo(cx - signX * 13, cy).lineTo(cx, cy).lineTo(cx, cy - signY * 13).stroke({ color: 0xafe7ff, width: 2.5 });
       }
-      graph.arc(x, y, radius + 7, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(state.player.commandTime / BALANCE.command.duration, 0, 1))
+      graph.arc(x, y, radius + 7, -Math.PI / 2, -Math.PI / 2 + TAU * clamp((state.player.markTime ?? 0) / 1.4, 0, 1))
         .stroke({ color: 0xb9eaff, width: 2, alpha: 0.85 });
       this.commandHint.visible = true; this.commandHint.position.set(x, y - radius - 21);
-      this.commandHint.text = `集火 · ${(Math.ceil(state.player.commandTime * 10) / 10).toFixed(1)}s`;
+      this.commandHint.text = '护刃追迹';
     }
   }
 
@@ -782,7 +799,7 @@ export class GameRenderer {
     this.playerGlow.visible = this.settings.quality !== 'low' || ready;
     this.skillHint.visible = ready || player.overheated;
     this.skillHint.position.set(x, y + 71);
-    this.skillHint.text = ready ? `${keyLabel(this.settings.keybindings.beam)} 贯穿炮` : '过热 · 松开射击';
+    this.skillHint.text = ready ? '左键 · 贯穿炮' : '过热 · 松开射击';
     this.trailClock -= dt;
     if (dashing && this.trailClock <= 0) { this.effects.trail(x, y, tilt); this.trailClock = 1 / 40; }
     const graph = this.playerMarks.clear();
@@ -1066,10 +1083,6 @@ export class GameRenderer {
       }
       if (ready) graph.arc(x, y, 24, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(state.player.perfectWindow / BALANCE.dash.window, 0, 1))
         .stroke({ color: 0xffe5a9, width: 2, alpha: 0.9 });
-      if (state.companions.length > 0 && state.player.commandCooldown <= 0) {
-        for (const side of [-1, 1]) graph.moveTo(x + side * 27, y - 5).lineTo(x + side * 30, y).lineTo(x + side * 27, y + 5)
-          .stroke({ color: 0x9edfff, width: 2, alpha: 0.9 });
-      }
     }
   }
 

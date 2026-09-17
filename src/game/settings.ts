@@ -1,16 +1,16 @@
 import type { GameSettings } from './types';
 
-export type BindingAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'dash' | 'bomb' | 'focus' | 'beam' | 'command';
+export type BindingAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'dash' | 'bomb' | 'focus';
 export type KeyBindings = Record<BindingAction, string>;
 export type DamageNumberMode = 'all' | 'important' | 'off';
 
 export const BINDING_LABELS: Readonly<Record<BindingAction, string>> = {
   moveUp: '向上移动', moveDown: '向下移动', moveLeft: '向左移动', moveRight: '向右移动',
-  dash: '冲刺', bomb: '炸弹', focus: '慢速瞄准', beam: '贯穿炮', command: '子机指令',
+  dash: '冲刺', bomb: '炸弹', focus: '慢速瞄准',
 };
 export const DEFAULT_KEYBINDINGS: Readonly<KeyBindings> = Object.freeze({
   moveUp: 'KeyW', moveDown: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD',
-  dash: 'KeyR', bomb: 'Space', focus: 'ShiftLeft', beam: 'KeyQ', command: 'KeyE',
+  dash: 'KeyR', bomb: 'Space', focus: 'ShiftLeft',
 });
 export const DEFAULT_GAME_SETTINGS: Readonly<GameSettings> = Object.freeze({
   quality: 'medium', masterVolume: 0.7, musicVolume: 0.45, sfxVolume: 0.65, screenShake: 0.45,

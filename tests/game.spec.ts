@@ -143,7 +143,7 @@ test('fixed arena beam warning locks its geometry and pause preserves its remain
 });
 
 for (const season of ['s1', 's2'] as const) {
-  test(`${season} advances all six cards before completion and clears encounter resources`, async ({ page }) => {
+  test(`${season} requires all six cards and cleans the encounter correctly`, async ({ page }) => {
     await openGame(page);
     await page.evaluate(season => window.__MAFUYU_DEBUG__.practice({ season, mode: 'story', cardIndex: 0 }), season);
     for (let card = 1; card <= 6; card++) {
@@ -157,12 +157,16 @@ for (const season of ['s1', 's2'] as const) {
         expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().hazards.length)).toBe(0);
       }
     }
-    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('complete');
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe(season === 's1' ? 'upgrade' : 'complete');
     expect(await page.evaluate(() => ({ shots: window.__MAFUYU_DEBUG__.state().bullets.filter(b => b.owner === 'enemy').length,
       parts: window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.role === 'part').length }))).toEqual({ shots: 0, parts: 0 });
-    await page.getByRole('button', { name: /继续.*无尽/ }).click();
-    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().mode)).toBe('endless');
-    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().seasonId)).toBe(season);
+    if (season === 's1') {
+      await page.keyboard.press('1');
+      await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
+    } else {
+      await page.getByRole('button', { name: /继续.*无尽/ }).click();
+      await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().mode)).toBe('endless');
+    }
     expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().arena)).toBeNull();
   });
 }
@@ -178,7 +182,7 @@ test('difficulty persists, cannot change during a run, and keeps separate high s
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().difficulty)).toBe('hard');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '结束本局，返回主菜单' }).click();
-  expect(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:best:v3:hard'))).toBe('4242');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mafuyu-sekai:profile:v2')!).bestScores.v5.hard.story)).toBe(4242);
   expect(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:best:v3'))).toBeNull();
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('complete'));
   await page.getByRole('button', { name: /继续.*无尽|无尽.*继续|进入无尽/ }).click();
@@ -201,7 +205,7 @@ test('hard cards use their own HP and beam warning instead of old boss phase val
   expect(values.remaining).toBeGreaterThan(0); expect(values.remaining).toBeLessThanOrEqual(0.8);
 });
 
-test('third-wave miniboss coexists with spawning and exposes a locked laser without ending the wave', async ({ page }) => {
+test('ECHO freezes progression while limited reinforcements and locked lasers continue', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await openGame(page);
   await page.getByRole('button', { name: '困难', exact: true }).click();
@@ -214,7 +218,7 @@ test('third-wave miniboss coexists with spawning and exposes a locked laser with
   expect(before).toMatchObject({ maxHp: 1620, bossStage: false });
   await expect(page.getByLabel('迷你首领行动')).toContainText('激光锁定');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.filter(e => e.type !== 'miniboss').length)).toBeGreaterThan(1);
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBeGreaterThan(before.waveTime);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBe(before.waveTime);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossSpawned)).toBe(false);
   await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toHaveCount(0);
@@ -222,16 +226,17 @@ test('third-wave miniboss coexists with spawning and exposes a locked laser with
 });
 
 for (const difficulty of ['普通', '困难']) {
-  test(`${difficulty} holds wave three until ECHO is defeated, then advances exactly once`, async ({ page }) => {
+  test(`${difficulty} holds the first encounter until ECHO is defeated, then advances exactly once`, async ({ page }) => {
     await openGame(page);
     await page.getByRole('button', { name: difficulty, exact: true }).click();
     await page.evaluate(() => {
       const d = window.__MAFUYU_DEBUG__; d.scenario('miniboss');
-      d.state().waveTime = 40;
+      d.advanceStage();
     });
     await expect(page.getByText(/击败首领后继续/)).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.some(enemy => enemy.type === 'miniboss'))).toBe(true);
     await page.waitForTimeout(800);
-    expect(await page.evaluate(() => ({ wave: window.__MAFUYU_DEBUG__.state().wave, time: window.__MAFUYU_DEBUG__.state().waveTime }))).toEqual({ wave: 3, time: 40 });
+    expect(await page.evaluate(() => ({ wave: window.__MAFUYU_DEBUG__.state().wave, time: window.__MAFUYU_DEBUG__.state().waveTime }))).toEqual({ wave: 1, time: 90 });
     await page.evaluate(() => {
       const s = window.__MAFUYU_DEBUG__.state(), e = s.enemies.find(e => e.type === 'miniboss')!;
       e.x = e.prevX = s.player.x + 300; e.y = e.prevY = s.player.y;
@@ -240,11 +245,13 @@ for (const difficulty of ['普通', '困难']) {
     });
     const bounds = (await page.locator('#game-host').boundingBox())!;
     await page.mouse.click(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2);
-    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(2);
+    await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('upgrade');
+    while (await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase === 'upgrade')) await page.keyboard.press('1');
     await expect(page.getByText(/击败首领后继续/)).toHaveCount(0);
     expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossDefeated)).toBe(true);
     await page.waitForTimeout(200);
-    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(4);
+    expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().wave)).toBe(2);
   });
   test(`${difficulty} flower card emits counter-rotating rings and restart removes every projectile`, async ({ page }) => {
     await openGame(page);
@@ -279,7 +286,6 @@ test('support craft fight while overheated, beam fires through the heat lock, re
   await page.keyboard.press('r');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
   await page.mouse.down();
-  await page.keyboard.press('q');
   await page.waitForFunction(() => {
     if (!window.__MAFUYU_DEBUG__.state().beams.length) return false;
     window.__MAFUYU_DEBUG__.pause();

@@ -20,32 +20,24 @@ async function aim(page: Page, x: number, y: number) {
   await page.mouse.move(screen.x, screen.y);
 }
 
-test('holding main fire preserves dash charge until Q, then E selects and releases a real target', async ({ page }) => {
+test('holding primary fire releases the dash beam automatically without a new hotkey', async ({ page }) => {
   await ready(page); await aim(page, 2450, 2000);
   await page.mouse.down(); await page.keyboard.press('r');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(3);
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().beams.length)).toBe(0);
-  await page.keyboard.press('q');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().beams.length)).toBeGreaterThan(0);
+  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().beams.length > 0);
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBe(0);
-  await page.mouse.up(); await aim(page, 2450, 2000); await page.keyboard.press('e');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.commandTargetId)).not.toBeNull();
-  const target = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.commandTargetId!);
-  await page.evaluate(id => window.__MAFUYU_DEBUG__.damageEnemy(id, 1e7), target);
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.commandTargetId)).toBeNull();
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.commandCooldown)).toBeGreaterThan(6);
+  await page.mouse.up();
   await expect(page.getByRole('meter', { name: '弹药' })).toHaveCount(0);
 });
 
-test('pause freezes Q/E clocks and pointer capture carries firing over the canvas edge', async ({ page }) => {
-  await ready(page); await aim(page, 2450, 2000); await page.keyboard.press('e'); await page.keyboard.press('r');
+test('pause freezes the beam window and pointer capture carries firing over the canvas edge', async ({ page }) => {
+  await ready(page); await aim(page, 2450, 2000); await page.keyboard.press('r');
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
   await page.keyboard.press('Escape');
   const before = await page.evaluate(() => {
-    const p = window.__MAFUYU_DEBUG__.state().player; return [p.perfectWindow, p.commandTime, p.commandCooldown];
+    const p = window.__MAFUYU_DEBUG__.state().player; return [p.perfectWindow, p.dashCooldown];
   });
   await page.waitForTimeout(180);
-  expect(await page.evaluate(() => { const p = window.__MAFUYU_DEBUG__.state().player; return [p.perfectWindow, p.commandTime, p.commandCooldown]; })).toEqual(before);
+  expect(await page.evaluate(() => { const p = window.__MAFUYU_DEBUG__.state().player; return [p.perfectWindow, p.dashCooldown]; })).toEqual(before);
   await page.getByRole('button', { name: /继续游戏/ }).click();
   await aim(page, 2300, 2000); await page.mouse.down();
   const host = (await page.locator('#game-host').boundingBox())!;
@@ -58,19 +50,18 @@ test('pause freezes Q/E clocks and pointer capture carries firing over the canva
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('paused');
 });
 
-test('Q remapping persists and old binding does not release stored fire', async ({ page }) => {
-  await ready(page);
-  await page.evaluate(() => {
-    const d = window.__MAFUYU_DEBUG__, settings = d.snapshot().settings;
-    d.settings({ keybindings: { ...settings.keybindings, beam: 'KeyF' }, damageNumbers: 'important' });
-  });
-  await page.reload(); await page.getByRole('button', { name: '开始游戏', exact: true }).waitFor();
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().settings)).toMatchObject({ keybindings: { beam: 'KeyF' }, damageNumbers: 'important' });
-  await page.getByRole('button', { name: '开始游戏', exact: true }).click();
-  await page.keyboard.press('r');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
+test('remaining actions may use Q/E and obsolete beam/command bindings are removed', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('mafuyu-sekai:settings:v3', JSON.stringify({ keybindings: { dash: 'KeyF', focus: 'KeyE', beam: 'KeyB', command: 'KeyC' }, damageNumbers: 'important' })));
+  await page.goto('/?debug=1'); await page.getByRole('button', { name: '开始游戏', exact: true }).waitFor();
+  const settings = await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().settings);
+  expect(settings).toMatchObject({ keybindings: { dash: 'KeyF', focus: 'KeyE' }, damageNumbers: 'important' });
+  expect(settings.keybindings).not.toHaveProperty('beam'); expect(settings.keybindings).not.toHaveProperty('command');
+  await page.getByRole('button', { name: '开始游戏' }).click();
   await page.keyboard.press('q');
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBe(0);
   await page.keyboard.press('f');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(0);
+  await page.keyboard.down('e');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.focus)).toBe(true);
+  await page.keyboard.up('e');
 });

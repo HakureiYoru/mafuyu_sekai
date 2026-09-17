@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GameSimulation } from './simulation';
 import { BALANCE, STEP } from './config';
 import { FixedClock } from './clock';
+import { enqueueUpgrade, offerModules } from './upgrades';
 import type { Bullet, InputAction, ModuleId } from './types';
 
 const input = (extra: Partial<InputAction> = {}): InputAction => ({ moveX: 0, moveY: 0, aimX: 3000, aimY: 2000, shoot: false, bomb: false, dash: false, ...extra });
@@ -10,8 +11,12 @@ const shot = (extra: Partial<Bullet> = {}): Bullet => ({ id: 9999, owner: 'playe
   targetId: null, remainingHits: 1, hitIds: new Set(), kind: 'normal', ...extra });
 function run(modules: ModuleId[] = [], level = 7, companions = 0) {
   const sim = new GameSimulation(400);
-  sim.reset('story', 400, 'normal', { season: 's2', carryover: { level, xp: 20, companions } });
-  sim.chooseUpgrade(sim.state.build.choices[0]); sim.state.build.modules = [...modules];
+  sim.state.player.level = level; sim.state.player.xp = 20;
+  sim.state.build.modules = [...modules];
+  if (companions) {
+    sim.state.pickups.push({ id: 8000, type: 'support', value: companions, x: 2000, y: 2000, age: 0 });
+    sim.step(input());
+  }
   sim.state.spawnTimer = 99999; sim.state.player.invincible = 99999;
   return sim;
 }
@@ -24,8 +29,14 @@ function hit(sim: GameSimulation, enemy: ReturnType<typeof target>, kind: Bullet
   sim.state.bullets.push(shot({ id: 9999 + sim.state.tick, kind, x: enemy.x, y: enemy.y, damage }));
   sim.step(input());
 }
+function offer(sim: GameSimulation, id: ModuleId) {
+  enqueueUpgrade(sim.state.build, 'level', `fixture:${sim.state.build.choiceIndex}`);
+  offerModules(sim.state.build, sim.state.player.level, 400);
+  sim.state.build.choices = [id]; sim.state.status = 'upgrade';
+  expect(sim.chooseUpgrade(id, sim.state.build.offerId!)).toBe(true);
+}
 
-describe('v4 combat modules use non-recursive sources', () => {
+describe('v5 combat modules use non-recursive sources', () => {
   it('adds pierce and two wings without another heat charge; precision requires continuous focus', () => {
     const sim = run(['piercing', 'wingShots', 'precision']);
     sim.state.player.specialCooldown = 999;
@@ -82,7 +93,7 @@ describe('v4 combat modules use non-recursive sources', () => {
     const main = target(sim, 2600, 2000), side = target(sim, 2900, 2127); main.radius = side.radius = 18;
     sim.state.player.perfectWindow = 0.5;
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2900, y: 2127 }));
-    sim.step(input({ beam: true }));
+    sim.step(input({ shoot: true }));
     expect(main.hp).toBe(960); expect(side.hp).toBe(988);
     expect(sim.state.beams).toHaveLength(3);
     expect(sim.state.bullets.some(b => b.owner === 'enemy')).toBe(true);
@@ -99,12 +110,12 @@ describe('v4 combat modules use non-recursive sources', () => {
   });
 });
 
-describe('v4 resource state, collision core and progression', () => {
+describe('v5 resource state, collision core and progression', () => {
   it('uses radius 7 for enemy bullets and radius 18 for bodies, with a disjoint graze band', () => {
-    const sim = run(['graze']); const p = sim.state.player; p.invincible = 0; p.heat = 50; p.idleTime = 0; p.commandCooldown = 4;
+    const sim = run(['graze']); const p = sim.state.player; p.invincible = 0; p.heat = 50; p.idleTime = 0; p.dashCooldown = 2;
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2020, radius: 6, life: 10 }));
-    sim.step(input()); expect(p.hp).toBe(5); expect(p.heat).toBe(48); expect(p.commandCooldown).toBeCloseTo(4 - STEP - 0.1);
-    ticks(sim, 5); expect(p.heat).toBe(48); expect(p.commandCooldown).toBeCloseTo(4 - 6 * STEP - 0.1);
+    sim.step(input()); expect(p.hp).toBe(5); expect(p.heat).toBe(48); expect(p.dashCooldown).toBeCloseTo(2 - STEP - 0.05);
+    ticks(sim, 5); expect(p.heat).toBe(48); expect(p.dashCooldown).toBeCloseTo(2 - 6 * STEP - 0.05);
     sim.state.bullets.push(shot({ owner: 'enemy', x: 2012, radius: 6 }));
     sim.step(input()); expect(p.hp).toBe(4);
     p.invincible = 0; target(sim, 2030, 2000).radius = 18;
@@ -115,53 +126,49 @@ describe('v4 resource state, collision core and progression', () => {
     sim.state.pickups.push({ id: 991, x: p.x, y: p.y, type: 'bomb', value: 4, age: 0 });
     sim.step(input()); expect(p.bombs).toBe(5); expect(p.xp).toBe(90);
   });
-  it('revives once, keeps the inherited level floor and does not reset the consumed revive in endless', () => {
+  it('revives once, never loses a weapon level and does not reset consumed revive in endless', () => {
     const sim = run(['revive']); const p = sim.state.player;
     const lethal = () => { p.hp = 1; p.invincible = 0; sim.state.bullets.push(shot({ owner: 'enemy', x: p.x, y: p.y })); sim.step(input()); };
     lethal(); expect(p.hp).toBe(1); expect(p.invincible).toBeCloseTo(0.8); expect(p.level).toBe(7);
     sim.state.status = 'complete'; sim.continueEndless(); lethal(); expect(sim.state.status).toBe('failed');
   });
-  it('earns only local resonance at level ten and clears it on a season retry', () => {
+  it('earns only local resonance at level ten and clears it on a fresh Lv1 retry', () => {
     const sim = run([], 10); const p = sim.state.player; p.xp = 0;
     sim.state.pickups.push({ id: 990, type: 'xp', value: 2500, age: 0, x: p.x, y: p.y });
     sim.step(input()); expect(sim.state.build).toMatchObject({ resonance: 4, resonanceXp: 0 });
-    sim.reset('story', 400, 'normal', { season: 's2', carryover: { level: 7, xp: 20, companions: 1 } });
-    expect(sim.state.build).toMatchObject({ resonance: 0, modules: [], levelFloor: 7 });
+    sim.reset('story', 400, 'normal');
+    expect(sim.state.build).toMatchObject({ resonance: 0, modules: [], levelFloor: 1 });
+    expect(sim.state.player).toMatchObject({ level: 1, xp: 0 });
   });
   it('recharges two dashes sequentially, applies vent once and preserves heat lock', () => {
     const sim = run(['vent']);
-    sim.state.build.choices = ['doubleDash']; sim.state.status = 'upgrade'; sim.chooseUpgrade('doubleDash');
+    offer(sim, 'doubleDash');
     const p = sim.state.player; p.heat = 80; p.heatLock = 5; p.overheated = true;
     sim.step(input({ dash: true })); ticks(sim, 11); expect(sim.dashCharges).toBe(1); expect(p.heat).toBeLessThanOrEqual(55); expect(p.overheated).toBe(true);
     sim.step(input({ dash: true })); expect(sim.dashCharges).toBe(0);
     ticks(sim, 144); expect(sim.dashCharges).toBe(1);
     ticks(sim, 156); expect(sim.dashCharges).toBe(2);
   });
-  it('pauses seven offers, commits once, requires both minibosses, and puts choice seven before the final', () => {
-    const sim = new GameSimulation(400); sim.reset('story', 400, 'normal', { season: 's2', carryover: { level: 7, xp: 20, companions: 3 } });
-    let offers = 0;
-    for (let stage = 1; stage <= 6; stage++) {
-      expect(sim.state.status).toBe('upgrade'); const tick = sim.state.tick;
-      sim.step(input({ shoot: true })); expect(sim.state.tick).toBe(tick);
-      const choice = sim.state.build.choices[0]; expect(sim.chooseUpgrade(choice)).toBe(true); expect(sim.chooseUpgrade(choice)).toBe(false); offers++;
-      sim.state.player.invincible = 99999; sim.state.spawnTimer = 99999; sim.state.waveTime = 75 - STEP;
-      sim.step(input());
-      if (stage === 2 || stage === 4) {
-        expect(sim.state.status).toBe('playing'); expect(sim.isWaveBlocked()).toBe(true); ticks(sim, 100);
-        const boss = sim.state.enemies.find(e => e.role === 'miniboss')!; expect(boss).toBeTruthy();
-        const hp = sim.state.player.hp; sim.damageEnemy(boss, 1e9); expect(sim.state.player.hp).toBeGreaterThanOrEqual(hp);
-      }
-      expect(sim.state.status).toBe('upgrade');
-    }
-    expect(sim.state.enemies.some(e => e.type === 'boss')).toBe(false);
-    sim.chooseUpgrade(sim.state.build.choices[0]); offers++;
-    expect(offers).toBe(7); expect(sim.state.bossPending).toBe(true); ticks(sim, 120);
-    expect(sim.state.enemies.find(e => e.type === 'boss')?.archetypeId).toBe('lacuna');
+  it('queues multiple level rewards while freezing the actual battlefield until every choice is committed', () => {
+    const sim = run([], 1), p = sim.state.player; p.xp = 0;
+    target(sim, 2400); sim.state.bullets.push(shot({ owner: 'enemy', x: 2600, life: 10, vx: -60 }));
+    sim.state.pickups.push({ id: 500, type: 'xp', value: 260, x: p.x, y: p.y, age: 0 });
+    sim.step(input()); expect(p.level).toBe(3); expect(sim.state.status).toBe('upgrade');
+    expect(sim.state.build.pendingRewards).toHaveLength(2);
+    const before = structuredClone({ enemies: sim.state.enemies, bullets: sim.state.bullets, tick: sim.state.tick, elapsed: sim.state.elapsed });
+    ticks(sim, 120, input({ shoot: true, dash: true, bomb: true }));
+    expect({ enemies: sim.state.enemies, bullets: sim.state.bullets, tick: sim.state.tick, elapsed: sim.state.elapsed }).toEqual(before);
+    const id = sim.state.build.choices[0], token = sim.state.build.offerId!;
+    expect(sim.chooseUpgrade(id, token)).toBe(true); expect(sim.state.status).toBe('upgrade');
+    expect(sim.chooseUpgrade(sim.state.build.choices[0], token)).toBe(false);
+    expect(sim.chooseUpgrade(sim.state.build.choices[0], sim.state.build.offerId!)).toBe(true);
+    expect(sim.state.status).toBe('playing'); expect(sim.state.enemies).toEqual(before.enemies); expect(sim.state.bullets).toEqual(before.bullets);
+    sim.step(input()); expect(sim.state.tick).toBe(before.tick + 1);
   });
   it('module cooldowns, limited homing, dash inventory and simulation clocks agree at 30/60/120/144 Hz', () => {
     const results = [30, 60, 120, 144].map(hz => {
       const sim = run(['droneHoming', 'droneBurst', 'vent', 'reserveAmmo', 'intercept'], 7, 3);
-      sim.state.build.choices = ['doubleDash']; sim.state.status = 'upgrade'; sim.chooseUpgrade('doubleDash');
+      offer(sim, 'doubleDash');
       target(sim, 2400).hp = 99999;
       const clock = new FixedClock();
       for (let frame = 0; frame <= hz * 8; frame++) clock.advance(frame * 1000 / hz, dt => { sim.step(input({ shoot: true, dash: sim.state.tick % 120 === 0 }), dt); });

@@ -1,140 +1,64 @@
-import { BALANCE, MINIBOSS_ENCOUNTER } from './config';
 import type { EnemyType, SeasonId } from './types';
 
 export type EncounterId = 's1:echo' | 's1:mafuyu' | 's2:palisade' | 's2:reprise' | 's2:final';
-export interface CampaignStage {
-  name: string;
-  duration: number;
-  enemyPool?: EnemyType[];
-  midEncounter?: { time: number; id: EncounterId };
-  exitEncounter?: EncounterId;
-}
-export interface SeasonDefinition { id: SeasonId; name: string; stages: CampaignStage[]; finalEncounter: EncounterId }
-export const SEASONS: Record<SeasonId, SeasonDefinition> = {
-  s1: { id: 's1', name: '第一季 · 失落的共鸣', finalEncounter: 's1:mafuyu', stages: Array.from({ length: 5 }, (_, index) => ({
-    name: ['光源接入', '信号深入', '游猎回声', '共鸣追溯', '核心边界'][index],
-    duration: BALANCE.spawn.waveDuration,
-    ...(index + 1 === MINIBOSS_ENCOUNTER.wave ? { midEncounter: { time: MINIBOSS_ENCOUNTER.time, id: 's1:echo' as const } } : {}),
-  })) },
-  s2: { id: 's2', name: '第二季 · 镜界复奏', finalEncounter: 's2:final', stages: [
-    { name: '镜界入口', duration: 75, enemyPool: ['shield', 'returner'] },
-    { name: '幕门街区', duration: 75, enemyPool: ['shield', 'returner', 'weaver'], exitEncounter: 's2:palisade' },
-    { name: '中继回廊', duration: 75, enemyPool: ['returner', 'sampler', 'repairer'] },
-    { name: '复奏断层', duration: 75, enemyPool: ['shield', 'sampler', 'repairer', 'carrier'], exitEncounter: 's2:reprise' },
-    { name: '裂核庭院', duration: 75, enemyPool: ['weaver', 'returner', 'repairer', 'carrier'] },
-    { name: '终章前线', duration: 75, enemyPool: ['shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier'] },
-  ] },
-};
-
+export interface CampaignStage { name: string; duration: number; enemyPool?: EnemyType[]; exitEncounter: EncounterId; midEncounter?: { time: number; id: EncounterId } }
+export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
+  { name: '光源接入', duration: 90, exitEncounter: 's1:echo' },
+  { name: '镜幕交界', duration: 90, exitEncounter: 's2:palisade' },
+  { name: '共鸣核心', duration: 60, exitEncounter: 's1:mafuyu' },
+  { name: '复奏断层', duration: 60, exitEncounter: 's2:reprise' },
+  { name: '终章前线', duration: 60, exitEncounter: 's2:final' },
+];
+export const CAMPAIGN_DURATION = 360;
+export const ENCOUNTERS = CAMPAIGN_STAGES.map(stage => stage.exitEncounter);
+export const ENEMY_INTRODUCTIONS: readonly { time: number; type: EnemyType }[] = [
+  { time: 0, type: 'basic' }, { time: 20, type: 'dasher' }, { time: 35, type: 'returner' },
+  { time: 60, type: 'sniper' }, { time: 75, type: 'shield' }, { time: 110, type: 'carrier' },
+  { time: 150, type: 'minelayer' }, { time: 180, type: 'weaver' }, { time: 210, type: 'repairer' },
+  { time: 240, type: 'sprayer' }, { time: 270, type: 'sampler' },
+];
+export interface CampaignDefinition { id: string; duration: number; stages: readonly CampaignStage[]; finalEncounter: EncounterId }
+export const CAMPAIGN: CampaignDefinition = { id: 'continuous', duration: CAMPAIGN_DURATION, stages: CAMPAIGN_STAGES, finalEncounter: 's2:final' };
 export interface CampaignProgress {
-  season: SeasonId;
-  stage: number;
-  stageElapsed: number;
-  phase: 'stage' | 'encounter' | 'choice' | 'complete';
-  activeEncounter: EncounterId | null;
-  completedStages: number[];
-  defeatedEncounters: EncounterId[];
-  /** Catch-up is awarded before the guarding encounter, once per authored stage. */
-  catchupStages: number[];
-  /** Number of choices already committed; the initial season-two offer has index zero. */
-  choiceIndex: number;
+  season: SeasonId; stage: number; stageElapsed: number; progression: number;
+  phase: 'stage' | 'encounter' | 'choice' | 'complete'; activeEncounter: EncounterId | null;
+  completedStages: number[]; defeatedEncounters: EncounterId[]; choiceIndex: number;
 }
 export type CampaignAction =
   | { type: 'stageStarted'; stage: number }
   | { type: 'stageCleared'; stage: number }
   | { type: 'encounter'; id: EncounterId; stage: number }
-  | { type: 'catchup'; stage: 2 | 4; minLevel: 5 | 7; companions: 1; overflowXp: 60 }
-  | { type: 'choice'; index: number; stage: number }
+  | { type: 'encounterCleared'; id: EncounterId; index: number }
   | { type: 'complete'; season: SeasonId };
-
 const EPSILON = 1e-8;
 
-/** Owns campaign objectives only. The simulation owns enemy lifetimes, rewards and all combat clocks. */
+/** Only ordinary combat advances progression. Simulation time and enemy clocks remain independent. */
 export class CampaignDirector {
   readonly state: CampaignProgress;
   private started = false;
-
-  constructor(season: SeasonId) {
-    this.state = { season, stage: 1, stageElapsed: 0, phase: season === 's2' ? 'choice' : 'stage',
-      activeEncounter: null, completedStages: [], defeatedEncounters: [], catchupStages: [], choiceIndex: 0 };
+  constructor(_season: SeasonId = 's1') {
+    this.state = { season: 's1', stage: 1, stageElapsed: 0, progression: 0, phase: 'stage', activeEncounter: null,
+      completedStages: [], defeatedEncounters: [], choiceIndex: 0 };
   }
-
-  start(): CampaignAction[] {
-    if (this.started) return [];
-    this.started = true;
-    return this.state.phase === 'choice'
-      ? [{ type: 'choice', index: 0, stage: 1 }]
-      : [{ type: 'stageStarted', stage: 1 }];
-  }
-
+  start(): CampaignAction[] { if (this.started) return []; this.started = true; return [{ type: 'stageStarted', stage: 1 }]; }
   step(dt: number): CampaignAction[] {
-    if (!this.started || !Number.isFinite(dt) || dt <= 0 || this.state.phase !== 'stage') return [];
-    const progress = this.state, stage = SEASONS[progress.season].stages[progress.stage - 1], actions: CampaignAction[] = [];
-    progress.stageElapsed = Math.min(stage.duration, progress.stageElapsed + dt);
-    const mid = stage.midEncounter;
-    if (mid && progress.stageElapsed >= mid.time - EPSILON && !progress.activeEncounter && !progress.defeatedEncounters.includes(mid.id)) {
-      progress.activeEncounter = mid.id;
-      actions.push({ type: 'encounter', id: mid.id, stage: progress.stage });
-    }
-    if (progress.stageElapsed < stage.duration - EPSILON) return actions;
-    progress.stageElapsed = stage.duration;
-    if (progress.activeEncounter) { progress.phase = 'encounter'; return actions; }
-    if (stage.exitEncounter && !progress.defeatedEncounters.includes(stage.exitEncounter)) {
-      progress.phase = 'encounter'; progress.activeEncounter = stage.exitEncounter;
-      if (progress.season === 's2' && (progress.stage === 2 || progress.stage === 4) && !progress.catchupStages.includes(progress.stage)) {
-        progress.catchupStages.push(progress.stage);
-        actions.push({ type: 'catchup', stage: progress.stage, minLevel: progress.stage === 2 ? 5 : 7, companions: 1, overflowXp: 60 });
-      }
-      actions.push({ type: 'encounter', id: stage.exitEncounter, stage: progress.stage });
-    } else actions.push(...this.clearStage());
-    return actions;
+    const p = this.state;
+    if (!this.started || !Number.isFinite(dt) || dt <= 0 || p.phase !== 'stage') return [];
+    const stage = CAMPAIGN_STAGES[p.stage - 1];
+    p.stageElapsed = Math.min(stage.duration, p.stageElapsed + dt);
+    p.progression = CAMPAIGN_STAGES.slice(0, p.stage - 1).reduce((sum, item) => sum + item.duration, 0) + p.stageElapsed;
+    if (p.stageElapsed < stage.duration - EPSILON) return [];
+    p.stageElapsed = stage.duration; p.progression = Math.round(p.progression);
+    p.activeEncounter = stage.exitEncounter; p.phase = 'encounter';
+    return [{ type: 'encounter', id: stage.exitEncounter, stage: p.stage }];
   }
-
   defeatEncounter(id: EncounterId): CampaignAction[] {
-    const progress = this.state;
-    if (!this.started || progress.phase === 'complete' || progress.activeEncounter !== id || progress.defeatedEncounters.includes(id)) return [];
-    progress.activeEncounter = null; progress.defeatedEncounters.push(id);
-    if (id === SEASONS[progress.season].finalEncounter) {
-      progress.phase = 'complete';
-      return [{ type: 'complete', season: progress.season }];
-    }
-    const stage = SEASONS[progress.season].stages[progress.stage - 1];
-    if (progress.stageElapsed >= stage.duration - EPSILON) return this.clearStage();
-    progress.phase = 'stage';
-    return [];
-  }
-
-  resolveChoice(): CampaignAction[] {
-    const progress = this.state;
-    if (!this.started || progress.phase !== 'choice') return [];
-    progress.choiceIndex++;
-    // Entry choice starts stage one; subsequent choices follow an already-cleared stage.
-    if (!progress.completedStages.includes(progress.stage)) {
-      progress.phase = 'stage';
-      return [{ type: 'stageStarted', stage: progress.stage }];
-    }
-    return this.advance();
-  }
-
-  private clearStage(): CampaignAction[] {
-    const progress = this.state;
-    if (progress.completedStages.includes(progress.stage)) return [];
-    progress.completedStages.push(progress.stage);
-    const actions: CampaignAction[] = [{ type: 'stageCleared', stage: progress.stage }];
-    if (progress.season === 's2') {
-      progress.phase = 'choice';
-      actions.push({ type: 'choice', index: progress.choiceIndex, stage: progress.stage });
-    } else actions.push(...this.advance());
-    return actions;
-  }
-
-  private advance(): CampaignAction[] {
-    const progress = this.state, definition = SEASONS[progress.season];
-    if (progress.stage === definition.stages.length) {
-      progress.phase = 'encounter'; progress.activeEncounter = definition.finalEncounter;
-      return [{ type: 'encounter', id: definition.finalEncounter, stage: progress.stage }];
-    }
-    progress.stage++; progress.stageElapsed = 0; progress.phase = 'stage';
-    return [{ type: 'stageStarted', stage: progress.stage }];
+    const p = this.state;
+    if (!this.started || p.phase !== 'encounter' || p.activeEncounter !== id || p.defeatedEncounters.includes(id)) return [];
+    p.activeEncounter = null; p.defeatedEncounters.push(id); p.completedStages.push(p.stage);
+    if (id === 's2:final') { p.phase = 'complete'; return [{ type: 'complete', season: 's2' }]; }
+    const actions: CampaignAction[] = [{ type: 'encounterCleared', id, index: p.stage - 1 }, { type: 'stageCleared', stage: p.stage }];
+    p.stage++; p.stageElapsed = 0; p.phase = 'stage'; p.season = p.stage >= 4 ? 's2' : 's1';
+    actions.push({ type: 'stageStarted', stage: p.stage }); return actions;
   }
 }

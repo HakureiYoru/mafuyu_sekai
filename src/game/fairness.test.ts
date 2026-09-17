@@ -44,11 +44,10 @@ function projectileForecast(bullet: Bullet): Forecast {
 }
 function start(season: SeasonId, difficulty: Difficulty, card: number, placement: readonly [number, number]) {
   const sim = new GameSimulation(4004, difficulty);
-  sim.reset('story', 4004, difficulty, { season });
-  if (sim.state.status === 'upgrade') sim.chooseUpgrade(sim.state.build.choices[0]);
+  sim.reset('story', 4004, difficulty, { difficulty });
   // Baseline movement tests deliberately have no optional defensive module or auto-firing companion.
   sim.state.build.modules = [];
-  const boss = sim.spawnEnemy('boss', 2000, 1780)!;
+  const boss = sim.spawnEnemy('boss', 2000, 1780, season === 's1' ? 's1:mafuyu' : 's2:final')!;
   for (let i = 0; i < card; i++) advanceSpellCard(boss, difficulty);
   const p = sim.state.player;
   p.x = p.prevX = placement[0]; p.y = p.prevY = placement[1]; p.invincible = 0;

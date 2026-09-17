@@ -1,95 +1,202 @@
 import { SeededRandom } from './math';
-import type { CarryoverSnapshot, ModuleId, PlayerBuild } from './types';
+import type { EvolutionId, ModuleId, ModuleRank, PlayerBuild, ResourceChoiceId, UpgradeChoiceId, UpgradeSource } from './types';
 
 export type ModuleBranch = 'main' | 'drone' | 'resource';
-export interface ModuleDefinition { id: ModuleId; name: string; branch: ModuleBranch; description: string }
+export interface ModuleDefinition { id: ModuleId; name: string; branch: ModuleBranch; description: string; rank2Description: string }
+const definition = (id: ModuleId, name: string, branch: ModuleBranch, description: string, rank2Description: string): ModuleDefinition => ({ id, name, branch, description, rank2Description });
 export const MODULES: Record<ModuleId, ModuleDefinition> = {
-  piercing: { id: 'piercing', name: '贯通线圈', branch: 'main', description: '普通主炮额外穿透 1 个不同目标；同一目标不重复受伤。' },
-  wingShots: { id: 'wingShots', name: '双联翼炮', branch: 'main', description: '每轮追加两枚平行副弹，各造成 1 点伤害，不额外增加热量。' },
-  precision: { id: 'precision', name: '精密校准', branch: 'main', description: '保持慢速瞄准 0.35 秒后，普通主炮伤害增加 20%；松开后结束。' },
-  shatter: { id: 'shatter', name: '碎晶弹头', branch: 'main', description: '主炮击杀迸发 6 枚伤害为 1 的短程碎片；冷却 0.45 秒，碎片不会再次引爆。' },
-  chain: { id: 'chain', name: '导电追踪', branch: 'main', description: '特殊弹索敌扩大至 600；命中后向 220 内最多两个其他目标连锁，各造成 5 点伤害。' },
-  prism: { id: 'prism', name: '分光棱镜', branch: 'main', description: '普通贯穿炮追加两束 12 点侧向光束，不清弹、不重复伤害主束目标；慢速瞄准时改为集中光束，首个目标受到 52 点伤害，不发射侧束。' },
-  droneHoming: { id: 'droneHoming', name: '追迹矩阵', branch: 'drone', description: '基础子机弹获得 1.2 秒有限追踪，最大转速 2 弧度／秒。' },
-  droneBurst: { id: 'droneBurst', name: '共振集火', branch: 'drone', description: '子机累计 12 次基础弹命中追加一枚伤害为 12 的穿甲弹；最多命中两个目标，冷却至少 3 秒。' },
-  slow: { id: 'slow', name: '离子束缚', branch: 'drone', description: '子机命中使普通怪移动减速 25%，持续 0.8 秒；不影响 Boss 或已承诺的突进。' },
-  division: { id: 'division', name: '分工索敌', branch: 'drone', description: '子机自动索敌与指令射程扩大至 720；自动模式优先分配不同目标，点名指令期间集中攻击指定目标。' },
-  intercept: { id: 'intercept', name: '防卫拦截', branch: 'drone', description: '每 8 秒储备一次拦截，消除进入玩家周围 90 内的一枚敌弹；不拦截激光或地面攻击。' },
-  orbitBlade: { id: 'orbitBlade', name: '轨道护刃', branch: 'drone', description: '子机获得半径 24、伤害 4 的护刃；点名后经 0.25 秒转移至目标外缘 18 处，途中不伤害；同一目标共享 0.4 秒冷却，不挡敌弹。' },
-  doubleDash: { id: 'doubleDash', name: '双蓄推进', branch: 'resource', description: '冲刺最多储存两次，按原冷却逐次回复；强化光束机会不会叠加。' },
-  vent: { id: 'vent', name: '排热喷口', branch: 'resource', description: '冲刺结束降低 25 热量，冷却 4 秒；不缩短过热的强制锁定。' },
-  reserveAmmo: { id: 'reserveAmmo', name: '冷凝弹仓', branch: 'resource', description: '热量达到 80 时自动降低 30，冷却 10 秒；不跳过过热的强制锁定。' },
-  graze: { id: 'graze', name: '擦弹回收', branch: 'resource', description: '非无敌擦弹降低 2 热量并减少子机指令冷却 0.1 秒；每秒最多三次、每枚敌弹仅一次，每轮指令最多减 2 秒。' },
-  revive: { id: 'revive', name: '复苏应答', branch: 'resource', description: '本次挑战一次：致命伤改为剩余 1 点生命，并获得 0.8 秒无敌；仍损失经验。' },
-  magnet: { id: 'magnet', name: '寻物脉冲', branch: 'resource', description: '每 10 秒触发 0.8 秒、范围 600 的拾取牵引；只吸引已有掉落。' },
+  piercing: definition('piercing', '贯通线圈', 'main', '普通主炮额外穿透 1 个不同目标。', '普通主炮额外穿透 2 个不同目标。'),
+  wingShots: definition('wingShots', '双联翼炮', 'main', '每轮追加两枚平行副弹，各造成 1 点伤害，不额外加热。', '两枚平行副弹各造成 1.5 点伤害。'),
+  precision: definition('precision', '精密校准', 'main', '保持慢移 0.35 秒后，普通主炮伤害增加 20%。', '保持慢移 0.35 秒后，普通主炮伤害增加 30%。'),
+  shatter: definition('shatter', '碎晶弹头', 'main', '主炮击杀迸发 6 枚伤害为 1 的短程碎片；冷却 0.45 秒。', '主炮击杀产生的六枚碎片各造成 1.5 点伤害。'),
+  chain: definition('chain', '导电追踪', 'main', '特殊弹索敌扩大至 600；命中后向 220 内最多两个其他目标连锁，各造成 5 点伤害。', '特殊弹命中后最多连锁三个其他目标，各造成 5 点伤害。'),
+  prism: definition('prism', '分光棱镜', 'main', '贯穿炮追加两束 12 点侧束；慢移时改为集中束，首目标受到 52 点伤害。侧束不重复伤害主束目标，不额外清弹。', '两束侧束各造成 18 点伤害；慢移集中束首目标受到 58 点伤害。'),
+  droneHoming: definition('droneHoming', '追迹矩阵', 'drone', '基础子机弹获得 1.2 秒有限追踪，最大转速 2 弧度／秒。', '基础子机弹的有限追踪持续 1.6 秒。'),
+  droneBurst: definition('droneBurst', '共振集火', 'drone', '子机累计 12 次基础命中追加 12 伤害穿甲弹，最多命中两个目标；冷却至少 3 秒。', '子机累计 10 次基础命中追加 14 伤害穿甲弹。'),
+  slow: definition('slow', '离子束缚', 'drone', '子机基础命中使普通怪减速 25%，持续 0.8 秒；不影响首领或已承诺的突进。', '减速提高至 35%，持续 0.8 秒。'),
+  division: definition('division', '分工索敌', 'drone', '子机索敌扩大至 720，自动优先分配不同目标。', '子机索敌扩大至 840，自动优先分配不同目标。'),
+  intercept: definition('intercept', '防卫拦截', 'drone', '每 8 秒储备一次拦截，消除周围 90 内的一枚敌弹；不拦截激光或范围攻击。', '拦截储备冷却缩短至 6 秒，仍最多储备一次。'),
+  orbitBlade: definition('orbitBlade', '轨道护刃', 'drone', '子机护刃造成 4 伤害，同目标共享 0.4 秒冷却；自动接近主炮命中的目标，标记消失后返回轨道。', '护刃伤害提高至 5；护刃不阻挡敌弹。'),
+  doubleDash: definition('doubleDash', '双蓄推进', 'resource', '冲刺最多储存两次，每 2.6 秒逐次回复；贯穿炮窗口不叠加。', '两次冲刺的逐次回复时间缩短至 2.3 秒。'),
+  vent: definition('vent', '排热喷口', 'resource', '冲刺结束降低 25 热量，冷却 4 秒；不跳过强制过热锁定。', '冲刺结束降低 35 热量，冷却仍为 4 秒。'),
+  reserveAmmo: definition('reserveAmmo', '冷凝弹仓', 'resource', '热量达到 80 时自动降低 30，冷却 10 秒；不跳过强制过热锁定。', '热量达到 80 时自动降低 40，冷却仍为 10 秒。'),
+  graze: definition('graze', '擦弹回收', 'resource', '非无敌擦弹降热 2、减少冲刺回充 0.05 秒；每秒最多三次，每弹一次，每轮回充最多返还 0.3 秒。', '每次擦弹降热 3、减少回充 0.08 秒；每轮回充最多返还 0.45 秒。'),
+  revive: definition('revive', '复苏应答', 'resource', '本局一次致命伤保留 1 HP，获得 0.8 秒无敌；仍损失经验。', '致命伤保留 2 HP，获得 1.2 秒无敌；已消耗的复苏不会恢复。'),
+  magnet: definition('magnet', '寻物脉冲', 'resource', '每 10 秒触发 0.8 秒、范围 600 的拾取牵引。', '每 8 秒触发 0.8 秒、范围 750 的拾取牵引。'),
+  ricochet: definition('ricochet', '反跳弹芯', 'main', '普通主炮命中后，向 220 内另一个目标反跳一次，造成原弹 40% 伤害；冷却 0.25 秒。', '反跳伤害提高至原弹的 60%，不再触发其他模块。'),
+  rearSpark: definition('rearSpark', '尾迹火花', 'main', '持续射击时每 0.6 秒向后发射两枚短弹，各 1 伤害，射程 360。', '两枚尾弹各造成 1.5 点伤害。'),
+  crossOrbit: definition('crossOrbit', '交叉阵位', 'drone', '子机均匀分布于半径 150 的轨道。', '子机轨道半径提高至 180，索敌范围额外增加 80。'),
+  returnWing: definition('returnWing', '回旋机翼', 'drone', '每 6 秒一轮基础子机弹直线出射，0.4 秒后原路返回；该轮不追踪，同目标去回各命中一次。', '回旋弹轮次冷却缩短至 4.5 秒；返回命中不触发追加效果。'),
+  brakeField: definition('brakeField', '制动场', 'resource', '慢移 0.6 秒后生成半径 110、持续 0.8 秒的场，使普通怪减速 25%；冷却 6 秒。', '制动场半径提高至 140，减速提高至 35%；不影响首领或已承诺突进。'),
+  dashEcho: definition('dashEcho', '余迹脉冲', 'resource', '冲刺结束留下残影，0.3 秒后以半径 90 爆破，造成 6 伤害；冷却 4 秒，不清弹。', '残影爆破半径提高至 110，造成 10 伤害。'),
 };
-export const RESONANCE = { xpPerRank: 600, maxRank: 4, damagePerRank: 0.05, maxDamageBonus: 0.4 } as const;
-export const MODULE_CHOICE_LIMIT = 7;
-/** These offers invite a deliberate change to movement, aiming or command usage. */
-export const BEHAVIOR_MODULES: readonly ModuleId[] = ['precision', 'prism', 'division', 'orbitBlade', 'doubleDash'];
-export const FINAL_OFFER_EXCLUSIONS: readonly ModuleId[] = ['shatter', 'slow', 'magnet'];
 
-export function createBuild(carryover?: CarryoverSnapshot): PlayerBuild {
-  const level = carryover?.level;
-  return { modules: [], levelFloor: typeof level === 'number' && Number.isFinite(level) ? Math.max(1, Math.min(10, Math.floor(level))) : 1,
-    resonance: 0, resonanceXp: 0, choices: [], choiceIndex: 0 };
+/** Combat numbers are shared with the fixed-step simulation; tuples index rank I / II. */
+export const MODULE_VALUES = {
+  piercing: { extraHits: [1, 2] }, wingShots: { damage: [1, 1.5] }, precision: { bonus: [0.2, 0.3], hold: 0.35 },
+  shatter: { damage: [1, 1.5], count: 6, cooldown: 0.45 }, chain: { targets: [2, 3], damage: 5, range: 220, lockRange: 600 },
+  prism: { sideDamage: [12, 18], focusDamage: [52, 58] }, droneHoming: { duration: [1.2, 1.6], turnSpeed: 2 },
+  droneBurst: { hits: [12, 10], damage: [12, 14], cooldown: 3, targets: 2 }, slow: { amount: [0.25, 0.35], duration: 0.8 },
+  division: { range: [720, 840] }, intercept: { cooldown: [8, 6], radius: 90 }, orbitBlade: { damage: [4, 5], radius: 24, cooldown: 0.4, transit: 0.25, markDuration: 1.4, markCooldown: 0.8 },
+  doubleDash: { cooldown: [2.6, 2.3], charges: 2 }, vent: { heat: [25, 35], cooldown: 4 }, reserveAmmo: { heat: [30, 40], threshold: 80, cooldown: 10 },
+  graze: { heat: [2, 3], recharge: [0.05, 0.08], refundCap: [0.3, 0.45], rate: 3 }, revive: { hp: [1, 2], invincible: [0.8, 1.2] }, magnet: { cooldown: [10, 8], range: [600, 750], duration: 0.8 },
+  ricochet: { ratio: [0.4, 0.6], range: 220, cooldown: 0.25 }, rearSpark: { damage: [1, 1.5], cooldown: 0.6, range: 360, count: 2 },
+  crossOrbit: { radius: [150, 180], bonusRange: [0, 80] }, returnWing: { cooldown: [6, 4.5], returnAt: 0.4 },
+  brakeField: { radius: [110, 140], slow: [0.25, 0.35], hold: 0.6, duration: 0.8, cooldown: 6 },
+  dashEcho: { radius: [90, 110], damage: [6, 10], warning: 0.3, cooldown: 4 },
+} as const;
+export interface EvolutionDefinition { id: EvolutionId; name: string; primary: ModuleId; partner: ModuleId; description: string }
+export const EVOLUTIONS: Record<EvolutionId, EvolutionDefinition> = {
+  needleArray: { id: 'needleArray', name: '针轨贯阵', primary: 'piercing', partner: 'precision', description: '慢移时将当轮基础主炮合为一枚高速针弹，保留合计伤害，最多命中五个不同目标；副弹独立。' },
+  spiralBloom: { id: 'spiralBloom', name: '回旋花火', primary: 'wingShots', partner: 'rearSpark', description: '保留翼炮与尾弹，射击期间每 1.2 秒追加六枚环形短弹，各 2 伤害，射程 420。' },
+  forkNetwork: { id: 'forkNetwork', name: '分叉电网', primary: 'chain', partner: 'slow', description: '保留特殊主弹与连锁，另向最多两个不同目标发射各 6 伤害的追踪弹；副弹不再连锁。' },
+  triangleAssault: { id: 'triangleAssault', name: '三角围攻', primary: 'droneBurst', partner: 'crossOrbit', description: '集火追加弹由现有子机交叉发射，总伤害 18 按数量均分；每弹最多命中两个目标，保留 3 秒冷却。' },
+  huntingReturn: { id: 'huntingReturn', name: '巡猎回旋', primary: 'orbitBlade', partner: 'returnWing', description: '护刃返回轨道的途中也可伤害经过的敌人，每趟每敌一次 4 伤害；不阻挡敌弹。' },
+  echoTrail: { id: 'echoTrail', name: '残响疾行', primary: 'doubleDash', partner: 'dashEcho', description: '保留双蓄 II，残影爆破替换为持续 0.75 秒、宽 64 的冲刺尾迹；余迹 I／II 时每敌一次 8／12 伤害，冷却 4 秒，不清弹。' },
+};
+export const EVOLUTION_VALUES = {
+  needleArray: { targets: 5 }, spiralBloom: { cooldown: 1.2, count: 6, damage: 2, range: 420 },
+  forkNetwork: { targets: 2, damage: 6 }, triangleAssault: { damage: 18, targets: 2, cooldown: 3 },
+  huntingReturn: { damage: 4 }, echoTrail: { duration: 0.75, width: 64, damage: [8, 12], cooldown: 4 },
+} as const;
+export const RESONANCE = { xpPerRank: 600, maxRank: 4, damagePerRank: 0.05, maxDamageBonus: 0.5 } as const;
+export const MODULE_CHOICE_LIMIT = 13;
+export const MODULE_SLOT_LIMIT = 6;
+export const EVOLUTION_LIMIT = 2;
+export const BEHAVIOR_MODULES: readonly ModuleId[] = ['precision', 'prism', 'division', 'orbitBlade', 'doubleDash', 'rearSpark', 'crossOrbit', 'returnWing', 'brakeField', 'dashEcho'];
+export interface ChoiceContext { reviveConsumed?: boolean; offerId?: string }
+type BuildView = Pick<PlayerBuild, 'modules' | 'ranks' | 'evolutions'>;
+
+export function createBuild(): PlayerBuild {
+  return { modules: [], ranks: {}, evolutions: [], levelFloor: 1, resonance: 0, resonanceXp: 0, choices: [], choiceIndex: 0,
+    pendingRewards: [], rewardHistory: [], rerollsRemaining: 2, offerRevision: 0, offerId: null };
+}
+export function moduleRank(build: Pick<PlayerBuild, 'modules' | 'ranks'>, id: ModuleId): 0 | ModuleRank {
+  return build.modules.includes(id) ? build.ranks[id] === 2 ? 2 : 1 : 0;
+}
+export function rankValue(build: Pick<PlayerBuild, 'modules' | 'ranks'>, id: ModuleId, values: readonly [number, number]): number {
+  const rank = moduleRank(build, id); return rank ? values[rank - 1] : 0;
+}
+export function hasEvolution(build: Pick<PlayerBuild, 'evolutions'>, id: EvolutionId): boolean { return build.evolutions.includes(id); }
+export function evolutionForModule(build: BuildView, id: ModuleId): EvolutionDefinition | undefined {
+  return build.evolutions.map(evolution => EVOLUTIONS[evolution]).find(evolution => evolution.primary === id);
+}
+export function eligibleEvolutions(build: BuildView): EvolutionId[] {
+  if (build.evolutions.length >= EVOLUTION_LIMIT) return [];
+  return Object.values(EVOLUTIONS).filter(evolution => !hasEvolution(build, evolution.id)
+    && moduleRank(build, evolution.primary) === 2 && moduleRank(build, evolution.partner) >= 1).map(evolution => evolution.id);
 }
 
-/** Called only at campaign choice gates. Reopening the same gate never rerolls an existing offer. */
-export function offerModules(build: PlayerBuild, level: number, seed: number): ModuleId[] {
-  if (build.choiceIndex >= MODULE_CHOICE_LIMIT) return [];
+/** Reward identity, including consumed rewards, prevents duplicate level or encounter events. */
+export function enqueueUpgrade(build: PlayerBuild, source: UpgradeSource, rewardId: string): boolean {
+  if (!rewardId || build.rewardHistory.length >= MODULE_CHOICE_LIMIT || build.rewardHistory.some(reward => reward.id === rewardId)
+    || build.rewardHistory.filter(reward => reward.source === source).length >= (source === 'level' ? 9 : 4)) return false;
+  const reward = { id: rewardId, source }; build.rewardHistory.push(reward); build.pendingRewards.push({ ...reward }); return true;
+}
+function availableModules(build: PlayerBuild, level: number, context: ChoiceContext): ModuleId[] {
+  return Object.values(MODULES).filter(module => {
+    const rank = moduleRank(build, module.id);
+    return rank < 2 && (rank > 0 || build.modules.length < MODULE_SLOT_LIMIT) && (module.id !== 'chain' || level >= 4)
+      && !(module.id === 'revive' && context.reviveConsumed) && !evolutionForModule(build, module.id);
+  }).map(module => module.id);
+}
+function hashSeed(seed: number, text: string): number {
+  let hash = Number.isFinite(seed) ? seed | 0 : 12345;
+  for (const character of text) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return hash;
+}
+
+/** An offer is stable until explicitly rerolled or consumed; this never changes the world. */
+export function offerModules(build: PlayerBuild, level: number, seed: number, context: ChoiceContext = {}): UpgradeChoiceId[] {
+  const reward = build.pendingRewards[0];
+  if (!reward || build.choiceIndex >= MODULE_CHOICE_LIMIT) return [];
   if (build.choices.length) return [...build.choices];
-  const available = Object.values(MODULES).filter(module => !build.modules.includes(module.id) && (module.id !== 'chain' || level >= 4)
-    && (build.choiceIndex !== MODULE_CHOICE_LIMIT - 1 || !FINAL_OFFER_EXCLUSIONS.includes(module.id)));
-  const random = new SeededRandom((Number.isFinite(seed) ? seed : 12345) ^ Math.imul(build.choiceIndex + 1, 0x9e3779b1));
-  const take = (pool: ModuleDefinition[]) => pool[Math.floor(random.next() * pool.length)].id;
-  const selected: ModuleId[] = [];
-  for (const branch of ['main', 'drone', 'resource'] as const) {
-    const pool = available.filter(module => module.branch === branch);
-    if (pool.length) selected.push(take(pool));
-  }
+  const random = new SeededRandom(hashSeed(seed, `${reward.id}:${build.offerRevision}`));
+  const available = availableModules(build, level, context), selected: UpgradeChoiceId[] = [];
+  const addRandom = (pool: readonly UpgradeChoiceId[]) => {
+    const candidates = pool.filter(id => !selected.includes(id));
+    if (selected.length < 3 && candidates.length) selected.push(candidates[Math.floor(random.next() * candidates.length)]);
+  };
+  if (reward.source === 'boss') addRandom(eligibleEvolutions(build).map(id => `evolution:${id}` as const));
+  if (build.choiceIndex < 2) addRandom(available.filter(id => BEHAVIOR_MODULES.includes(id)));
+  addRandom(available.filter(id => moduleRank(build, id) === 1));
+  const partners = Object.values(EVOLUTIONS).filter(evolution => moduleRank(build, evolution.primary) > 0 && !hasEvolution(build, evolution.id)).map(evolution => evolution.partner);
+  const newModules = available.filter(id => moduleRank(build, id) === 0);
+  addRandom(newModules.filter(id => partners.includes(id)));
+  addRandom(newModules);
   while (selected.length < 3) {
-    const pool = available.filter(module => !selected.includes(module.id));
-    if (!pool.length) break;
-    selected.push(take(pool));
+    const previous = selected.length; addRandom(available); if (selected.length === previous) break;
   }
-  if (build.choiceIndex < 2 && !selected.some(id => BEHAVIOR_MODULES.includes(id))) {
-    const pool = available.filter(module => BEHAVIOR_MODULES.includes(module.id));
-    if (pool.length) {
-      const replacement = take(pool), branch = MODULES[replacement].branch;
-      const index = selected.findIndex(id => MODULES[id].branch === branch);
-      selected[index >= 0 ? index : selected.length - 1] = replacement;
-    }
-  }
+  for (const fallback of ['reward:heal', 'reward:bomb', 'reward:xp'] as const) if (selected.length < 3) selected.push(fallback);
   for (let index = selected.length - 1; index > 0; index--) {
-    const other = Math.floor(random.next() * (index + 1));
-    [selected[index], selected[other]] = [selected[other], selected[index]];
+    const other = Math.floor(random.next() * (index + 1)); [selected[index], selected[other]] = [selected[other], selected[index]];
   }
-  build.choices = selected;
+  build.choices = selected; build.offerId = `${reward.id}:${build.offerRevision}`;
   return [...selected];
 }
 
-/** Only IDs from the pending offer can be committed, once. Modules survive damage until the run resets. */
-export function chooseModule(build: PlayerBuild, id: ModuleId): boolean {
-  if (build.choiceIndex >= MODULE_CHOICE_LIMIT || !build.choices.includes(id) || build.modules.includes(id) || !MODULES[id]) return false;
-  build.modules.push(id); build.choices = []; build.choiceIndex++;
+/** The UI supplies offerId so a stale click cannot consume the next reward or a rerolled offer. */
+export function chooseModule(build: PlayerBuild, id: UpgradeChoiceId, context: ChoiceContext = {}): boolean {
+  if (!build.pendingRewards.length || build.choiceIndex >= MODULE_CHOICE_LIMIT || !build.choices.includes(id)
+    || (context.offerId !== undefined && context.offerId !== build.offerId)) return false;
+  if (id.startsWith('evolution:')) {
+    const evolution = id.slice('evolution:'.length) as EvolutionId;
+    if (build.pendingRewards[0].source !== 'boss' || !eligibleEvolutions(build).includes(evolution)) return false;
+    build.evolutions.push(evolution);
+  } else if (!id.startsWith('reward:')) {
+    const moduleId = id as ModuleId, rank = moduleRank(build, moduleId);
+    if (!MODULES[moduleId] || rank >= 2 || (rank === 0 && build.modules.length >= MODULE_SLOT_LIMIT)
+      || (moduleId === 'revive' && context.reviveConsumed) || evolutionForModule(build, moduleId)) return false;
+    if (!rank) build.modules.push(moduleId);
+    build.ranks[moduleId] = rank === 0 ? 1 : 2;
+  }
+  build.pendingRewards.shift(); build.choices = []; build.offerId = null; build.offerRevision = 0; build.choiceIndex++;
   return true;
 }
-
-/** Precision is a main-shot-only condition supplied by the combat caller; other sources get resonance alone. */
-export function buildDamageMultiplier(build: PlayerBuild, precisionActive = false): number {
-  const rank = Number.isFinite(build.resonance) ? Math.max(0, Math.min(RESONANCE.maxRank, Math.floor(build.resonance))) : 0;
-  const precision = precisionActive && build.modules.includes('precision') ? 0.2 : 0;
-  return 1 + Math.min(RESONANCE.maxDamageBonus, rank * RESONANCE.damagePerRank + precision);
+export function rerollModules(build: PlayerBuild, level: number, seed: number, context: ChoiceContext = {}): UpgradeChoiceId[] {
+  if (!build.pendingRewards.length || !build.choices.length || build.rerollsRemaining <= 0
+    || (context.offerId !== undefined && context.offerId !== build.offerId)) return [];
+  const previous = [...build.choices]; build.rerollsRemaining--; build.offerRevision++; build.choices = [];
+  let next = offerModules(build, level, seed, context);
+  // A variable pool should change; an exhausted pool still correctly offers its three resources.
+  for (let attempts = 0; attempts < 8 && next.every(id => previous.includes(id)); attempts++) {
+    build.offerRevision++; build.choices = []; next = offerModules(build, level, seed, context);
+  }
+  return next;
 }
 
-/** Feed only XP left after normal weapon leveling. Returns newly earned resonance ranks. */
+export interface UpgradeChoiceView { id: UpgradeChoiceId; name: string; description: string; branch: ModuleBranch; kind: 'module' | 'rank' | 'evolution' | 'resource'; rank: ModuleRank | null }
+const RESOURCE_CHOICES: Record<ResourceChoiceId, Pick<UpgradeChoiceView, 'name' | 'description'>> = {
+  'reward:heal': { name: '应急修复', description: '回复 2 HP；每点溢出治疗转换为 30 XP。' },
+  'reward:bomb': { name: '炸弹补给', description: '获得 1 枚炸弹；达到上限时转换为 30 XP。' },
+  'reward:xp': { name: '共鸣结晶', description: '获得 100 XP；保留升级溢出，Lv10 后计入共鸣。' },
+};
+export function choiceView(build: Pick<PlayerBuild, 'modules' | 'ranks'>, id: UpgradeChoiceId): UpgradeChoiceView {
+  if (id.startsWith('evolution:')) {
+    const evolution = EVOLUTIONS[id.slice('evolution:'.length) as EvolutionId];
+    return { id, name: evolution.name, description: evolution.description, branch: MODULES[evolution.primary].branch, kind: 'evolution', rank: null };
+  }
+  if (id.startsWith('reward:')) return { id, ...RESOURCE_CHOICES[id as ResourceChoiceId], branch: 'resource', kind: 'resource', rank: null };
+  const moduleId = id as ModuleId, module = MODULES[moduleId], rank = moduleRank(build, moduleId) ? 2 : 1;
+  return { id, name: module.name, description: rank === 1 ? module.description : module.rank2Description, branch: module.branch, kind: rank === 1 ? 'module' : 'rank', rank };
+}
+export function buildModuleViews(build: BuildView): { id: ModuleId; name: string; description: string; branch: ModuleBranch; rank: ModuleRank; evolution: EvolutionId | null }[] {
+  return build.modules.map(id => {
+    const module = MODULES[id], rank = moduleRank(build, id) as ModuleRank, evolution = evolutionForModule(build, id);
+    return { id, name: evolution?.name ?? module.name, description: evolution?.description ?? (rank === 2 ? module.rank2Description : module.description),
+      branch: module.branch, rank, evolution: evolution?.id ?? null };
+  });
+}
+
+/** Precision applies only to the ordinary main shot, and combines additively with resonance. */
+export function buildDamageMultiplier(build: PlayerBuild, precisionActive = false): number {
+  const resonance = Number.isFinite(build.resonance) ? Math.max(0, Math.min(RESONANCE.maxRank, Math.floor(build.resonance))) : 0;
+  return 1 + resonance * RESONANCE.damagePerRank + (precisionActive ? rankValue(build, 'precision', MODULE_VALUES.precision.bonus) : 0);
+}
 export function addResonanceXp(build: PlayerBuild, amount: number, level = 10): number {
   if (level < 10 || !Number.isFinite(amount) || amount <= 0 || build.resonance >= RESONANCE.maxRank) return 0;
-  const before = build.resonance;
-  build.resonanceXp += amount;
-  const ranks = Math.floor(build.resonanceXp / RESONANCE.xpPerRank);
-  build.resonance = Math.min(RESONANCE.maxRank, build.resonance + ranks);
+  const before = build.resonance; build.resonanceXp += amount;
+  build.resonance = Math.min(RESONANCE.maxRank, build.resonance + Math.floor(build.resonanceXp / RESONANCE.xpPerRank));
   build.resonanceXp = build.resonance === RESONANCE.maxRank ? 0 : build.resonanceXp % RESONANCE.xpPerRank;
   return build.resonance - before;
 }

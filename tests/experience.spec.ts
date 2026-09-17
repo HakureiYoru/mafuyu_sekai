@@ -20,53 +20,46 @@ test('keybinding swap, damage-number preferences and pause module states are vis
   await open(page);
   await page.getByRole('button', { name: '体验设置', exact: true }).click();
   await page.getByRole('button', { name: '重要命中', exact: true }).click();
-  await page.getByRole('button', { name: '改键：贯穿炮', exact: true }).click();
-  await page.keyboard.press('e');
-  await expect(page.getByRole('button', { name: '改键：贯穿炮', exact: true })).toContainText('E');
-  await expect(page.getByRole('button', { name: '改键：子机指令', exact: true })).toContainText('Q');
-  await page.getByRole('button', { name: '改键：贯穿炮', exact: true }).click();
+  await page.getByRole('button', { name: '改键：冲刺', exact: true }).click();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: '改键：冲刺', exact: true })).toContainText('空格');
+  await expect(page.getByRole('button', { name: '改键：炸弹', exact: true })).toContainText('R');
+  await page.getByRole('button', { name: '改键：冲刺', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeVisible();
   await waitForDialogSettled(page);
-  await page.screenshot({ path: 'test-results/v4.1-settings-keybindings.png' });
+  await page.screenshot({ path: 'test-results/v5.0-settings-keybindings.png' });
   await page.keyboard.press('Escape');
   await page.reload();
   await expect(page.getByRole('button', { name: '开始游戏' })).toBeVisible();
-  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().settings)).toMatchObject({ damageNumbers: 'important', keybindings: { beam: 'KeyE', command: 'KeyQ' } });
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().settings)).toMatchObject({ damageNumbers: 'important', keybindings: { dash: 'Space', bomb: 'KeyR' } });
   await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ modules: ['intercept', 'revive', 'vent'], encounter: 'palisade' }));
   await page.keyboard.press('Escape');
   await expect(page.locator('.paused-modules article')).toHaveCount(3);
   await expect(page.locator('.paused-modules')).toContainText('就绪');
-  await expect(page.locator('.controls-guide')).toContainText('手动贯穿炮');
+  await expect(page.locator('.controls-guide')).toContainText('随后左键释放贯穿炮');
   await waitForDialogSettled(page);
-  await page.screenshot({ path: 'test-results/v4.1-pause-modules.png' });
+  await page.screenshot({ path: 'test-results/v5.0-pause-modules.png' });
   await expect(page.getByRole('progressbar', { name: '弹药', exact: true })).toHaveCount(0);
 });
 
-test('manual Q preserves its stored shot during primary fire and E shows a confirmed target', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
+test('held primary fire releases the dash beam and removed Q/E do nothing', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await open(page);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.practice({ encounter: 'palisade' }));
   const bounds = (await page.locator('#game-host').boundingBox())!;
-  const target = await page.evaluate(() => {
-    const state = window.__MAFUYU_DEBUG__.state(), enemy = state.enemies.find(enemy => enemy.type === 'palisade')!;
-    return { id: enemy.id, x: (enemy.x - state.camera.x + 800) / 1600, y: (enemy.y - state.camera.y + 450) / 900 };
-  });
-  await page.mouse.move(bounds.x + target.x * bounds.width, bounds.y + target.y * bounds.height);
-  await page.keyboard.press('e');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.commandTargetId)).toBe(target.id);
-  await expect(page.locator('.skill-chip.is-commanding')).toContainText('集火');
-  await page.keyboard.press('r');
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBeGreaterThan(3);
-  await page.mouse.down();
-  await page.waitForTimeout(100);
+  await page.mouse.move(bounds.x + bounds.width * .8, bounds.y + bounds.height / 2);
+  await page.keyboard.press('q'); await page.keyboard.press('e');
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().beams.length)).toBe(0);
-  await page.keyboard.press('q');
-  await page.waitForFunction(() => window.__MAFUYU_DEBUG__.state().beams.length > 0);
-  await page.screenshot({ path: 'test-results/v4.1-beam-720.png' });
+  await expect(page.locator('.skill-chip')).toHaveCount(2);
+  await page.mouse.down(); await page.keyboard.press('r');
+  await page.waitForFunction(() => {
+    const d = window.__MAFUYU_DEBUG__; if (!d.state().beams.length) return false; d.pause(); return true;
+  });
   await page.mouse.up();
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBe(0);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().beams[0])).toMatchObject({ length: 2400, width: 88 });
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.perfectWindow)).toBe(0);
+  await page.screenshot({ path: 'test-results/v5.0-beam-720.png' });
   expect(errors).toEqual([]);
 });
 
@@ -85,7 +78,7 @@ test('status rails keep four viewports clear and low motion retains PALISADE war
     expect(host.width / host.height).toBeCloseTo(16 / 9, 3);
     expect(host.y).toBeGreaterThanOrEqual(top.y + top.height - 1);
     expect(host.y + host.height).toBeLessThanOrEqual(bottom.y + 1);
-    await page.screenshot({ path: `test-results/v4.1-low-${width}x${height}.png` });
+    await page.screenshot({ path: `test-results/v5.0-low-${width}x${height}.png` });
     expect(await page.locator('#game-host canvas').count()).toBe(1);
   }
   expect(errors).toEqual([]);

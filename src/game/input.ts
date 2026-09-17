@@ -11,8 +11,6 @@ export class InputState {
   pointerY = VIEW.height / 2;
   private dash = false;
   private bomb = false;
-  private beam = false;
-  private command = false;
   protected bindings: KeyBindings;
   constructor(bindings: KeyBindings = DEFAULT_KEYBINDINGS) { this.bindings = normalizeKeybindings(bindings); }
   setBindings(bindings: KeyBindings): void { this.clear(); this.bindings = normalizeKeybindings(bindings); }
@@ -29,8 +27,6 @@ export class InputState {
     this.keys.add(code);
     if (code === this.bindings.dash) this.dash = true;
     if (code === this.bindings.bomb) this.bomb = true;
-    if (code === this.bindings.beam) this.beam = true;
-    if (code === this.bindings.command) this.command = true;
   }
   keyUp(code: string) { this.keys.delete(code); }
   requestDash() { this.dash = true; }
@@ -39,14 +35,13 @@ export class InputState {
       moveX: Number(this.held('moveRight')) - Number(this.held('moveLeft')),
       moveY: Number(this.held('moveDown')) - Number(this.held('moveUp')),
       aimX: this.pointerX + cameraX, aimY: this.pointerY + cameraY,
-      shoot: this.shoot, dash: this.dash, bomb: this.bomb, focus: this.held('focus'), beam: this.beam, command: this.command,
+      shoot: this.shoot, dash: this.dash, bomb: this.bomb, focus: this.held('focus'),
     };
     this.dash = false;
     this.bomb = false;
-    this.beam = this.command = false;
     return result;
   }
-  clear() { this.keys.clear(); this.shoot = false; this.dash = false; this.bomb = false; this.beam = this.command = false; }
+  clear() { this.keys.clear(); this.shoot = false; this.dash = false; this.bomb = false; }
 }
 
 export class InputController extends InputState {

@@ -103,8 +103,8 @@ describe('combat feedback semantics and bounded effects', () => {
   it('reduced motion preserves critical feedback without portrait trails or label bounce', () => {
     const system = create({ reducedMotion: true });
     system.trail(0, 0, 0); expect(system.count).toBe(0);
-    system.handle({ type: 'command', text: 'issued', x: 0, y: 0 }); system.update(1 / 60);
-    expect(labels(system)).toEqual(['子机集火']);
+    system.handle({ type: 'module', moduleId: 'orbitBlade', x: 0, y: 0 }); system.update(1 / 60);
+    expect(labels(system)).toEqual(['轨道护刃']);
     expect(system.labels.children[0].scale.x).toBe(1);
   });
 });

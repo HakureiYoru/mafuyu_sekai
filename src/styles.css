@@ -1714,7 +1714,7 @@ kbd {
 
 /* Action states stay in the status rail, leaving the entire 16:9 battlefield clear. */
 .battle-weapon .compact-resource { display: block; width: 100%; }
-.weapon-skills { display: grid; grid-template-columns: 1fr 1.2fr 1.1fr; gap: 7px; margin-top: 10px; }
+.weapon-skills { display: grid; grid-template-columns: 1fr 1.2fr; gap: 7px; margin-top: 10px; }
 .skill-chip { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 4px; border: 1px solid #2c3b51; border-radius: 4px; background: #111b2c; color: #93a7bf; }
 .skill-chip kbd { font-size: 10px; min-width: 20px; padding: 3px; text-align: center; background: #0a1422; border: 1px solid #48536a; border-radius: 3px; }
 .skill-chip>span { display: flex; flex-direction: column; gap: 3px; white-space: nowrap; font-size: 10px; }
@@ -1748,3 +1748,27 @@ kbd {
 .paused-modules article p { font-size: 11px; line-height: 1.7; color: #9bafc7; margin: 6px 0 0; }
 @media (max-width: 1000px) { .weapon-skills { gap: 4px; }.skill-chip { gap: 4px; padding: 5px 3px; }.skill-chip kbd { min-width: 17px; padding: 2px; font-size: 9px; } }
 @media (max-width: 720px) { .keybind-grid { grid-template-columns: 1fr 1fr; }.paused-modules>div { grid-template-columns: 1fr; }.skill-chip>span { font-size: 9px; }.skill-chip strong { font-size: 10px; }.skill-chip { gap: 3px; }.skill-chip kbd { font-size: 8px; min-width: 14px; }.damage-number-setting { grid-template-columns: 1fr; } }
+
+/* v5 build information remains in the lower rail; details expand only on demand. */
+.menu-history { font-size: 11px; color: #8d9cb0; }
+.module-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 5px 0; }
+.module-slots>span { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 8px; color: #61728a; height: 21px; border: 1px solid #2b3b50; border-radius: 3px; }
+.module-slots>span.is-equipped { color: #b9d7e6; border-color: #496879; }
+.module-slots>span.is-evolved { color: #d8c6ff; border-color: #8671b4; }
+.module-slots b { font-size: 9px; font-weight: 500; color: #c2f4ed; flex-shrink: 0; }
+.battle-comms p { min-height: 14px; max-height: 14px; margin: 4px 0; }
+.battle-comms .module-summary { font-size: 10px; }
+.upgrade-toolbar { margin: 16px 0; display: flex; align-items: center; gap: 20px; justify-content: space-between; }
+.upgrade-toolbar>span { font-size: 12px; color: #9db2ca; line-height: 1.7; }
+.upgrade-toolbar>button { flex-shrink: 0; }
+.upgrade-card.choice-evolution { border-color: #bd95ee; background: #201c35; }
+.evolution-recipes { margin: 16px 0; color: #a4b8cf; font-size: 12px; }
+.evolution-recipes summary { cursor: pointer; color: #d3deee; padding: 7px 0; }
+.evolution-recipes summary>span { margin-left: 12px; color: #9aa9c2; }
+.evolution-recipes>p { line-height: 1.7; }
+.evolution-recipes>div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+.evolution-recipes>div p { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 6px 0; line-height: 1.5; }
+.evolution-recipes strong { font-weight: 500; color: #d5c6ec; }
+.evolution-recipes .is-evolved strong { color: #adf1dd; }
+@media (max-width: 1000px) { .module-slots>span { font-size: 0; }.module-slots b { font-size: 10px; } }
+@media (max-width: 720px) { .evolution-recipes>div { grid-template-columns: 1fr; }.upgrade-toolbar { gap: 10px; } }

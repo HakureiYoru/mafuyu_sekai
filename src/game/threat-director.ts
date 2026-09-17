@@ -172,7 +172,7 @@ export class ThreatDirector {
     const cfg = THREAT_PACING[difficulty], age = Math.max(0, elapsed) % (cfg.pressure + cfg.breather);
     return age + 1e-8 < cfg.pressure ? 'pressure' : 'breather';
   }
-  tacticalCap(difficulty: Difficulty = 'normal'): number { return THREAT_PACING[difficulty].tacticalCap; }
+  tacticalCap(difficulty: Difficulty = 'normal', progression = 360): number { return THREAT_PACING[difficulty].tacticalCap - Number(progression < 90); }
   /** Call once each simulation tick even when no actor requests a new attack. */
   update(elapsed: number, enemies?: readonly Enemy[]): void {
     for (let i = this.active.length - 1; i >= 0; i--) {
@@ -182,10 +182,10 @@ export class ThreatDirector {
     for (const id of this.deferred.keys()) if (enemies && !enemies.some(e => e.id === id && e.hp > 0)) { this.deferred.delete(id); this.retryAt.delete(id); }
   }
   selectSpawn(pool: readonly EnemyType[], enemies: readonly Pick<Enemy, 'type' | 'hp'>[], roll: number,
-    difficulty: Difficulty = 'normal', elapsed = 0, indicators: readonly Pick<SpawnIndicator, 'type'>[] = []): EnemyType | null {
+    difficulty: Difficulty = 'normal', elapsed = 0, indicators: readonly Pick<SpawnIndicator, 'type'>[] = [], progression = 360): EnemyType | null {
     const pressure = pool.filter(type => PRESSURE.has(type));
     const count = enemies.filter(e => e.hp > 0 && TACTICAL.has(e.type)).length + indicators.filter(e => TACTICAL.has(e.type)).length;
-    const tactical = count < this.tacticalCap(difficulty) && this.pace(elapsed, difficulty) === 'pressure' ? pool.filter(type => TACTICAL.has(type)) : [];
+    const tactical = count < this.tacticalCap(difficulty, progression) && this.pace(elapsed, difficulty) === 'pressure' ? pool.filter(type => TACTICAL.has(type)) : [];
     const value = clamp(Number.isFinite(roll) ? roll : 0, 0, 1 - Number.EPSILON);
     const choosePressure = value < THREAT_PACING.pressureShare;
     const choices = choosePressure && pressure.length || !tactical.length ? pressure : tactical;

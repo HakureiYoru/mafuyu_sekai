@@ -79,7 +79,7 @@ function harness(season: SeasonId = 's1', difficulty: Difficulty = 'normal', car
 
 describe('independent six-card encounters', () => {
   it.each(['s1', 's2'] as const)('%s retains the agreed six names and exact normal/hard HP without shared mutable brains', season => {
-    const expected = season === 's1' ? [700, 750, 800, 850, 900, 1000] : [2040, 2380, 2550, 2720, 2890, 3060];
+    const expected = season === 's1' ? [700, 750, 800, 850, 900, 1000] : [1500, 1700, 1800, 1900, 2100, 2200];
     expect(SPELL_CARDS[season].normal.map(card => card.hp)).toEqual(expected);
     expect(SPELL_CARDS[season].hard.map(card => card.hp)).toEqual(expected.map(hp => Math.round(hp * 1.35)));
     expect(new Set(SPELL_CARDS[season].normal.map(card => card.pattern)).size).toBe(6);
@@ -304,9 +304,8 @@ describe('fixed clock and bounded encounter lifetime', () => {
 describe('production simulation spell integration', () => {
   it.each(['normal', 'hard'] as const)('runs all seven %s slice walls with real input, 7-radius damage, no dash and no invulnerability', difficulty => {
     const sim = new GameSimulation(7004, difficulty);
-    sim.reset('story', 7004, difficulty, { season: 's2' });
-    if (sim.state.status === 'upgrade') expect(sim.chooseUpgrade(sim.state.build.choices[0])).toBe(true);
-    const boss = sim.spawnEnemy('boss', 2000, 1780)!;
+    sim.reset('story', 7004, difficulty, { difficulty });
+    const boss = sim.spawnEnemy('boss', 2000, 1780, 's2:final')!;
     const p = sim.state.player; p.invincible = 0; p.x = p.prevX = ARENA.x + 100;
     let cueId = 0, reactAt = Infinity, target = p.y, emitted = 0;
     for (let tick = 0; tick < 12 * 60; tick++) {

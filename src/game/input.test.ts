@@ -20,29 +20,26 @@ describe('input transitions', () => {
     input.clear();
     expect(input.read(10, 20)).toMatchObject({ moveX: 0, moveY: 0, dash: false, bomb: false, shoot: false, aimX: 810, aimY: 470 });
   });
-  it('consumes manual Q and E once independently of held main fire and keyboard repeat', () => {
+  it('ignores removed Q/E defaults without interfering with held main fire', () => {
     const input = new InputState(); input.shoot = true;
     input.keyDown('KeyQ'); input.keyDown('KeyE');
-    expect(input.read(0, 0)).toMatchObject({ beam: true, command: true, shoot: true });
-    input.keyDown('KeyQ', true); input.keyDown('KeyE');
-    expect(input.read(0, 0)).toMatchObject({ beam: false, command: false, shoot: true });
-    input.keyUp('KeyQ'); input.keyDown('KeyQ');
-    expect(input.read(0, 0)).toMatchObject({ beam: true, command: false });
-    input.keyUp('KeyE'); input.keyDown('KeyE'); input.clear();
-    expect(input.read(0, 0)).toMatchObject({ beam: false, command: false, shoot: false });
+    expect(input.keys.size).toBe(0);
+    expect(input.read(0, 0)).toMatchObject({ shoot: true, dash: false, bomb: false });
+    expect(input.read(0, 0)).not.toHaveProperty('beam');
+    expect(input.read(0, 0)).not.toHaveProperty('command');
   });
   it('uses remapped movement/actions and clears the old held keys on rebinding', () => {
     const input = new InputState(); input.keyDown('KeyW'); input.keyDown('KeyQ');
     let bindings = rebindKey({ ...DEFAULT_KEYBINDINGS }, 'moveUp', 'ArrowUp');
-    bindings = rebindKey(bindings, 'beam', 'KeyE'); input.setBindings(bindings);
-    expect(input.read(0, 0)).toMatchObject({ moveY: 0, beam: false });
+    bindings = rebindKey(bindings, 'dash', 'KeyE'); input.setBindings(bindings);
+    expect(input.read(0, 0)).toMatchObject({ moveY: 0, dash: false });
     input.keyDown('KeyW'); input.keyDown('ArrowUp'); input.keyDown('KeyE'); input.keyDown('KeyQ');
-    expect(input.read(0, 0)).toMatchObject({ moveY: -1, beam: true, command: true });
+    expect(input.read(0, 0)).toMatchObject({ moveY: -1, dash: true, bomb: false });
   });
   it('preserves the right-Shift focus alias unless that physical key was assigned to another action', () => {
     const input = new InputState(); input.keyDown('ShiftRight'); expect(input.read(0, 0).focus).toBe(true);
-    input.setBindings(rebindKey({ ...DEFAULT_KEYBINDINGS }, 'beam', 'ShiftRight'));
-    input.keyDown('ShiftRight'); expect(input.read(0, 0)).toMatchObject({ focus: false, beam: true });
+    input.setBindings(rebindKey({ ...DEFAULT_KEYBINDINGS }, 'dash', 'ShiftRight'));
+    input.keyDown('ShiftRight'); expect(input.read(0, 0)).toMatchObject({ focus: false, dash: true });
     input.keyDown('ShiftLeft'); expect(input.read(0, 0).focus).toBe(true);
   });
 });
@@ -78,21 +75,21 @@ describe('browser input lifecycle at the DOM boundary', () => {
     expect(input.read(0, 0)).toMatchObject({ shoot: false, moveY: -1 }); expect(host.released).toEqual([7]);
     input.destroy();
   });
-  it.each(['blur', 'hidden', 'escape', 'clear', 'destroy'])('releases capture and pending Q/E on %s', reason => {
+  it.each(['blur', 'hidden', 'escape', 'clear', 'destroy'])('releases capture and pending dash/bomb on %s', reason => {
     const { host, win, doc, pause, toggle, input } = setup();
     dispatch(host, 'pointerdown', { pointerId: 8, button: 0, clientX: 400, clientY: 200 });
-    dispatch(win, 'keydown', { code: 'KeyQ', repeat: false }); dispatch(win, 'keydown', { code: 'KeyE', repeat: false });
+    dispatch(win, 'keydown', { code: 'KeyR', repeat: false }); dispatch(win, 'keydown', { code: 'Space', repeat: false });
     if (reason === 'blur') dispatch(win, 'blur');
     else if (reason === 'hidden') { doc.hidden = true; dispatch(doc, 'visibilitychange'); }
     else if (reason === 'escape') dispatch(win, 'keydown', { code: 'Escape', repeat: false });
     else if (reason === 'clear') input.clear();
     else input.destroy();
-    expect(input.read(0, 0)).toMatchObject({ shoot: false, beam: false, command: false }); expect(host.captures.size).toBe(0);
+    expect(input.read(0, 0)).toMatchObject({ shoot: false, dash: false, bomb: false }); expect(host.captures.size).toBe(0);
     if (reason === 'blur' || reason === 'hidden') expect(pause).toHaveBeenCalledOnce();
     if (reason === 'escape') expect(toggle).toHaveBeenCalledOnce();
     input.destroy();
-    dispatch(win, 'keydown', { code: 'KeyQ', repeat: false });
-    expect(input.read(0, 0).beam).toBe(false);
+    dispatch(win, 'keydown', { code: 'KeyR', repeat: false });
+    expect(input.read(0, 0).dash).toBe(false);
   });
   it('drops held fire when the browser cancels pointer capture', () => {
     const { host, input } = setup();

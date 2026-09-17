@@ -1,5 +1,5 @@
 import dialogueData from './data/dialogue.json';
-import type { CombatEvent, CommsMessage, EnemyType, SeasonId } from './types';
+import type { CombatEvent, CommsMessage, EnemyType } from './types';
 
 type Line = { id: string; sender: string; color: string; text: string; maxed?: boolean };
 const data: Record<string, Line[]> = dialogueData;
@@ -14,13 +14,8 @@ export class Dialogue {
   private sequence = 0;
   private last = new Map<string, number>();
   private selections = new Map<string, number>();
-  private season: SeasonId = 's1';
   reset() { this.queue = []; this.current = null; this.age = 0; this.time = 0; this.last.clear(); }
-  start(season: SeasonId = 's1') {
-    this.reset(); this.season = season;
-    if (season === 's2') this.narrate('第一季的共鸣还在。选好模块，我们一起穿过镜界。');
-    else this.say('SYSTEM_STATUS', true);
-  }
+  start() { this.reset(); this.say('SYSTEM_STATUS', true); }
   private narrate(text: string, speaker = 'EMU') {
     this.queue = []; this.age = 0;
     this.current = { id: ++this.sequence, speaker, avatar: speaker === 'EMU' ? 'player' : 'enemy', color: speaker === 'EMU' ? '#91efe0' : '#c1adfa', text };
@@ -41,14 +36,9 @@ export class Dialogue {
   }
   handle(events: CombatEvent[], score: number) {
     for (const event of events) {
-      if (this.season === 's2' && event.type === 'wave') {
-        const lines = ['镜界入口到了。护盾的正面很硬，绕到侧面吧。', '前面是幕门街区。弹墙会留下短暂的通路。', '中继回廊正在记录脚步。看见地面印记后，别停在原地。', '复奏断层中，修复者和裂核一同出现。先找到维系它们的连线。', '裂核庭院到了。让子机守住侧翼，我们继续向前。', '这是终章前线。所有回声都在这里汇合，再走一步。'];
-        this.narrate(lines[Math.max(0, Math.min(5, (event.amount ?? 1) - 1))]);
-      }
-      else if (event.type === 'card') this.narrate(`${event.text ?? '下一张符卡'}。每一层弹幕都在变化，跟着空隙慢慢穿过去。`);
-      else if (this.season === 's2' && event.type === 'boss') this.narrate('LACUNA，就在镜面的另一侧。把我们带来的共鸣，完整地传过去。');
-      else if (this.season === 's2' && event.type === 'complete') this.narrate('镜界也听到了！这一次，两个世界都留下了我们的声音。');
-      else if (this.season === 's2' && event.type === 'attack' && event.text === 'arrival') this.narrate(event.enemyType === 'palisade' ? 'PALISADE 封住了前路。拆掉侧臂，弹墙就会松动。' : event.enemyType === 'reprise' ? 'REPRISE 的弹幕会停驻再折返。别站在它离开的轨迹上。' : '终点正在回应，准备迎接新的共鸣。');
+      if (event.type === 'card') this.narrate(`${event.text ?? '下一张符卡'}。每一层弹幕都在变化，跟着空隙慢慢穿过去。`);
+      else if (event.type === 'boss' && event.encounterId === 's2:final') this.narrate('LACUNA，就在镜面的另一侧。把一路积攒的共鸣，完整地传过去。');
+      else if (event.type === 'attack' && event.text === 'arrival') this.narrate(event.enemyType === 'palisade' ? 'PALISADE 封住了前路。拆掉侧臂，弹墙就会松动。' : event.enemyType === 'reprise' ? 'REPRISE 的弹幕会停驻再折返。别站在它离开的轨迹上。' : '前路出现了强大的回声，准备迎战。');
       else if (event.type === 'boss') this.say('BOSS_ENTRY', true);
       else if (event.type === 'bossLow') this.say('BOSS_LOW_HP', true);
       else if (event.type === 'failure') { this.say('FAILURE_EVENT', true, { score: `${score}` }); this.age = 10; }

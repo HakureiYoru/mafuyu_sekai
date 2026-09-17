@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ASSET_URLS, BALANCE } from './game/config';
 import type { GameSettings, HudSnapshot, RuntimeControls } from './game/types';
 import changelog from 'virtual:changelog';
-import { MODULES } from './game/upgrades';
+import { MODULES, EVOLUTIONS, choiceView, buildModuleViews } from './game/upgrades';
 import { BINDING_LABELS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, rebindKey } from './game/settings';
 import type { BindingAction } from './game/settings';
 
@@ -67,15 +67,13 @@ function ControlsGuide({ settings, compact = false }: { settings: GameSettings; 
   return <div className={`controls-guide ${compact ? 'compact' : ''}`}>
     <div><span className="keycaps">{(['moveUp', 'moveLeft', 'moveDown', 'moveRight'] as const).map(action => <kbd key={action}>{key(action)}</kbd>)}</span><span>移动 · {key('focus')} 慢速瞄准</span></div>
     <div><span className="keycaps"><kbd>鼠标左键</kbd></span><span>瞄准 · 射击</span></div>
-    <div><span className="keycaps"><kbd>{key('dash')}</kbd><span className="key-or">/</span><kbd>右键</kbd></span><span>无敌冲刺 · 储存一发贯穿炮</span></div>
-    <div><span className="keycaps"><kbd>{key('beam')}</kbd></span><span>手动贯穿炮 · 冲刺后 {BALANCE.dash.window} 秒内</span></div>
-    <div><span className="keycaps"><kbd>{key('command')}</kbd></span><span>准星指定子机集火</span></div>
+    <div><span className="keycaps"><kbd>{key('dash')}</kbd><span className="key-or">/</span><kbd>右键</kbd></span><span>无敌冲刺 · 随后左键释放贯穿炮</span></div>
     <div><span className="keycaps"><kbd>{key('bomb')}</kbd><kbd>Esc</kbd></span><span>炸弹 · 暂停</span></div>
   </div>;
 }
 
 function SaveNotice({ snapshot: s }: { snapshot: HudSnapshot }) {
-  return <p className={`save-notice save-${s.saveStatus}`} role="status">{s.saveMessage || (s.saveStatus === 'session' ? '浏览器暂时无法保存，进度仅保留在当前页面。' : s.saveStatus === 'saved' ? '通关与纪录已保存于此浏览器' : '通关后自动保存成长并解锁第二季')}</p>;
+  return <p className={`save-notice save-${s.saveStatus}`} role="status">{s.saveMessage || (s.saveStatus === 'session' ? '浏览器暂时无法保存，进度仅保留在当前页面。' : s.saveStatus === 'saved' ? '通关与纪录已保存于此浏览器' : '每局从 Lv1 开始 · 成绩自动保存在此浏览器')}</p>;
 }
 
 function Menu({ runtime, snapshot: s, openSettings, openChangelog }: { runtime: RuntimeControls; snapshot: HudSnapshot; openSettings: () => void; openChangelog: () => void }) {
@@ -83,20 +81,16 @@ function Menu({ runtime, snapshot: s, openSettings, openChangelog }: { runtime: 
   return <section className="menu-screen" aria-label="主菜单" style={{ '--scene-image': `url("${ASSET_URLS.bg}")` } as CSSProperties}>
     <div className="menu-simple">
       <h1 className="menu-title">MAFUYU SEKAI</h1>
-      <div className="season-options" role="group" aria-label="选择季度">
-        <button aria-pressed={s.seasonId === 's1'} onClick={() => runtime.setSeason('s1')}>第一季<span>失落的共鸣</span></button>
-        <button aria-pressed={s.seasonId === 's2'} disabled={!s.season2Unlocked} onClick={() => runtime.setSeason('s2')}>第二季<span>{s.season2Unlocked ? '镜界复奏' : '通关第一季解锁'}</span></button>
-      </div>
       <div className="difficulty-options" role="group" aria-label="游戏难度">
         <button aria-pressed={s.difficulty === 'normal'} onClick={() => runtime.setDifficulty('normal')}>普通</button>
         <button aria-pressed={s.difficulty === 'hard'} onClick={() => runtime.setDifficulty('hard')}>困难</button>
       </div>
-      <p className="season-description">{s.seasonId === 's2' && s.carryover ? `继承 Lv.${s.carryover.level} · 子机 ${s.carryover.companions}/3 · 六段镜界与七次模块选择` : '五波街区 · 游猎回声 · 六张终章符卡'}</p>
       {s.difficulty === 'hard' && <p className="difficulty-note">更快敌人 · 密集攻势 · 受到伤害 ×2</p>}
       <button className="menu-start" onClick={() => runtime.start()}>开始游戏</button>
       <button className="menu-settings" onClick={openSettings}>体验设置</button>
-      <div className="menu-instructions" aria-label="基本操作"><p>{(['moveUp', 'moveLeft', 'moveDown', 'moveRight'] as const).map(action => keyLabel(s.settings.keybindings[action])).join(' / ')} 移动 · 左键射击</p><p>{keyLabel(s.settings.keybindings.dash)} / 右键冲刺 → {keyLabel(s.settings.keybindings.beam)} 贯穿炮 · {keyLabel(s.settings.keybindings.command)} 集火</p><p>{keyLabel(s.settings.keybindings.focus)} 慢移 · {keyLabel(s.settings.keybindings.bomb)} 炸弹 · Esc 暂停</p></div>
+      <div className="menu-instructions" aria-label="基本操作"><p>{(['moveUp', 'moveLeft', 'moveDown', 'moveRight'] as const).map(action => keyLabel(s.settings.keybindings[action])).join(' / ')} 移动 · 左键射击</p><p>{keyLabel(s.settings.keybindings.dash)} / 右键冲刺 · 随后左键贯穿炮</p><p>{keyLabel(s.settings.keybindings.focus)} 慢移 · {keyLabel(s.settings.keybindings.bomb)} 炸弹 · Esc 暂停</p></div>
       <span className="menu-best">{s.difficulty === 'hard' ? '困难' : '普通'}纪录 {s.bestScore.toLocaleString('en-US')}</span>
+      {s.historicalBestScore > 0 && <span className="menu-history">旧版历史纪录 {s.historicalBestScore.toLocaleString('en-US')}</span>}
       <SaveNotice snapshot={s} />
       <button className="menu-version" onClick={openChangelog}>{latest.version} · 更新日志</button>
     </div>
@@ -112,23 +106,40 @@ function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; ru
   const activeModules = s.moduleStates.filter(module => module.status === 'active' || module.status === 'cooldown' || module.status === 'consumed').slice(0, 3);
   return <div className={`hud battle-hud ${s.phase !== 'playing' ? 'hud-inactive' : ''}`} aria-label="战斗状态">
     <div className="battle-top">
-      <div className="stage-summary"><div><span className="status-dot" /><strong>{s.mode === 'endless' ? '无尽' : s.seasonId === 's2' ? '第二季' : '第一季'} · {s.difficulty === 'hard' ? '困难' : '普通'}</strong><span>{String(s.wave).padStart(2, '0')} / {s.mode === 'endless' ? '∞' : s.stageCount}</span></div><span className="stage-title">{s.stageName}{s.waveBlocked ? ' · 击败首领后继续' : ''}</span><Meter value={s.waveProgress} label="当前波次进度" /></div>
+      <div className="stage-summary"><div><span className="status-dot" /><strong>{s.mode === 'endless' ? '无尽' : '连续战役'} · {s.difficulty === 'hard' ? '困难' : '普通'}</strong><span>{s.mode === 'endless' ? '∞' : `${Math.floor(s.progression / 360 * 100)}%`}</span></div><span className="stage-title">{s.stageName}{s.waveBlocked ? ' · 击败首领后继续' : ''}</span><Meter value={s.waveProgress} label="战役推进进度" /></div>
       <div className="encounter-summary">
-        {bossMax > 0 ? <><div><strong>{s.cardName || (s.seasonId === 's1' ? 'ECHO' : s.minibossAction.split(' · ')[0])}</strong><span>{s.cardCount > 0 ? `${s.cardIndex} / ${s.cardCount}` : '首领战'} · {Math.ceil(100 * bossHp / bossMax)}%</span></div><Meter value={bossHp} max={bossMax} className="meter-violet" label={s.bossMaxHp > 0 ? '真冬生命' : '游猎回声生命'} /><p aria-label={s.bossMaxHp > 0 ? '首领行动' : '迷你首领行动'}>{s.bossMaxHp > 0 ? s.bossAction : s.minibossAction}</p></> : <><strong className="battle-announcement" role="status">{s.announcement || (s.arena ? '固定竞技场 · 注意场地边界' : '保持移动，收集共鸣')}</strong><span>{formatTime(s.elapsed)} · SCORE {String(s.score).padStart(7, '0')}</span></>}
+        {bossMax > 0 ? <><div><strong>{s.cardName || s.minibossAction.split(' · ')[0]}</strong><span>{s.cardCount > 0 ? `${s.cardIndex} / ${s.cardCount}` : '首领战'} · {Math.ceil(100 * bossHp / bossMax)}%</span></div><Meter value={bossHp} max={bossMax} className="meter-violet" label={s.bossMaxHp > 0 ? '真冬生命' : '游猎回声生命'} /><p aria-label={s.bossMaxHp > 0 ? '首领行动' : '迷你首领行动'}>{s.bossMaxHp > 0 ? s.bossAction : s.minibossAction}</p></> : <><strong className="battle-announcement" role="status">{s.announcement || (s.arena ? '固定竞技场 · 注意场地边界' : '保持移动，收集共鸣')}</strong><span>{formatTime(s.elapsed)} · SCORE {String(s.score).padStart(7, '0')}</span></>}
       </div>
       <div className="battle-actions"><span className="battle-score">{String(s.score).padStart(7, '0')}<small>{formatTime(s.elapsed)}</small></span><span className="battle-bombs">✦ {s.bombs}<small>炸弹 / {key('bomb')}</small></span><button className="icon-button" onClick={() => runtime.pause()} aria-label="暂停游戏"><Icon name="pause" /></button><button className="icon-button" onClick={openSettings} aria-label="暂停并打开设置"><Icon name="settings" /></button></div>
     </div>
     <div className="battle-bottom">
-      <div className="battle-player"><div className="compact-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><strong>LV. {String(s.level).padStart(2, '0')}</strong><span>{s.hp} / {s.maxHp} HP</span><span className="support-status" aria-label="子机支援">子机 {s.companions} / {BALANCE.companion.max}</span></div><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><div className="compact-growth"><span>{s.level >= 10 && s.seasonId === 's2' ? `共鸣 ${s.resonance} / 4 · 伤害 +${s.resonance * 5}%` : '武器成长'}</span><span>{s.level >= 10 ? 'MAX' : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= 10 ? 1 : s.xp} max={s.level >= 10 ? 1 : s.xpNeeded} className="meter-violet" label="武器成长" /></div>
-      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '通讯'}<span>{s.comms?.speaker ?? 'SYSTEM'} {commsCollapsed ? '+' : '−'}</span></button>{!commsCollapsed && <p>{s.comms?.text || s.announcement || '听见你的共鸣。'}</p>}<div className="module-summary" aria-label="已装配模块" title={s.modules.map(id => MODULES[id].name).join(' · ')}>{s.modules.length ? `${s.modules.length} / 7 模块 · Esc 查看状态` : s.seasonId === 's2' ? '段落结束后选择模块' : `冲刺储能 · ${key('beam')} 手动贯穿炮`}</div><div className="module-live" aria-label="模块即时状态">{activeModules.map(module => <span key={module.id} className={`module-${module.status}`}>{MODULES[module.id].name} · {module.status === 'consumed' ? '已用尽' : module.status === 'active' ? '生效中' : `${module.remaining.toFixed(1)}s`}</span>)}</div></div>
-      <div className="battle-weapon"><div className={`compact-resource ${s.overheated ? 'is-hot' : ''}`}><span>{s.overheated ? '过热 · 松开射击' : '热量'} <strong>{Math.round(s.heat)}%</strong></span><Meter value={s.heat} max={100} className="meter-heat" label="武器热量" /></div><div className="weapon-skills"><div className={`skill-chip ${s.dashCharges > 0 ? 'is-ready' : ''}`}><kbd>{key('dash')}</kbd><span>冲刺 <strong>{s.dashCharges > 0 ? s.modules.includes('doubleDash') ? `${s.dashCharges}/2` : '就绪' : `${s.dashCooldown.toFixed(1)}s`}</strong></span></div><div className={`skill-chip ${perfect ? 'is-beam-ready' : ''}`}><kbd>{key('beam')}</kbd><span>贯穿炮 <strong>{perfect ? `${s.perfectWindow.toFixed(1)}s` : '冲刺储能'}</strong></span></div><div className={`skill-chip ${s.commandTime > 0 ? 'is-commanding' : s.commandCooldown <= 0 && s.companions > 0 ? 'is-ready' : ''}`}><kbd>{key('command')}</kbd><span>集火 <strong>{s.companions === 0 ? '需要子机' : s.commandTime > 0 ? `${s.commandTime.toFixed(1)}s` : s.commandCooldown > 0 ? `${s.commandCooldown.toFixed(1)}s` : '就绪'}</strong></span></div></div></div>
+      <div className="battle-player"><div className="compact-heading"><img src={ASSET_URLS.player} alt="玩家头像" /><strong>LV. {String(s.level).padStart(2, '0')}</strong><span>{s.hp} / {s.maxHp} HP</span><span className="support-status" aria-label="子机支援">子机 {s.companions} / {BALANCE.companion.max}</span></div><div className="health-segments" role="meter" aria-label="生命" aria-valuenow={s.hp} aria-valuemin={0} aria-valuemax={s.maxHp}>{Array.from({ length: s.maxHp }, (_, i) => <span key={i} className={i < s.hp ? 'filled' : ''} />)}</div><div className="compact-growth"><span>{s.level >= 10 ? `共鸣 ${s.resonance} / 4 · 伤害 +${s.resonance * 5}%` : '武器成长'}</span><span>{s.level >= 10 ? 'MAX' : `${Math.floor(s.xp)} / ${s.xpNeeded}`}</span></div><Meter value={s.level >= 10 ? 1 : s.xp} max={s.level >= 10 ? 1 : s.xpNeeded} className="meter-violet" label="武器成长" /></div>
+      <div className="battle-comms"><button className="compact-comms-toggle" onClick={() => setCommsCollapsed(value => !value)} aria-expanded={!commsCollapsed}>{commsCollapsed ? '展开通讯' : '通讯'}<span>{s.comms?.speaker ?? 'SYSTEM'} {commsCollapsed ? '+' : '−'}</span></button>{!commsCollapsed && <p>{s.comms?.text || s.announcement || '听见你的共鸣。'}</p>}<div className="module-summary" aria-label="已装配模块">{s.modules.length} / 6 模块 · {s.evolutions.length} / 2 进化</div><div className="module-slots" aria-label="六个模块栏位">{Array.from({ length: 6 }, (_, i) => {
+        const id = s.modules[i], evolved = id && s.evolutions.map(key => EVOLUTIONS[key]).find(item => item.primary === id);
+        return <span key={i} className={evolved ? 'is-evolved' : id ? 'is-equipped' : ''} title={id ? evolved?.name ?? MODULES[id].name : '空模块栏位'}>{id ? <>{evolved?.name ?? MODULES[id].name}<b>{evolved ? '✦' : (s.moduleRanks[id] ?? 1) === 2 ? 'II' : 'I'}</b></> : '—'}</span>;
+      })}</div><div className="module-live" aria-label="模块即时状态">{activeModules.map(module => <span key={module.id} className={`module-${module.status}`}>{MODULES[module.id].name} · {module.status === 'consumed' ? '已用尽' : module.status === 'active' ? '生效中' : `${module.remaining.toFixed(1)}s`}</span>)}</div></div>
+      <div className="battle-weapon"><div className={`compact-resource ${s.overheated ? 'is-hot' : ''}`}><span>{s.overheated ? '过热 · 松开射击' : '热量'} <strong>{Math.round(s.heat)}%</strong></span><Meter value={s.heat} max={100} className="meter-heat" label="武器热量" /></div><div className="weapon-skills"><div className={`skill-chip ${s.dashCharges > 0 ? 'is-ready' : ''}`}><kbd>{key('dash')}</kbd><span>冲刺 <strong>{s.dashCharges > 0 ? s.modules.includes('doubleDash') ? `${s.dashCharges}/2` : '就绪' : `${s.dashCooldown.toFixed(1)}s`}</strong></span></div><div className={`skill-chip ${perfect ? 'is-beam-ready' : ''}`}><kbd>左键</kbd><span>贯穿炮 <strong>{perfect ? `${s.perfectWindow.toFixed(2)}s` : '冲刺后射击'}</strong></span></div></div></div>
     </div>
   </div>;
 }
 
+function EvolutionRecipes({ snapshot: s }: { snapshot: HudSnapshot }) {
+  return <details className="evolution-recipes"><summary>进化组合 <span>{s.evolutions.length} / 2</span></summary><p>主模块 II＋搭配模块 I，在首领奖励中选择进化；仍占原有栏位。</p><div>{Object.values(EVOLUTIONS).map(item => <p key={item.id} className={s.evolutions.includes(item.id) ? 'is-evolved' : ''}><strong>{item.name}</strong><span>{MODULES[item.primary].name} II ＋ {MODULES[item.partner].name} I</span></p>)}</div></details>;
+}
+
 function UpgradeChoice({ snapshot: s, runtime }: { snapshot: HudSnapshot; runtime: RuntimeControls }) {
   const branches = { main: '主炮', drone: '子机', resource: '机动与资源' };
-  return <Dialog title={s.modules.length === 0 ? '带上新的共鸣' : '为下一程，选择强化'} eyebrow={`MIRROR RESONANCE / ${s.modules.length + 1} OF 7`} className="upgrade-dialog"><p className="dialog-description">战斗已暂停。按 1 / 2 / 3 或点击选择一个模块，本季挑战中持续生效。</p><div className="upgrade-cards">{s.upgradeChoices.map((id, index) => { const item = MODULES[id]; return <button key={id} className={`upgrade-card branch-${item.branch}`} onClick={() => runtime.chooseUpgrade(id)}><span className="upgrade-branch">{branches[item.branch]}<kbd>{index + 1}</kbd></span><strong>{item.name}</strong><p>{item.description}</p><span className="upgrade-confirm">选择模块 <Icon name="arrow" /></span></button>; })}</div><p className="upgrade-owned">{s.modules.length ? `已装配：${s.modules.map(id => MODULES[id].name).join(' · ')}` : '继承等级是本季下限，模块不会因受伤而丢失。'}</p><button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button></Dialog>;
+  const kinds = { module: '新模块', rank: '升至 II', evolution: '组合进化', resource: '补给' };
+  return <Dialog title={s.choiceSource === 'boss' ? '首领奖励' : '选择强化'} eyebrow={`已装配 ${s.modules.length} / 6 · 已进化 ${s.evolutions.length} / 2`} className="upgrade-dialog">
+    <p className="dialog-description">战斗已暂停。按 1 / 2 / 3 或点击选择，随后继续当前战场。</p>
+    <div className="upgrade-cards">{s.upgradeChoices.map((id, index) => {
+      const item = choiceView({ modules: [...s.modules], ranks: s.moduleRanks }, id);
+      return <button key={s.upgradeOfferId + ':' + id} className={`upgrade-card branch-${item.branch} choice-${item.kind}`} onClick={() => runtime.chooseUpgrade(id, s.upgradeOfferId ?? undefined)}><span className="upgrade-branch">{branches[item.branch]} · {kinds[item.kind]}<kbd>{index + 1}</kbd></span><strong>{item.name}</strong><p>{item.description}</p><span className="upgrade-confirm">选择强化 <Icon name="arrow" /></span></button>;
+    })}</div>
+    <div className="upgrade-toolbar"><span>{s.modules.length ? `已装配：${buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => item.name + (item.evolution ? ' ✦' : item.rank === 2 ? ' II' : ' I')).join(' · ')}` : '模块在本局持续生效，受伤不会丢失。'}</span><button className="button button-secondary button-small" disabled={s.rerollsRemaining === 0} onClick={() => runtime.rerollUpgrades()}>重抽 · {s.rerollsRemaining}</button></div>
+    <EvolutionRecipes snapshot={s} />
+    <button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button>
+  </Dialog>;
 }
 
 function Settings({ settings, setSettings, onClose }: { settings: GameSettings; setSettings: (settings: Partial<GameSettings>) => void; onClose: () => void }) {
@@ -154,12 +165,11 @@ function Settings({ settings, setSettings, onClose }: { settings: GameSettings; 
 }
 
 function PausedModules({ snapshot: s }: { snapshot: HudSnapshot }) {
-  if (!s.modules.length) return null;
   const labels = { ready: '就绪', active: '生效中', cooldown: '冷却', consumed: '本局已消耗' };
-  return <details className="paused-modules" open><summary>本局模块 <span>{s.modules.length} / 7</span></summary><div>{s.modules.map(id => {
-    const state = s.moduleStates.find(module => module.id === id);
-    return <article key={id}><div><strong>{MODULES[id].name}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{MODULES[id].description}</p></article>;
-  })}</div></details>;
+  return <><details className="paused-modules" open><summary>本局模块 <span>{s.modules.length} / 6</span></summary><div>{buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => {
+    const state = s.moduleStates.find(module => module.id === item.id);
+    return <article key={item.id}><div><strong>{item.name} {item.evolution ? '✦' : item.rank === 2 ? 'II' : 'I'}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{item.description}</p></article>;
+  })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><EvolutionRecipes snapshot={s} /></>;
 }
 
 function RunResults({ snapshot }: { snapshot: HudSnapshot }) {
@@ -196,8 +206,8 @@ export default function App({ runtime }: { runtime: RuntimeControls }) {
     {snapshot.phase === 'loading' && <section className="screen-overlay loading-screen" aria-label="加载游戏"><span className="loading-mark" aria-hidden="true">✦</span><div className="eyebrow">MAFUYU SEKAI</div><h1>正在连接世界</h1><div className="loading-progress"><Meter value={snapshot.loading} label="资源加载进度" /><span>{Math.round(snapshot.loading * 100)}%</span></div><p>让共鸣，再次响起。</p></section>}
     {snapshot.phase === 'upgrade' && <UpgradeChoice snapshot={snapshot} runtime={runtime} />}
     {!settingsOpen && snapshot.phase === 'paused' && <Dialog title="稍作停留" eyebrow="TAKE A BREATH" onClose={() => runtime.resume()}><p className="dialog-description">世界正在等你。准备好后，继续共鸣。</p><RunResults snapshot={snapshot} /><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.resume()}><Icon name="play" />继续游戏 <kbd>ESC</kbd></button><button className="button button-secondary" onClick={openSettings}><Icon name="settings" />体验设置</button><button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button></div><PausedModules snapshot={snapshot} /><ControlsGuide settings={snapshot.settings} compact /></Dialog>}
-    {!settingsOpen && snapshot.phase === 'failed' && <Dialog title="这次共鸣，暂时中断" eyebrow="RESONANCE LOST" className="result-dialog failure-dialog"><div className="result-emblem" aria-hidden="true">✧</div><p className="dialog-description">{snapshot.seasonId === 's2' ? '本季模块已归零。再次挑战将恢复第一季通关成长，从镜界入口开始。' : '每一次靠近，都是下一次前进的起点。'}</p><RunResults snapshot={snapshot} /><div className="result-detail"><span>{snapshot.stageName} · 第 {snapshot.wave} 段</span><span>最高纪录 {snapshot.bestScore.toLocaleString('en-US')}</span></div><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.restart()}><Icon name="restart" />再次挑战</button><button className="button button-secondary" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}
-    {!settingsOpen && snapshot.phase === 'complete' && <Dialog title="你的声音，抵达了这里" eyebrow="RESONANCE RESTORED" className="result-dialog complete-dialog"><div className="result-emblem" aria-hidden="true">✦</div><p className="dialog-description">{snapshot.seasonId === 's2' ? '镜界复奏完成。两个世界，都留下了你的共鸣。' : snapshot.season2Unlocked ? '第一季通关成长已保留，镜界复奏现已开放。' : '世界重归平静。让这份共鸣在无尽挑战中继续。'}</p><RunResults snapshot={snapshot} /><SaveNotice snapshot={snapshot} /><div className="dialog-actions">{snapshot.seasonId === 's1' && snapshot.season2Unlocked && <button className="button button-primary" onClick={() => runtime.continueSeason()}>进入第二季 · 镜界复奏<Icon name="arrow" /></button>}<button className="button button-secondary" onClick={() => runtime.continueEndless()}><Icon name="spark" />继续 · 无尽挑战<Icon name="arrow" /></button><button className="button button-secondary" onClick={() => runtime.restart()}><Icon name="restart" />重新开始</button><button className="text-button centered" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}
+    {!settingsOpen && snapshot.phase === 'failed' && <Dialog title="这次共鸣，暂时中断" eyebrow="RESONANCE LOST" className="result-dialog failure-dialog"><div className="result-emblem" aria-hidden="true">✧</div><p className="dialog-description">本局成长已结束。再次挑战将从 Lv1 开始新的构筑。</p><RunResults snapshot={snapshot} /><SaveNotice snapshot={snapshot} /><div className="result-detail"><span>{snapshot.stageName} · 推进 {Math.floor(snapshot.progression / 360 * 100)}%</span><span>最高纪录 {snapshot.bestScore.toLocaleString('en-US')}</span></div><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.restart()}><Icon name="restart" />再次挑战</button><button className="button button-secondary" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}
+    {!settingsOpen && snapshot.phase === 'complete' && <Dialog title="你的声音，抵达了这里" eyebrow="RESONANCE RESTORED" className="result-dialog complete-dialog"><div className="result-emblem" aria-hidden="true">✦</div><p className="dialog-description">连续战役完成。带着这套构筑，继续挑战无尽。</p><RunResults snapshot={snapshot} /><SaveNotice snapshot={snapshot} /><div className="dialog-actions"><button className="button button-secondary" onClick={() => runtime.continueEndless()}><Icon name="spark" />继续 · 无尽挑战<Icon name="arrow" /></button><button className="button button-secondary" onClick={() => runtime.restart()}><Icon name="restart" />重新开始</button><button className="text-button centered" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}
     {snapshot.phase === 'error' && <Dialog title="世界暂时无法连接" eyebrow="CONNECTION INTERRUPTED" className="error-dialog"><p className="dialog-description">{snapshot.error || '游戏加载遇到了问题，请重新连接。'}</p><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.start()}><Icon name="restart" />重新连接</button><button className="text-button centered" onClick={() => window.location.reload()}>刷新页面</button></div></Dialog>}
     {settingsOpen && <Settings settings={snapshot.settings} setSettings={settings => runtime.setSettings(settings)} onClose={() => setSettingsOpen(false)} />}
     {changelogOpen && snapshot.phase === 'menu' && <Changelog onClose={() => setChangelogOpen(false)} />}

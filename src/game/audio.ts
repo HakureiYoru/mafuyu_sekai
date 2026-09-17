@@ -75,7 +75,6 @@ export class GameAudio {
     make('shield', 0.1, (t, p) => (Math.sin(t * 6600) * 0.12 + Math.sin(t * 9700) * 0.09) * (1 - p) ** 4);
     make('weakpoint', 0.12, (t, p) => (Math.sin(t * 4300) + Math.sin(t * 6450)) * 0.14 * (1 - p) ** 3);
     make('break', 0.28, (t, p) => (noise() * 0.28 + Math.sin(t * (1100 - p * 800)) * 0.25) * (1 - p) ** 2);
-    make('command', 0.22, (t, p) => (Math.sin(t * (p < 0.4 ? 3100 : 4700)) + Math.sin(t * 6200) * 0.3) * 0.16 * Math.sin(p * Math.PI));
     make('ready', 0.18, (t, p) => Math.sin(t * (p < 0.5 ? 3900 : 5200)) * 0.16 * (1 - p));
     make('interrupt', 0.18, (t, p) => (Math.sin(t * 1600) + Math.sin(t * 800)) * 0.18 * (1 - p) ** 2);
     make('warning-line', 0.32, (t, p) => Math.sin(t * (2500 + p * 1600)) * 0.2 * Math.sin(p * Math.PI));
@@ -134,7 +133,6 @@ export class GameAudio {
       else if (event.type === 'hit') this.sound(event.hitResult === 'shield' ? 'shield' : event.hitResult === 'weakpoint' ? 'weakpoint' : event.hitResult === 'part' ? 'break' : 'impact', 0.25, event.hitResult === 'weakpoint' ? 2 : 1, 0.045);
       else if (event.type === 'shieldBreak') this.sound('break', 0.65, 4, 0.12);
       else if (event.type === 'interrupt') this.sound('interrupt', 0.6, 4, 0.15);
-      else if (event.type === 'command' && event.text !== 'expired') this.sound(event.text === 'ready' ? 'ready' : 'command', 0.6, 3, 0.18);
       else if (event.type === 'module') this.sound(event.moduleId === 'revive' ? 'support' : 'ready', 0.4, 3, 0.18, `module-${event.moduleId ?? 'trigger'}`);
       else if (event.type === 'kill') this.sound(event.hitResult === 'part' ? 'break' : 'kill', event.hitResult === 'part' ? 0.5 : 0.35, event.hitResult === 'part' ? 3 : 1, 0.075);
       else if (event.type === 'dash') this.sound('dash', 0.6, 3, 0.1);

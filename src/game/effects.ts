@@ -145,7 +145,7 @@ export class EffectSystem {
   handle(event: CombatEvent) {
     const { x, y, angle = 0 } = event;
     const color = event.color ?? 0x90f9e2;
-    this.emissionPriority = ['damage', 'beam', 'shieldBreak', 'interrupt', 'command', 'module', 'support', 'levelup', 'xpLoss'].includes(event.type)
+    this.emissionPriority = ['damage', 'beam', 'shieldBreak', 'interrupt', 'module', 'support', 'levelup', 'xpLoss'].includes(event.type)
       || event.hitResult === 'weakpoint' || event.hitResult === 'part' || event.text === 'deviceBurst' || event.type === 'card' && event.text === 'cleared' ? 2 : 0;
     switch (event.type) {
       case 'shot':
@@ -230,10 +230,6 @@ export class EffectSystem {
       case 'interrupt':
         this.ring(x, y, 0xffdc9f, 12, 90, 0.25); this.burst(x, y, 0xffdc9f, 8, 170, 4, angle);
         this.label(x, y, '打断', 0xffe8b7); break;
-      case 'command':
-        if (event.text === 'issued') { this.ring(x, y, 0xa6eaff, 85, 35, 0.25); this.label(x, y - 18, '子机集火', 0xbaedff); }
-        else if (event.text === 'ready') this.label(x, y, '集火就绪', 0xbaedff);
-        break;
       case 'module':
         this.burst(x, y, 0xc2d8ff, 6, 100, 4);
         this.label(x, y, event.moduleId ? MODULES[event.moduleId].name : event.text ?? '模块触发', 0xd3e6ff, 0, null, 2, `module-${event.moduleId ?? 'trigger'}`); break;

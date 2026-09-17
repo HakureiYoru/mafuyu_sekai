@@ -1,0 +1,807 @@
+{
+  "version": "5.0.0",
+  "measuredAt": "2026-09-17T07:15:33.915Z",
+  "sourceHashes": {
+    "src/game/simulation.ts": "63c9b82fefff7e70f0d650b1c070b61f8d9da050b47938165348428f8f786311",
+    "src/game/config.ts": "d9423bdce1b11290bd8938d3159c607f21b44cd9e71d80f045202ed7e73be415",
+    "src/game/settings.ts": "d35675b29f880a9cf1f65484c08da546e895c3a0b45bd07ce60762cc768d040d",
+    "src/game/difficulty.ts": "3f0205a0d67c30316dd510d27206d48b73631de6ae29a8dc996d0c5c5e1f1c28",
+    "src/game/miniboss-ai.ts": "727192078f8a9f31c3f851fc38a327c7c6b85dd4f4dbb8c65f2f671bd12098db",
+    "src/game/math.ts": "31c5728c823f0f323100ed84abd273e5b632e0efcf0484a84cd57b3cc14b67d9",
+    "src/game/pool.ts": "0ed3f11dda733add37f64fbe7fe7e7dffe7e7b0a0f4e4e6cf1a54cb2f32080c5",
+    "src/game/enemy-ai.ts": "e44bddf9504e77a4c771d43e7c8a7a322fb34e7e0f4c76a44a671a3a91c61e71",
+    "src/game/threat-director.ts": "764285e001c291ef65e004f4286ad7c4d879d112b241ee0f8a57f9135d2ba04e",
+    "src/game/projectile-motion.ts": "aa7b389fd787035592bbed32bf89b3d0f989a9c50891bad83fb318f8ec691792",
+    "src/game/campaign.ts": "a848183dba300f133a707d1a6c840ff331b7532087967d67265cc7a60c7e5274",
+    "src/game/upgrades.ts": "91a485b827f89c9a8a211dda5a304e326b76fa151629eb93a7c76b52235ddd9a",
+    "src/game/spellcards.ts": "7b0cbc08a1f247c3cfca1b05fbab84623503aefec0e3bf5fc1dc654995f6b909",
+    "src/game/season2-ai.ts": "69ea4a0af350083f403321381c93678f0d9a416e7f67320a2b66c438dfbb9675",
+    "src/game/fairness.test.ts": "a818791ecc4bfc58bd667118a99e0e1739568268a86b0f1d508a3134a71fd6e2",
+    "scripts/balance-v5.mjs": "86de6967b3c893acbf27902ca9edd1b5dfe97f94c14181b88fcb48daca272546",
+    "scripts/balance-v4.mjs": "1d89b2d75922bea1be25f50d45a50d5a096b9ef5f9da48fe6013d336b4201239",
+    "scripts/simulation-loader.mjs": "4f6801a8b0ec4ee27900488088754ffbe311445e8a8f45e1903c613ee9551d6c"
+  },
+  "status": "complete",
+  "method": "Actual 60 Hz simulation, seeded real upgrade offers, fresh Lv1 with zero XP and companions. Controls update every 100 ms; visible-warning route controller uses a 200 ms recognition delay. No manual Q/E or forced gear/levels. Only immutable invulnerability is added to separately labelled DPS cases.",
+  "limitations": [
+    "Exact mouse aiming and synthetic path prediction are not human playtesting.",
+    "The controller does not plan exposed-weakpoint shots or coordinated shield flanks.",
+    "DPS-case movement and invulnerability change survivability; DPS cases cannot establish human clearability.",
+    "Tests use simulation ticks, not real browser frame performance."
+  ],
+  "matrix": {
+    "seeds": [
+      50001
+    ],
+    "difficulties": [
+      "normal"
+    ],
+    "profiles": [
+      "main"
+    ],
+    "modes": [
+      "DPS"
+    ]
+  },
+  "cases": [
+    {
+      "seed": 50001,
+      "difficulty": "normal",
+      "profile": "main",
+      "mode": "DPS",
+      "result": "complete",
+      "elapsed": 595.283,
+      "computeSeconds": 2.101,
+      "level": 10,
+      "progression": 360,
+      "bossEntries": [
+        {
+          "id": "s1:echo",
+          "elapsed": 90,
+          "progression": 90,
+          "level": 3,
+          "xp": 100,
+          "companions": 2,
+          "hp": 5,
+          "bombs": 5,
+          "modules": [
+            "returnWing",
+            "precision"
+          ],
+          "ranks": {
+            "returnWing": 1,
+            "precision": 1
+          },
+          "evolutions": []
+        },
+        {
+          "id": "s2:palisade",
+          "elapsed": 211.983,
+          "progression": 180,
+          "level": 6,
+          "xp": 50,
+          "companions": 3,
+          "hp": 5,
+          "bombs": 5,
+          "modules": [
+            "returnWing",
+            "precision",
+            "crossOrbit",
+            "prism"
+          ],
+          "ranks": {
+            "returnWing": 1,
+            "precision": 2,
+            "crossOrbit": 1,
+            "prism": 2
+          },
+          "evolutions": []
+        },
+        {
+          "id": "s1:mafuyu",
+          "elapsed": 321.267,
+          "progression": 240,
+          "level": 8,
+          "xp": 250,
+          "companions": 3,
+          "hp": 5,
+          "bombs": 5,
+          "modules": [
+            "returnWing",
+            "precision",
+            "crossOrbit",
+            "prism",
+            "droneBurst",
+            "wingShots"
+          ],
+          "ranks": {
+            "returnWing": 1,
+            "precision": 2,
+            "crossOrbit": 1,
+            "prism": 2,
+            "droneBurst": 1,
+            "wingShots": 2
+          },
+          "evolutions": []
+        },
+        {
+          "id": "s2:reprise",
+          "elapsed": 421.583,
+          "progression": 300,
+          "level": 9,
+          "xp": 430,
+          "companions": 3,
+          "hp": 5,
+          "bombs": 5,
+          "modules": [
+            "returnWing",
+            "precision",
+            "crossOrbit",
+            "prism",
+            "droneBurst",
+            "wingShots"
+          ],
+          "ranks": {
+            "returnWing": 1,
+            "precision": 2,
+            "crossOrbit": 2,
+            "prism": 2,
+            "droneBurst": 2,
+            "wingShots": 2
+          },
+          "evolutions": []
+        },
+        {
+          "id": "s2:final",
+          "elapsed": 519.7,
+          "progression": 360,
+          "level": 10,
+          "xp": 0,
+          "companions": 3,
+          "hp": 5,
+          "bombs": 5,
+          "modules": [
+            "returnWing",
+            "precision",
+            "crossOrbit",
+            "prism",
+            "droneBurst",
+            "wingShots"
+          ],
+          "ranks": {
+            "returnWing": 2,
+            "precision": 2,
+            "crossOrbit": 2,
+            "prism": 2,
+            "droneBurst": 2,
+            "wingShots": 2
+          },
+          "evolutions": [
+            "triangleAssault"
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "at": 20.1,
+          "level": 2,
+          "source": "level",
+          "offer": [
+            "returnWing",
+            "brakeField",
+            "graze"
+          ],
+          "selected": "returnWing"
+        },
+        {
+          "at": 70.8,
+          "level": 3,
+          "source": "level",
+          "offer": [
+            "returnWing",
+            "precision",
+            "crossOrbit"
+          ],
+          "selected": "precision"
+        },
+        {
+          "at": 121.983,
+          "level": 5,
+          "source": "level",
+          "offer": [
+            "crossOrbit",
+            "brakeField",
+            "returnWing"
+          ],
+          "selected": "crossOrbit"
+        },
+        {
+          "at": 121.983,
+          "level": 5,
+          "source": "boss",
+          "offer": [
+            "returnWing",
+            "prism",
+            "intercept"
+          ],
+          "selected": "prism"
+        },
+        {
+          "at": 121.983,
+          "level": 5,
+          "source": "level",
+          "offer": [
+            "wingShots",
+            "precision",
+            "prism"
+          ],
+          "selected": "precision"
+        },
+        {
+          "at": 186.183,
+          "level": 6,
+          "source": "level",
+          "offer": [
+            "brakeField",
+            "intercept",
+            "prism"
+          ],
+          "selected": "prism"
+        },
+        {
+          "at": 261.283,
+          "level": 8,
+          "source": "level",
+          "offer": [
+            "droneBurst",
+            "crossOrbit",
+            "reserveAmmo"
+          ],
+          "selected": "droneBurst"
+        },
+        {
+          "at": 261.283,
+          "level": 8,
+          "source": "boss",
+          "offer": [
+            "ricochet",
+            "returnWing",
+            "wingShots"
+          ],
+          "selected": "wingShots"
+        },
+        {
+          "at": 261.283,
+          "level": 8,
+          "source": "level",
+          "offer": [
+            "droneBurst",
+            "crossOrbit",
+            "wingShots"
+          ],
+          "selected": "wingShots"
+        },
+        {
+          "at": 323.25,
+          "level": 9,
+          "source": "level",
+          "offer": [
+            "crossOrbit",
+            "droneBurst",
+            "returnWing"
+          ],
+          "selected": "crossOrbit"
+        },
+        {
+          "at": 361.583,
+          "level": 9,
+          "source": "boss",
+          "offer": [
+            "reward:heal",
+            "droneBurst",
+            "returnWing"
+          ],
+          "selected": "droneBurst"
+        },
+        {
+          "at": 459.7,
+          "level": 10,
+          "source": "boss",
+          "offer": [
+            "reward:heal",
+            "returnWing",
+            "evolution:triangleAssault"
+          ],
+          "selected": "evolution:triangleAssault"
+        },
+        {
+          "at": 459.7,
+          "level": 10,
+          "source": "level",
+          "offer": [
+            "reward:bomb",
+            "reward:heal",
+            "returnWing"
+          ],
+          "selected": "returnWing"
+        }
+      ],
+      "injuries": [],
+      "modules": [
+        "returnWing",
+        "precision",
+        "crossOrbit",
+        "prism",
+        "droneBurst",
+        "wingShots"
+      ],
+      "ranks": {
+        "returnWing": 2,
+        "precision": 2,
+        "crossOrbit": 2,
+        "prism": 2,
+        "droneBurst": 2,
+        "wingShots": 2
+      },
+      "evolutions": [
+        "triangleAssault"
+      ],
+      "segments": [
+        {
+          "id": "approach:1",
+          "seconds": 90,
+          "damage": 1118,
+          "bossDamage": 0,
+          "sources": {
+            "normal": 420.5,
+            "beam": 465.75,
+            "burst": 15,
+            "drone": 207.75,
+            "module": 9
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 32,
+          "kills": 69,
+          "heatLockedSeconds": 23.083,
+          "dps": 12.422,
+          "bossDps": 0
+        },
+        {
+          "id": "s1:echo",
+          "seconds": 31.983,
+          "damage": 1406,
+          "bossDamage": 1200,
+          "sources": {
+            "normal": 509,
+            "drone": 270,
+            "beam": 500,
+            "burst": 100,
+            "module": 27
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 11,
+          "kills": 9,
+          "heatLockedSeconds": 9.7,
+          "dps": 43.96,
+          "bossDps": 37.52
+        },
+        {
+          "id": "approach:2",
+          "seconds": 90,
+          "damage": 2347,
+          "bossDamage": 0,
+          "sources": {
+            "normal": 672,
+            "burst": 113,
+            "beam": 595.25,
+            "drone": 729,
+            "module": 49,
+            "prism": 115,
+            "heavy": 2,
+            "special": 27.75,
+            "device": 44
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 32,
+          "kills": 112,
+          "heatLockedSeconds": 30.85,
+          "dps": 26.078,
+          "bossDps": 0
+        },
+        {
+          "id": "s2:palisade",
+          "seconds": 49.3,
+          "damage": 2971.5,
+          "bossDamage": 2000,
+          "sources": {
+            "normal": 1214.5,
+            "drone": 631.25,
+            "beam": 860,
+            "prism": 76,
+            "special": 63,
+            "heavy": 32,
+            "module": 39.75,
+            "device": 6,
+            "burst": 49
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 18,
+          "kills": 35,
+          "heatLockedSeconds": 16.3,
+          "dps": 60.274,
+          "bossDps": 40.568
+        },
+        {
+          "id": "approach:3",
+          "seconds": 59.983,
+          "damage": 2589,
+          "bossDamage": 0,
+          "sources": {
+            "beam": 546,
+            "drone": 176,
+            "normal": 1364.75,
+            "module": 484.25,
+            "device": 18
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 20,
+          "kills": 86,
+          "heatLockedSeconds": 18.433,
+          "dps": 43.162,
+          "bossDps": 0
+        },
+        {
+          "id": "s1:mafuyu",
+          "seconds": 1.983,
+          "damage": 70,
+          "bossDamage": 0,
+          "sources": {
+            "beam": 24,
+            "normal": 33.5,
+            "drone": 3,
+            "module": 9.5
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 1,
+          "kills": 6,
+          "heatLockedSeconds": 0.7,
+          "dps": 35.294,
+          "bossDps": 0
+        },
+        {
+          "id": "s1:mafuyu:card1",
+          "seconds": 3.833,
+          "damage": 700,
+          "bossDamage": 700,
+          "sources": {
+            "burst": 90,
+            "normal": 394.99999999999875,
+            "module": 102,
+            "drone": 45,
+            "beam": 58,
+            "special": 10
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 2,
+          "kills": 0,
+          "heatLockedSeconds": 0,
+          "dps": 182.609,
+          "bossDps": 182.609
+        },
+        {
+          "id": "s1:mafuyu:card2",
+          "seconds": 6.417,
+          "damage": 750,
+          "bossDamage": 750,
+          "sources": {
+            "drone": 84,
+            "module": 126,
+            "normal": 413.99999999999864,
+            "beam": 116,
+            "special": 10
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 2,
+          "kills": 0,
+          "heatLockedSeconds": 3.067,
+          "dps": 116.883,
+          "bossDps": 116.883
+        },
+        {
+          "id": "s1:mafuyu:card3",
+          "seconds": 6.183,
+          "damage": 800,
+          "bossDamage": 800,
+          "sources": {
+            "drone": 81,
+            "module": 141,
+            "normal": 494.0000000000017,
+            "special": 10,
+            "beam": 73.99999999999757
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 3,
+          "kills": 0,
+          "heatLockedSeconds": 1.617,
+          "dps": 129.38,
+          "bossDps": 129.38
+        },
+        {
+          "id": "s1:mafuyu:card4",
+          "seconds": 6.95,
+          "damage": 850,
+          "bossDamage": 850,
+          "sources": {
+            "drone": 93,
+            "module": 144,
+            "normal": 486.99999999999886,
+            "beam": 116,
+            "special": 10
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 2,
+          "kills": 0,
+          "heatLockedSeconds": 3.067,
+          "dps": 122.302,
+          "bossDps": 122.302
+        },
+        {
+          "id": "s1:mafuyu:card5",
+          "seconds": 7.4,
+          "damage": 900,
+          "bossDamage": 900,
+          "sources": {
+            "normal": 456.99999999999847,
+            "module": 150,
+            "drone": 99,
+            "beam": 174,
+            "special": 20
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 3,
+          "kills": 0,
+          "heatLockedSeconds": 3.067,
+          "dps": 121.622,
+          "bossDps": 121.622
+        },
+        {
+          "id": "s1:mafuyu:card6",
+          "seconds": 7.55,
+          "damage": 1000,
+          "bossDamage": 1000,
+          "sources": {
+            "normal": 546.0000000000022,
+            "module": 159,
+            "drone": 100.99999999999653,
+            "beam": 174,
+            "special": 20
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 3,
+          "kills": 1,
+          "heatLockedSeconds": 2.533,
+          "dps": 132.45,
+          "bossDps": 132.45
+        },
+        {
+          "id": "approach:4",
+          "seconds": 60,
+          "damage": 3065.5,
+          "bossDamage": 0,
+          "sources": {
+            "normal": 1517,
+            "module": 603.5,
+            "beam": 563.5,
+            "drone": 321.5,
+            "prism": 34,
+            "device": 18,
+            "heavy": 8
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 21,
+          "kills": 92,
+          "heatLockedSeconds": 16.467,
+          "dps": 51.092,
+          "bossDps": 0
+        },
+        {
+          "id": "s2:reprise",
+          "seconds": 38.117,
+          "damage": 4081.5,
+          "bossDamage": 3200,
+          "sources": {
+            "normal": 1946,
+            "module": 888,
+            "drone": 474.5,
+            "beam": 696,
+            "burst": 50,
+            "special": 9,
+            "prism": 18
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 13,
+          "kills": 22,
+          "heatLockedSeconds": 14.3,
+          "dps": 107.079,
+          "bossDps": 83.953
+        },
+        {
+          "id": "approach:5",
+          "seconds": 60,
+          "damage": 4108.625,
+          "bossDamage": 0,
+          "sources": {
+            "normal": 2319.574999999974,
+            "module": 723.0125000000035,
+            "burst": 81.84999999999991,
+            "beam": 496.54999999999995,
+            "prism": 38,
+            "drone": 449.637499999999
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 21,
+          "kills": 111,
+          "heatLockedSeconds": 20.017,
+          "dps": 68.477,
+          "bossDps": 0
+        },
+        {
+          "id": "s2:final",
+          "seconds": 1.983,
+          "damage": 155.375,
+          "bossDamage": 0,
+          "sources": {
+            "normal": 99.4249999999999,
+            "module": 43.34999999999998,
+            "drone": 12.600000000000001
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 0,
+          "kills": 4,
+          "heatLockedSeconds": 0,
+          "dps": 78.34,
+          "bossDps": 0
+        },
+        {
+          "id": "s2:final:card1",
+          "seconds": 8.2,
+          "damage": 1500,
+          "bossDamage": 1500,
+          "sources": {
+            "burst": 108,
+            "normal": 839.9999999999961,
+            "module": 273.9000000000003,
+            "drone": 125.39999999999992,
+            "beam": 130.70000000000695,
+            "special": 22
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 4,
+          "kills": 0,
+          "heatLockedSeconds": 1.617,
+          "dps": 182.927,
+          "bossDps": 182.927
+        },
+        {
+          "id": "s2:final:card2",
+          "seconds": 11.417,
+          "damage": 1700,
+          "bossDamage": 1700,
+          "sources": {
+            "drone": 177.30000000000882,
+            "special": 44,
+            "normal": 909.999999999995,
+            "module": 313.5,
+            "beam": 255.20000000000002
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 4,
+          "kills": 0,
+          "heatLockedSeconds": 4.517,
+          "dps": 148.905,
+          "bossDps": 148.905
+        },
+        {
+          "id": "s2:final:card3",
+          "seconds": 12.567,
+          "damage": 1966.4,
+          "bossDamage": 1800,
+          "sources": {
+            "drone": 194.70000000000016,
+            "normal": 1137.0000000000007,
+            "module": 346.49999999999983,
+            "beam": 255.20000000000002,
+            "special": 33
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 4,
+          "kills": 1,
+          "heatLockedSeconds": 4.683,
+          "dps": 156.477,
+          "bossDps": 143.236
+        },
+        {
+          "id": "s2:final:card4",
+          "seconds": 12.917,
+          "damage": 1900,
+          "bossDamage": 1900,
+          "sources": {
+            "normal": 1054.1000000000024,
+            "module": 356.3999999999996,
+            "drone": 201.30000000000018,
+            "beam": 255.20000000000002,
+            "special": 33
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 5,
+          "kills": 0,
+          "heatLockedSeconds": 4.517,
+          "dps": 147.097,
+          "bossDps": 147.097
+        },
+        {
+          "id": "s2:final:card5",
+          "seconds": 14.4,
+          "damage": 2100,
+          "bossDamage": 2100,
+          "sources": {
+            "beam": 353.50000000000966,
+            "drone": 224.40000000000026,
+            "module": 386.0999999999995,
+            "normal": 1091.999999999992,
+            "special": 44
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 6,
+          "kills": 0,
+          "heatLockedSeconds": 5.8,
+          "dps": 145.833,
+          "bossDps": 145.833
+        },
+        {
+          "id": "s2:final:card6",
+          "seconds": 14.1,
+          "damage": 2200,
+          "bossDamage": 2200,
+          "sources": {
+            "normal": 1223.19999999999,
+            "module": 395.9999999999989,
+            "drone": 217.80000000000024,
+            "beam": 319,
+            "special": 44
+          },
+          "received": {},
+          "bombs": 0,
+          "beams": 5,
+          "kills": 1,
+          "heatLockedSeconds": 5,
+          "dps": 156.028,
+          "bossDps": 156.028
+        }
+      ]
+    }
+  ],
+  "changedSources": [],
+  "finishedAt": "2026-09-17T07:15:36.128Z"
+}

@@ -1,0 +1,74 @@
+{
+  "capturedAt": "2026-09-17T07:30:03.477Z",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "debugOverlayHidden": true,
+  "sourceModified": false,
+  "fullBrowserSuite": {
+    "passed": 35,
+    "failed": 0,
+    "duration": "2.6 minutes"
+  },
+  "choices": {
+    "choices": [
+      "rearSpark",
+      "evolution:spiralBloom",
+      "intercept"
+    ],
+    "phase": "upgrade",
+    "raf": false
+  },
+  "scene": {
+    "modules": [
+      "wingShots",
+      "rearSpark",
+      "chain",
+      "slow",
+      "doubleDash",
+      "dashEcho"
+    ],
+    "ranks": {
+      "wingShots": 2,
+      "rearSpark": 2,
+      "chain": 2,
+      "slow": 2,
+      "doubleDash": 2,
+      "dashEcho": 2
+    },
+    "evolutions": [
+      "spiralBloom",
+      "echoTrail"
+    ],
+    "playerAreas": [
+      {
+        "kind": "trail",
+        "life": 0.7333333333333333,
+        "width": 64
+      }
+    ],
+    "enemyBullets": 15
+  },
+  "pageErrors": [],
+  "screenshots": [
+    "v5.0.0-menu-1280.png",
+    "v5.0.0-upgrade-evolution-1280.png",
+    "v5.0.0-six-slot-pause-1280.png",
+    "v5.0.0-evolution-trail-1280.png"
+  ],
+  "additionalValidation": {
+    "finalBundle": "index-BMerQEtE.js",
+    "test": "real lethal hit exposes failed score persistence on failure screen before retry",
+    "passed": 1,
+    "failed": 0,
+    "duration": "13.4 seconds",
+    "scope": "Only failure-screen SaveNotice was added after the previous 35-test full pass. The new regression was run on the rebuilt production bundle. The prior 35 checks were not repeated."
+  },
+  "combinedBrowserCoverage": {
+    "passed": 36,
+    "failed": 0,
+    "fullRun": 35,
+    "targetedAfterMinimalFix": 1
+  }
+}

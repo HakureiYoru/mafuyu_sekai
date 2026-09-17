@@ -13,9 +13,10 @@ const cases = [
   { name: 'lacuna-nodes', season: 's2', cardIndex: 2 },
   { name: 'lacuna-rings', season: 's2', cardIndex: 4 },
   { name: 'lacuna-finale', season: 's2', cardIndex: 5 },
-  { name: 'modules-and-carriers', season: 's2', modules: ['shatter', 'chain', 'prism', 'droneHoming', 'droneBurst', 'doubleDash', 'intercept'] },
+  { name: 'modules-and-carriers', modules: ['wingShots', 'rearSpark', 'chain', 'slow', 'doubleDash', 'dashEcho'],
+    ranks: { wingShots: 2, rearSpark: 2, chain: 2, slow: 2, doubleDash: 2, dashEcho: 2 }, evolutions: ['spiralBloom', 'echoTrail'] },
 ];
-const report = { version, measuredAt: new Date().toISOString(), scenario: '1920×1080 medium, production WebGL; hardest recurring cards and seven-module second-season combat. Each case has a 3s warmup then 24s of real browser RAF sampling. Practice player invincibility is enabled; this measures performance, not human difficulty.', errors: [], cases: [] };
+const report = { version, measuredAt: new Date().toISOString(), scenario: '1920×1080 medium, production WebGL; hardest recurring cards and six rank-II modules with two evolutions. Each case has a 3s warmup then 24s of real browser RAF sampling. Practice player invincibility is enabled; this measures performance, not human difficulty.', errors: [], cases: [] };
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '5185', '--strictPort'], { windowsHide: true, stdio: 'ignore' });
 let browser;
 try {
@@ -35,7 +36,7 @@ try {
     await page.evaluate(item => {
       window.__MAFUYU_DEBUG__.practice(item);
       const state = window.__MAFUYU_DEBUG__.state();
-      if (item.modules) { state.wave = 6; state.spawnTimer = 0; state.mode = 'endless'; }
+      if (item.modules) { state.wave = 6; state.spawnTimer = 0; state.mode = 'endless'; state.player.level = 10; state.player.xp = 0; }
     }, item);
     let bot;
     if (item.modules) bot = setInterval(async () => {
@@ -47,13 +48,12 @@ try {
           button: 0, buttons: 1, pointerType: 'mouse', pointerId: 1, bubbles: true };
         canvas.dispatchEvent(new window.PointerEvent('pointermove', pointer)); canvas.dispatchEvent(new window.PointerEvent('pointerdown', pointer));
         if (p.dashCooldown <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyR' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyR' })); }
-        if (p.perfectWindow > 0 && p.dashTime <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyQ' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyQ' })); }
-        if (p.commandCooldown <= 0) { window.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyE' })); window.dispatchEvent(new window.KeyboardEvent('keyup', { code: 'KeyE' })); }
       }).catch(e => report.errors.push(e.message));
     }, 100);
     await page.waitForTimeout(3000);
     const metrics = await page.evaluate(async () => {
       const samples = [], resources = []; let previous = 0, first = 0, lastResource = 0;
+      const elapsedStart = window.__MAFUYU_DEBUG__.state().elapsed;
       await new Promise(resolve => {
         const sample = now => {
           first ||= now; if (previous) samples.push(now - previous); previous = now;
@@ -61,7 +61,7 @@ try {
             const state = window.__MAFUYU_DEBUG__.state();
             resources.push({ time: (now - first) / 1000, ...window.__MAFUYU_DEBUG__.snapshot().stats,
               beams: state.beams.length, hazards: state.hazards.length, parts: state.enemies.filter(e => e.role === 'part' || e.type === 'core').length,
-              modules: state.build.modules, card: state.enemies.find(e => e.spell)?.spell?.cardIndex });
+              phase: window.__MAFUYU_DEBUG__.snapshot().phase, modules: state.build.modules, ranks: state.build.ranks, evolutions: state.build.evolutions, card: state.enemies.find(e => e.spell)?.spell?.cardIndex });
             lastResource = now;
           }
           if (now - first < 24000) requestAnimationFrame(sample); else resolve();
@@ -71,13 +71,15 @@ try {
       const at = fraction => samples[Math.min(samples.length - 1, Math.floor(samples.length * fraction))];
       const canvas = document.querySelector('canvas'), gl = canvas.getContext('webgl2'), ext = gl?.getExtension('WEBGL_debug_renderer_info');
       return { gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unavailable', canvas: { width: canvas.width, height: canvas.height },
+        simulatedSeconds: window.__MAFUYU_DEBUG__.state().elapsed - elapsedStart,
         frameMs: { p50: at(0.5), p95: at(0.95), p99: at(0.99), max: samples.at(-1) }, samples: samples.length, resources };
     });
     if (bot) clearInterval(bot);
     await page.screenshot({ path: `${output}/v${version}-${item.name}.png` });
     report.cases.push({ ...item, ...metrics });
     console.log(JSON.stringify({ case: item.name, frameMs: metrics.frameMs, maxBullets: Math.max(...metrics.resources.map(r => r.bullets)) }));
-    assert.ok(metrics.resources.every(r => r.bullets <= 4096 && r.hazards <= 12 && r.textures <= 64));
+    assert.ok(metrics.simulatedSeconds >= 23 && metrics.resources.every(r => r.phase === 'playing' && r.bullets <= 4096 && r.hazards <= 12 && r.textures <= 64));
+    if (item.modules) assert.ok(metrics.resources.every(r => r.modules.length === 6 && r.evolutions.length === 2 && Object.values(r.ranks).every(rank => rank === 2)));
   }
   assert.equal(report.errors.length, 0);
 } finally {

@@ -55,7 +55,7 @@ describe('v4.1 interaction ownership and collision', () => {
     expect(shield.hp).toBe(shield.maxHp - 12);
   });
 
-  it('Q breaking an actually committed shield cancels its pending attack reservation', () => {
+  it('the automatic dash beam cancels an actually committed shield attack reservation', () => {
     const sim = scene(), p = sim.state.player;
     const shield = sim.spawnEnemy('shield', p.x + 280, p.y)!;
     shield.angle = Math.PI; shield.cooldown = 0; shield.speed = 0;
@@ -65,8 +65,8 @@ describe('v4.1 interaction ownership and collision', () => {
     expect(director.intents.some(intent => intent.sourceId === shield.id)).toBe(true);
     expect(sim.state.bullets.some(bullet => bullet.owner === 'enemy' && bullet.sourceId === shield.id)).toBe(false);
 
-    p.perfectWindow = 4;
-    const events = sim.step({ ...idle, aimX: shield.x, aimY: shield.y, beam: true });
+    p.perfectWindow = 0.85;
+    const events = sim.step({ ...idle, aimX: shield.x, aimY: shield.y, shoot: true });
     expect(events.filter(event => event.type === 'beam')).toHaveLength(1);
     expect(events.filter(event => event.type === 'shieldBreak' && event.targetId === shield.id)).toHaveLength(1);
     expect(shield.hp).toBe(shield.maxHp - 10);
