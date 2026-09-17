@@ -1,0 +1,228 @@
+{
+  "version": "5.0.1",
+  "sha": "203369fc9d637d3e02544155d71dfaf71937efc0",
+  "url": "https://mafuyu-sekai.vercel.app",
+  "checkedAt": "2026-09-17T09:28:25.851Z",
+  "fixture": "Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.",
+  "errors": [],
+  "encounters": [
+    {
+      "id": "s1:echo",
+      "cards": [
+        {
+          "hp": 1200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:palisade",
+      "cards": [
+        {
+          "hp": 2000,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s1:mafuyu",
+      "cards": [
+        {
+          "hp": 697,
+          "card": 0,
+          "name": "点射·学姐在看你"
+        },
+        {
+          "hp": 750,
+          "card": 1,
+          "name": "排队·请走这一边"
+        },
+        {
+          "hp": 800,
+          "card": 2,
+          "name": "微笑·全角度营业"
+        },
+        {
+          "hp": 850,
+          "card": 3,
+          "name": "再见·回头还有"
+        },
+        {
+          "hp": 900,
+          "card": 4,
+          "name": "作词中·此处请留白"
+        },
+        {
+          "hp": 1000,
+          "card": 5,
+          "name": "礼貌·真的要送客了"
+        }
+      ]
+    },
+    {
+      "id": "s2:reprise",
+      "cards": [
+        {
+          "hp": 3200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:final",
+      "cards": [
+        {
+          "hp": 1500,
+          "card": 0,
+          "name": "闭园·闸机逐片关闭"
+        },
+        {
+          "hp": 1700,
+          "card": 1,
+          "name": "斜线·谢绝抄近路"
+        },
+        {
+          "hp": 1800,
+          "card": 2,
+          "name": "水族箱·请勿敲玻璃"
+        },
+        {
+          "hp": 1900,
+          "card": 3,
+          "name": "返场·申请已退回"
+        },
+        {
+          "hp": 2100,
+          "card": 4,
+          "name": "绕圈·出口不在这里"
+        },
+        {
+          "hp": 2200,
+          "card": 5,
+          "name": "25时·全场请安静"
+        }
+      ]
+    }
+  ],
+  "choices": [
+    {
+      "phase": "upgrade",
+      "offer": "level:2:0",
+      "choices": [
+        "crossOrbit",
+        "slow",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:echo:0",
+      "choices": [
+        "returnWing",
+        "wingShots",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:3:0",
+      "choices": [
+        "returnWing",
+        "precision",
+        "graze"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:palisade:0",
+      "choices": [
+        "graze",
+        "precision",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:4:0",
+      "choices": [
+        "piercing",
+        "graze",
+        "rearSpark"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:mafuyu:0",
+      "choices": [
+        "precision",
+        "graze",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:5:0",
+      "choices": [
+        "brakeField",
+        "wingShots",
+        "precision"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:reprise:0",
+      "choices": [
+        "precision",
+        "crossOrbit",
+        "brakeField"
+      ]
+    }
+  ],
+  "artifact": {
+    "entry": "./assets/index-BwVCtTmP.js",
+    "deployedSha256": "411373bf55fd1b5bb2f03cab258a0ce8b001cc7345451d8193ae19381c405d16",
+    "localEntry": "assets/index-BwVCtTmP.js",
+    "localSha256": "411373bf55fd1b5bb2f03cab258a0ce8b001cc7345451d8193ae19381c405d16"
+  },
+  "saved": {
+    "version": 2,
+    "revision": 1,
+    "clears": {
+      "v5:ebff1385-99aa-4d87-90a9-868099ab9468": {
+        "runId": "ebff1385-99aa-4d87-90a9-868099ab9468",
+        "ruleset": "v5",
+        "difficulty": "normal",
+        "encounterId": "s2:final",
+        "score": 226000,
+        "source": "gameplay",
+        "completedAt": 1789637331313
+      }
+    },
+    "bestScores": {
+      "v5": {
+        "normal": {
+          "story": 226000,
+          "endless": 0
+        },
+        "hard": {
+          "story": 0,
+          "endless": 0
+        }
+      }
+    }
+  },
+  "restarted": {
+    "level": 1,
+    "xp": 0,
+    "companions": 0,
+    "modules": 0,
+    "bombs": 3,
+    "hp": 5,
+    "canvases": 1,
+    "raf": true
+  },
+  "result": "passed"
+}
