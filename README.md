@@ -1,8 +1,8 @@
-# Mafuyu Sekai · Wonderhoy 串门中
+# 凤小梦大战朝比奈真冬
 
-**v5.0.1 · 笑梦来送快乐，学姐来送弹幕**
+**v5.0.2 · Wonderhoy！！……闭嘴。**
 
-以 Project Sekai 的凤笑梦与朝比奈真冬为主题的整蛊向同人弹幕游戏。笑梦打算把空白 SEKAI 变成临时游乐场，真冬学姐准备礼貌地用弹幕送客。通讯、符卡和道具彩蛋采用原创角色拌嘴，操作与伤害说明保持直白。
+以 Project Sekai 的凤笑梦与朝比奈真冬为主题的整蛊向同人弹幕游戏。笑梦只想大喊 Wonderhoy，阴暗的真冬只想让她闭嘴。笑梦越喊越开心，真冬从压抑、冷漠走向狂躁，用弹幕把声音压回去。台词和道具采用原创黑化整蛊演绎；操作与伤害说明保持直白。
 
 面向 PC 键鼠。每局从 Lv1 出发，在连续战役中面对十一种混合敌人与五位首领，通过六槽模块、两级强化和组合进化形成自己的打法。普通难度设计目标为 10–15 分钟，选卡时间不计入战斗时间。
 
@@ -97,10 +97,10 @@ npm run test:soak
 
 平衡脚本将正常生命与无敌输出诊断分开，记录实际候选、首领入口等级、耗时、伤害来源及资源消耗。自动控制不等同于真人体验。`node scripts/verify-deployment.mjs` 验证线上版本、新战役完成保存和刷新后的 Lv1 开局；`MAFUYU_DEPLOYMENT_URL` 可指定部署地址。
 
-详见 [v5.0 设计](docs/design-v5.0.md)、[v5.0 验证记录](docs/validation/v5.0.0.md) 与 [v5.0.1 文案规范](docs/copy-v5.0.1.md)、[本次验证](docs/validation/v5.0.1.md)。RTX 3060 Laptop 数据单列，核显目标仍需对应设备实测。
+详见 [v5.0 设计](docs/design-v5.0.md)、[v5.0 验证记录](docs/validation/v5.0.0.md) 与 [当前文案规范](docs/copy-v5.0.2.md)、[本次验证](docs/validation/v5.0.2.md)。RTX 3060 Laptop 数据单列，核显目标仍需对应设备实测。
 
 ## 资源与日志
 
-角色、背景、子弹、血包五张原始 PNG 及路径不变，SHA-256 基准见 `docs/baseline/assets.sha256.json`。其他既有道具许可见 [素材记录](docs/asset-sources-v3.1.md)。v5.0.1 全面重写游戏台词，保留事件分组和占位符；新增动效使用程序图形。
+角色、背景、子弹、血包五张原始 PNG 及路径不变，SHA-256 基准见 `docs/baseline/assets.sha256.json`。其他既有道具许可见 [素材记录](docs/asset-sources-v3.1.md)。v5.0.2 按黑化真冬与简单直白的笑梦重新调整台词，保留事件分组和占位符；新增动效使用程序图形。
 
 唯一日志来源为 `public/data/changelog.json`，最新版本在前，每次包含版本、日期、标题和 1–5 条重点。浏览器版本不包含 Electron 与触屏操作。

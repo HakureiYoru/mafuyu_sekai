@@ -19,15 +19,21 @@ const entryGroup = (event: CombatEvent) => event.encounterId === 's2:final' ? 'L
 export class Dialogue {
   private queue: CommsMessage[] = [];
   private current: CommsMessage | null = null;
+  private replies = new Map<number, CommsMessage>();
+  private replyCount = 0;
+  private protectedUntil = 0;
   private age = 0;
   private time = 0;
   private sequence = 0;
   private last = new Map<string, number>();
   private selections = new Map<string, number>();
-  reset() { this.queue = []; this.current = null; this.age = 0; this.time = 0; this.last.clear(); }
+  reset() {
+    this.queue = []; this.current = null; this.replies.clear(); this.replyCount = 0; this.protectedUntil = 0;
+    this.age = 0; this.time = 0; this.last.clear();
+  }
   start() { this.reset(); this.say('SYSTEM_STATUS', true); }
   private narrate(text: string, speaker = 'EMU') {
-    this.queue = []; this.age = 0;
+    this.queue = []; this.replies.clear(); this.age = 0;
     this.current = { id: ++this.sequence, speaker, avatar: speaker === 'EMU' ? 'player' : 'enemy', color: speaker === 'EMU' ? '#91efe0' : '#c1adfa', text };
   }
   say(group: string, priority = false, replacements: Record<string, string> = {}, maxed?: boolean) {
@@ -41,13 +47,39 @@ export class Dialogue {
     let text = line.text;
     for (const [key, value] of Object.entries(replacements)) text = text.replaceAll(`{${key}}`, value);
     const message: CommsMessage = { id: ++this.sequence, speaker: line.sender.startsWith('EMU') ? 'EMU' : 'MAFUYU', avatar: line.sender.startsWith('EMU') ? 'player' : 'enemy', color: line.color, text };
-    if (priority || !this.current) { this.current = message; this.age = 0; if (priority) this.queue = []; }
+    if (priority || !this.current) {
+      this.current = message; this.age = 0;
+      if (priority) { this.queue = []; this.replies.clear(); }
+    }
     else if (this.queue.length < 2) this.queue.push(message);
+    else return;
+    // One short reply belongs to an accepted shout, never to a free-running timer.
+    // Important events discard both queued banter and its unspoken replies.
+    if (message.speaker === 'EMU' && text.includes('Wonderhoy') && group !== 'COMPLETE_EVENT') {
+      const options = data.WONDERHOY_REPLY;
+      const reply = options[Math.min(this.replyCount++, options.length - 1)];
+      this.replies.set(message.id, { id: ++this.sequence, speaker: 'MAFUYU', avatar: 'enemy', color: reply.color, text: reply.text });
+    }
   }
   handle(events: CombatEvent[], score: number) {
+    // Settlement can emit upgrades or a killing bomb after the terminal event.
+    // The stopped runtime must retain the full result line, with no stale reply.
+    let terminal: CombatEvent | undefined;
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'failure' || events[i].type === 'complete') { terminal = events[i]; break; }
+    }
+    if (terminal) {
+      this.say(terminal.type === 'failure' ? 'FAILURE_EVENT' : 'COMPLETE_EVENT', true, { score: `${score}` });
+      this.replies.clear(); this.protectedUntil = this.time + 2.5; this.age = 10;
+      return;
+    }
     for (const event of events) {
+      if (['damage', 'boss', 'bossLow', 'card', 'levelup', 'leveldown'].includes(event.type)
+        || (event.type === 'attack' && (event.text === 'arrival' || event.text === 'encounterCleared'))) {
+        this.protectedUntil = this.time + 2.5;
+      }
       if (event.type === 'card' && event.text === 'cleared') this.say('CARD_CLEARED', true);
-      else if (event.type === 'card') this.narrate(`「${event.text ?? '下一张符卡'}」——学姐，这也算普通问候？！`);
+      else if (event.type === 'card') this.narrate(`「${event.text ?? '下一张符卡'}」`, 'MAFUYU');
       else if (event.type === 'boss' || (event.type === 'attack' && event.text === 'arrival')) {
         const group = entryGroup(event);
         // The spawn warning and actual arrival belong to the same entrance line.
@@ -55,12 +87,11 @@ export class Dialogue {
       }
       else if (event.type === 'attack' && event.text === 'encounterCleared') this.say('ENCOUNTER_CLEARED', true);
       else if (event.type === 'bossLow') this.say('BOSS_LOW_HP', true);
-      else if (event.type === 'failure') { this.say('FAILURE_EVENT', true, { score: `${score}` }); this.age = 10; }
       else if (event.type === 'damage') this.say('PLAYER_DAMAGE', true);
       else if (event.type === 'leveldown') this.say('LEVEL_DOWN_EVENT', true);
       else if (event.type === 'xpLoss') this.say('LEVEL_DOWN_EVENT');
       else if (event.type === 'levelup') { this.say('LEVEL_UP_EVENT', true, {}, (event.amount ?? 1) >= 10); this.say('EMU_LEVELUP'); }
-      else if (event.type === 'bomb') this.say('EMU_WONDERHOY', true);
+      else if (event.type === 'bomb') this.say('EMU_WONDERHOY', this.time >= this.protectedUntil);
       else if (event.type === 'pickup' && event.pickupType === 'hp') { this.say('HP_RECOVER_EVENT'); this.say('EMU_HEAL'); }
       else if (event.type === 'attack' && isBoss(event.enemyType)) this.say(attackGroup(event.enemyType));
       else if (event.enemyType && families[event.enemyType]) {
@@ -69,15 +100,17 @@ export class Dialogue {
         else if (event.type === 'attack') this.say(`TYPE_${family}_ATTACK`);
         else if (event.type === 'kill') this.say(`TYPE_${family}_DEATH`);
       }
-      else if (event.type === 'complete') {
-        this.say('COMPLETE_EVENT', true);
-        this.age = 10;
-      }
     }
   }
   update(dt: number) {
     this.time += dt; this.age += dt;
-    if (this.current && this.age > 5.5) { this.current = this.queue.shift() ?? null; this.age = 0; }
+    if (this.current) {
+      const reply = this.replies.get(this.current.id);
+      if (this.age > (reply ? 1.6 : 5.5)) {
+        this.replies.delete(this.current.id);
+        this.current = reply ?? this.queue.shift() ?? null; this.age = 0;
+      }
+    }
   }
   getMessage(reducedMotion = false): CommsMessage | null {
     if (!this.current) return null;

@@ -9,6 +9,8 @@ describe('continuous campaign communications', () => {
     const line = dialogue.getMessage(true)!.text;
     expect(line).not.toMatch(/第一季|继承|选好模块/);
     expect(dialogue.getMessage(true)?.text).toBe(line);
+    dialogue.update(2);
+    expect(dialogue.getMessage(true)?.speaker).toBe('MAFUYU');
     dialogue.update(6);
     expect(dialogue.getMessage(true)).toBeNull();
   });
@@ -69,6 +71,7 @@ describe('continuous campaign communications', () => {
     ]) as CombatEvent[];
     dialogue.handle(events, 0);
     expect(dialogue.getMessage(true)).toEqual(opening);
+    dialogue.update(2);
     dialogue.update(6);
     expect(dialogue.getMessage(true)).toBeNull();
   });
@@ -85,8 +88,79 @@ describe('continuous campaign communications', () => {
   it.each([
     ['miniboss', 'ECHO_ATTACK'], ['palisade', 'PALISADE_ATTACK'], ['reprise', 'REPRISE_ATTACK'],
   ] as const)('keeps %s mechanics out of the final-boss six-card banter', (enemyType, group) => {
-    const dialogue = new Dialogue(); dialogue.start(); dialogue.update(6);
+    const dialogue = new Dialogue(); dialogue.start(); dialogue.update(2); dialogue.update(6);
     dialogue.handle([{ type: 'attack', enemyType, text: 'windup', x: 0, y: 0 }], 0);
     expect(dialogue.getMessage(true)?.text).toBe(dialogueData[group][0].text);
+  });
+  it('answers repeated Wonderhoy shouts with short, increasingly angry replies', () => {
+    const dialogue = new Dialogue();
+    for (let i = 0; i < 10; i++) {
+      dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
+      expect(dialogue.getMessage(true)).toMatchObject({ speaker: 'EMU', avatar: 'player' });
+      expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
+      dialogue.update(1.61);
+      expect(dialogue.getMessage(true)).toMatchObject({ speaker: 'MAFUYU', avatar: 'enemy' });
+      expect(dialogue.getMessage(true)?.text).toBe(dialogueData.WONDERHOY_REPLY[Math.min(i, dialogueData.WONDERHOY_REPLY.length - 1)].text);
+      dialogue.update(6);
+      expect(dialogue.getMessage(true)).toBeNull();
+    }
+  });
+  it.each(['damage', 'boss', 'card', 'failure'] as const)('drops an unspoken shout reply when %s interrupts', type => {
+    const dialogue = new Dialogue();
+    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
+    dialogue.update(0.5);
+    dialogue.handle([{ type, encounterId: 's2:final', text: type === 'card' ? '测试符卡' : undefined, x: 0, y: 0 }], 20);
+    const important = dialogue.getMessage(true);
+    if (type !== 'failure') {
+      dialogue.update(2);
+      expect(dialogue.getMessage(true)).toEqual(important);
+    }
+    dialogue.update(6);
+    expect(dialogue.getMessage(true)).toBeNull();
+  });
+  it('lets damage and boss notices finish before a later bomb shout', () => {
+    for (const event of [{ type: 'damage' }, { type: 'boss', encounterId: 's2:final' }] as const) {
+      const dialogue = new Dialogue();
+      dialogue.handle([{ ...event, x: 0, y: 0 }], 0);
+      const important = dialogue.getMessage(true);
+      dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
+      expect(dialogue.getMessage(true)).toEqual(important);
+      dialogue.update(6);
+      expect(dialogue.getMessage(true)?.speaker).toBe('EMU');
+      expect(dialogue.getMessage(true)?.text).toContain('Wonderhoy');
+      dialogue.update(2);
+      expect(dialogue.getMessage(true)?.speaker).toBe('MAFUYU');
+    }
+  });
+  it.each([
+    ['complete', 'COMPLETE_EVENT'], ['failure', 'FAILURE_EVENT'],
+  ] as const)('keeps the full %s line despite later settlement events and discards all pending banter', (type, group) => {
+    const dialogue = new Dialogue();
+    dialogue.handle([{ type: 'damage', x: 0, y: 0 }, { type: 'bomb', x: 0, y: 0 }], 0);
+    dialogue.handle([
+      { type, x: 0, y: 0 },
+      { type: 'bomb', x: 0, y: 0 },
+      { type: 'levelup', amount: 10, x: 0, y: 0 },
+      { type: 'pickup', pickupType: 'hp', x: 0, y: 0 },
+    ], 2468);
+    expect(dialogue.getMessage()?.text).toBe(dialogueData[group][0].text.replaceAll('{score}', '2468'));
+    expect(dialogue.getMessage()).toEqual(dialogue.getMessage(true));
+    // Continuing after the result must not resurrect a queued shout or reply.
+    dialogue.update(1 / 60);
+    expect(dialogue.getMessage(true)).toBeNull();
+    dialogue.update(8);
+    expect(dialogue.getMessage(true)).toBeNull();
+  });
+  it('bounds queued replies during event bursts and removes them on reset', () => {
+    const dialogue = new Dialogue();
+    dialogue.handle([{ type: 'damage', x: 0, y: 0 }], 0);
+    for (let i = 0; i < 50; i++) dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
+    for (let i = 0; i < 4; i++) dialogue.update(6);
+    expect(dialogue.getMessage(true)).toBeNull();
+    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0);
+    dialogue.reset(); dialogue.update(10);
+    expect(dialogue.getMessage(true)).toBeNull();
+    dialogue.handle([{ type: 'bomb', x: 0, y: 0 }], 0); dialogue.update(2);
+    expect(dialogue.getMessage(true)?.text).toBe(dialogueData.WONDERHOY_REPLY[0].text);
   });
 });

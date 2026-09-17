@@ -5,30 +5,30 @@ export type ModuleBranch = 'main' | 'drone' | 'resource';
 export interface ModuleDefinition { id: ModuleId; name: string; branch: ModuleBranch; description: string; rank2Description: string; flavor: string }
 // Original fan-game banter stays separate from the exact combat descriptions.
 const MODULE_FLAVORS: Record<ModuleId, string> = {
-  piercing: '笑梦：学姐们排好队，一个 Wonderhoy 都不能少！',
-  wingShots: '单手打招呼不够热情，那就两边一起。',
-  precision: '真冬：你终于愿意安静慢下来了。',
-  shatter: '笑梦说这是彩纸。学姐建议别伸手接。',
-  chain: '一个人听见 Wonderhoy，就会有更多人听见。',
-  prism: '学姐，你的水族箱能借我打个舞台灯吗？',
-  droneHoming: '小笑梦认准了学姐，绕路也要打招呼。',
-  droneBurst: '大家一起喊！……学姐为什么往后退？',
-  slow: '真冬：先慢一点。我还没说可以开演。',
-  division: '小笑梦分头营业，每位学姐都得招呼到。',
-  intercept: '收到学姐的回礼了！这个……好像不能接。',
-  orbitBlade: '笑梦：小小的我，替我去和学姐贴贴！',
-  doubleDash: '杂技演员的基本功：蹦过去，再蹦回来。',
-  vent: '太热了？再跑一圈！这是笑梦的解决方案。',
-  reserveAmmo: '凤凰乐园后台特供：让热情稍微冷静一下。',
-  graze: '差一点就碰到了！这也算杂技成功吧？',
-  revive: '还不能谢幕，Wonderhoy 才喊到一半！',
-  magnet: '散场可以，亮晶晶的小道具必须全部带走。',
-  ricochet: '这位学姐收到了，顺便也跟那位打个招呼。',
-  rearSpark: '真冬：你走就走，为什么背后还在放礼花。',
-  crossOrbit: '小笑梦们排成一圈。学姐没有参加游戏。',
-  returnWing: '真冬：再见。……怎么又回来了？',
-  brakeField: '笑梦把这叫慢动作表演。学姐只想暂停。',
-  dashEcho: '笑梦已经跑远，留在原地的热情才刚开场。',
+  piercing: '笑梦：咻——！真冬：……连沉默都被穿透了。',
+  wingShots: '笑梦：砰砰！真冬：一边吵还不够？！',
+  precision: '笑梦：嘘……砰！真冬：……又骗我。',
+  shatter: '笑梦：哗啦啦！真冬：……全都碎了。',
+  chain: '笑梦：哔哩！哔哩！真冬：别把声音传过来！',
+  prism: '笑梦：亮晶晶！真冬：把那道光关掉！！',
+  droneHoming: '笑梦：追上啦！真冬：别过来……别过来！',
+  droneBurst: '小笑梦：Wonderhoy！！真冬：一起闭嘴！！',
+  slow: '笑梦：慢——慢——哇！真冬：慢下来也很吵。',
+  division: '笑梦：这边！那边！真冬：哪里都有你？！',
+  intercept: '笑梦：啪！没啦！真冬：……下一颗呢？',
+  orbitBlade: '笑梦：贴贴！真冬：别碰我！！',
+  doubleDash: '笑梦：咻！咻！真冬：不是让你再跑回来！',
+  vent: '笑梦：呼——！真冬：连喘气都这么响……',
+  reserveAmmo: '笑梦：冰冰的！真冬：……只有你还这么热闹。',
+  graze: '笑梦：呜哇！差一点！真冬：下一次别想躲开。',
+  revive: '真冬：终于安静了。笑梦：Wonderhoy！！',
+  magnet: '笑梦：哇！都来啦！真冬：……空白也被你填满。',
+  ricochet: '笑梦：叮！当！真冬：这声音怎么还会弹？！',
+  rearSpark: '笑梦：砰！砰！真冬：背过身也闭不了嘴？！',
+  crossOrbit: '小笑梦：哇！哇！真冬：别围着我喊！！',
+  returnWing: '真冬：……走了？笑梦：回来啦！',
+  brakeField: '笑梦：慢一点！真冬：我要停的是你的嘴。',
+  dashEcho: '笑梦：咻——砰！真冬：人走了还在吵？！',
 };
 const definition = (id: ModuleId, name: string, branch: ModuleBranch, description: string, rank2Description: string): ModuleDefinition => ({ id, name, branch, description, rank2Description, flavor: MODULE_FLAVORS[id] });
 export const MODULES: Record<ModuleId, ModuleDefinition> = {
@@ -74,12 +74,12 @@ export const MODULE_VALUES = {
 } as const;
 export interface EvolutionDefinition { id: EvolutionId; name: string; primary: ModuleId; partner: ModuleId; description: string; flavor: string }
 export const EVOLUTIONS: Record<EvolutionId, EvolutionDefinition> = {
-  needleArray: { id: 'needleArray', name: '针轨贯阵', primary: 'piercing', partner: 'precision', description: '慢移时将当轮基础主炮合为一枚高速针弹，保留合计伤害，最多命中五个不同目标；副弹独立。', flavor: '笑梦说学会了优等生的专注。专注于把全排学姐串起来。' },
-  spiralBloom: { id: 'spiralBloom', name: '回旋花火', primary: 'wingShots', partner: 'rearSpark', description: '保留翼炮与尾弹，射击期间每 1.2 秒追加六枚环形短弹，各 2 伤害，射程 420。', flavor: '凤凰乐园巡回演出，临时加演空白 SEKAI 场！' },
-  forkNetwork: { id: 'forkNetwork', name: '分叉电网', primary: 'chain', partner: 'slow', description: '保留特殊主弹与连锁，另向最多两个不同目标发射各 6 伤害的追踪弹；副弹不再连锁。', flavor: 'Wonderhoy 开始群发。真冬正在寻找免打扰按钮。' },
-  triangleAssault: { id: 'triangleAssault', name: '三角围攻', primary: 'droneBurst', partner: 'crossOrbit', description: '集火追加弹由现有子机交叉发射，总伤害 18 按数量均分；每弹最多命中两个目标，保留 3 秒冷却。', flavor: '学姐左边有笑梦，右边有笑梦，正前方还是笑梦。' },
-  huntingReturn: { id: 'huntingReturn', name: '巡猎回旋', primary: 'orbitBlade', partner: 'returnWing', description: '护刃返回轨道的途中也可伤害经过的敌人，每趟每敌一次 4 伤害；不阻挡敌弹。', flavor: '小笑梦：回后台之前，再和路上的学姐们打个招呼！' },
-  echoTrail: { id: 'echoTrail', name: '残响疾行', primary: 'doubleDash', partner: 'dashEcho', description: '保留双蓄 II，残影爆破替换为持续 0.75 秒、宽 64 的冲刺尾迹；余迹 I／II 时每敌一次 8／12 伤害，冷却 4 秒，不清弹。', flavor: '真冬：人走了，Wonderhoy 还在地上。' },
+  needleArray: { id: 'needleArray', name: '针轨贯阵', primary: 'piercing', partner: 'precision', description: '慢移时将当轮基础主炮合为一枚高速针弹，保留合计伤害，最多命中五个不同目标；副弹独立。', flavor: '笑梦：咻————！真冬：别把光捅进来！' },
+  spiralBloom: { id: 'spiralBloom', name: '回旋花火', primary: 'wingShots', partner: 'rearSpark', description: '保留翼炮与尾弹，射击期间每 1.2 秒追加六枚环形短弹，各 2 伤害，射程 420。', flavor: '笑梦：哇！砰砰砰！真冬：吵死了吵死了！！' },
+  forkNetwork: { id: 'forkNetwork', name: '分叉电网', primary: 'chain', partner: 'slow', description: '保留特殊主弹与连锁，另向最多两个不同目标发射各 6 伤害的追踪弹；副弹不再连锁。', flavor: '笑梦：Wonderhoy！Wonderhoy！真冬：别再传了！！' },
+  triangleAssault: { id: 'triangleAssault', name: '三角围攻', primary: 'droneBurst', partner: 'crossOrbit', description: '集火追加弹由现有子机交叉发射，总伤害 18 按数量均分；每弹最多命中两个目标，保留 3 秒冷却。', flavor: '小笑梦：哇！哇！哇！真冬：到底有几个你？！' },
+  huntingReturn: { id: 'huntingReturn', name: '巡猎回旋', primary: 'orbitBlade', partner: 'returnWing', description: '护刃返回轨道的途中也可伤害经过的敌人，每趟每敌一次 4 伤害；不阻挡敌弹。', flavor: '笑梦：转回来啦！真冬：不是让你回来！！' },
+  echoTrail: { id: 'echoTrail', name: '残响疾行', primary: 'doubleDash', partner: 'dashEcho', description: '保留双蓄 II，残影爆破替换为持续 0.75 秒、宽 64 的冲刺尾迹；余迹 I／II 时每敌一次 8／12 伤害，冷却 4 秒，不清弹。', flavor: '笑梦：咻咻——！真冬：……地上也是你的声音。' },
 };
 export const EVOLUTION_VALUES = {
   needleArray: { targets: 5 }, spiralBloom: { cooldown: 1.2, count: 6, damage: 2, range: 420 },
@@ -194,9 +194,9 @@ export function rerollModules(build: PlayerBuild, level: number, seed: number, c
 
 export interface UpgradeChoiceView { id: UpgradeChoiceId; name: string; description: string; flavor: string; branch: ModuleBranch; kind: 'module' | 'rank' | 'evolution' | 'resource'; rank: ModuleRank | null }
 const RESOURCE_CHOICES: Record<ResourceChoiceId, Pick<UpgradeChoiceView, 'name' | 'description' | 'flavor'>> = {
-  'reward:heal': { name: '应急修复', description: '回复 2 HP；每点溢出治疗转换为 30 XP。', flavor: '真冬：休息一下吧。笑梦：好！休息完啦！' },
-  'reward:bomb': { name: '炸弹补给', description: '获得 1 枚炸弹；达到上限时转换为 30 XP。', flavor: '谢幕礼炮。笑梦坚持认为现在还没到谢幕的时候。' },
-  'reward:xp': { name: '共鸣结晶', description: '获得 100 XP；保留升级溢出，Lv10 后计入共鸣。', flavor: '被学姐礼貌送客，也是一种宝贵的舞台经验。' },
+  'reward:heal': { name: '应急修复', description: '回复 2 HP；每点溢出治疗转换为 30 XP。', flavor: '笑梦：好啦！哇！真冬：……怎么又有力气了。' },
+  'reward:bomb': { name: '炸弹补给', description: '获得 1 枚炸弹；达到上限时转换为 30 XP。', flavor: '笑梦：砰——！真冬：那个词，不准再喊！！' },
+  'reward:xp': { name: '共鸣结晶', description: '获得 100 XP；保留升级溢出，Lv10 后计入共鸣。', flavor: '笑梦：又变强啦！真冬：……噪音还在增加。' },
 };
 export function choiceView(build: Pick<PlayerBuild, 'modules' | 'ranks'>, id: UpgradeChoiceId): UpgradeChoiceView {
   if (id.startsWith('evolution:')) {

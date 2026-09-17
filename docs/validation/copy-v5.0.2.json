@@ -1,0 +1,492 @@
+{
+  "errors": [],
+  "checks": [
+    {
+      "name": "menu-1280x720",
+      "width": 1280,
+      "height": 720,
+      "menu": {
+        "x": 400,
+        "y": 143.875,
+        "right": 880,
+        "bottom": 576.140625,
+        "w": 480,
+        "h": 432.265625,
+        "scrollWidth": 480,
+        "clientWidth": 480
+      },
+      "title": {
+        "x": 412.296875,
+        "y": 143.875,
+        "right": 867.703125,
+        "bottom": 198.875,
+        "w": 455.40625,
+        "h": 55,
+        "scrollWidth": 455,
+        "clientWidth": 455
+      },
+      "dialog": null,
+      "comms": null,
+      "live": null,
+      "rail": null
+    },
+    {
+      "name": "menu-1920x1080",
+      "width": 1920,
+      "height": 1080,
+      "menu": {
+        "x": 720,
+        "y": 323.875,
+        "right": 1200,
+        "bottom": 756.140625,
+        "w": 480,
+        "h": 432.265625,
+        "scrollWidth": 480,
+        "clientWidth": 480
+      },
+      "title": {
+        "x": 732.296875,
+        "y": 323.875,
+        "right": 1187.703125,
+        "bottom": 378.875,
+        "w": 455.40625,
+        "h": 55,
+        "scrollWidth": 455,
+        "clientWidth": 455
+      },
+      "dialog": null,
+      "comms": null,
+      "live": null,
+      "rail": null
+    },
+    {
+      "name": "menu-2560x1440",
+      "width": 2560,
+      "height": 1440,
+      "menu": {
+        "x": 1040,
+        "y": 503.875,
+        "right": 1520,
+        "bottom": 936.140625,
+        "w": 480,
+        "h": 432.265625,
+        "scrollWidth": 480,
+        "clientWidth": 480
+      },
+      "title": {
+        "x": 1052.296875,
+        "y": 503.875,
+        "right": 1507.703125,
+        "bottom": 558.875,
+        "w": 455.40625,
+        "h": 55,
+        "scrollWidth": 455,
+        "clientWidth": 455
+      },
+      "dialog": null,
+      "comms": null,
+      "live": null,
+      "rail": null
+    },
+    {
+      "name": "menu-2560x1080",
+      "width": 2560,
+      "height": 1080,
+      "menu": {
+        "x": 1040,
+        "y": 323.875,
+        "right": 1520,
+        "bottom": 756.140625,
+        "w": 480,
+        "h": 432.265625,
+        "scrollWidth": 480,
+        "clientWidth": 480
+      },
+      "title": {
+        "x": 1052.296875,
+        "y": 323.875,
+        "right": 1507.703125,
+        "bottom": 378.875,
+        "w": 455.40625,
+        "h": 55,
+        "scrollWidth": 455,
+        "clientWidth": 455
+      },
+      "dialog": null,
+      "comms": null,
+      "live": null,
+      "rail": null
+    },
+    {
+      "name": "menu-807x519",
+      "width": 807,
+      "height": 519,
+      "menu": {
+        "x": 163.5,
+        "y": 62.875,
+        "right": 643.5,
+        "bottom": 456.140625,
+        "w": 480,
+        "h": 393.265625,
+        "scrollWidth": 480,
+        "clientWidth": 480
+      },
+      "title": {
+        "x": 237.890625,
+        "y": 62.875,
+        "right": 569.09375,
+        "bottom": 102.875,
+        "w": 331.203125,
+        "h": 40,
+        "scrollWidth": 331,
+        "clientWidth": 331
+      },
+      "dialog": null,
+      "comms": null,
+      "live": null,
+      "rail": null
+    },
+    {
+      "name": "reply",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": null,
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 711,
+        "w": 463.078125,
+        "h": 109,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 701,
+        "w": 463.078125,
+        "h": 0,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "upgrade",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": {
+        "x": 165,
+        "y": 47.390625,
+        "right": 1115,
+        "bottom": 672.59375,
+        "w": 950,
+        "h": 625.203125,
+        "scrollWidth": 938,
+        "clientWidth": 938
+      },
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 711,
+        "w": 463.078125,
+        "h": 109,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 701,
+        "w": 463.078125,
+        "h": 0,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "boss",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": null,
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 113,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 14,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "pause",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": {
+        "x": 371.203125,
+        "y": 38.390625,
+        "right": 908.796875,
+        "bottom": 681.609375,
+        "w": 537.59375,
+        "h": 643.21875,
+        "scrollWidth": 526,
+        "clientWidth": 526
+      },
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 113,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 14,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "build",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": {
+        "x": 371.203125,
+        "y": 38.390625,
+        "right": 908.796875,
+        "bottom": 681.609375,
+        "w": 537.59375,
+        "h": 643.21875,
+        "scrollWidth": 526,
+        "clientWidth": 526
+      },
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 113,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 715,
+        "w": 463.078125,
+        "h": 14,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "failed",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": {
+        "x": 355.84375,
+        "y": 62.234375,
+        "right": 924.15625,
+        "bottom": 657.765625,
+        "w": 568.3125,
+        "h": 595.53125,
+        "scrollWidth": 556,
+        "clientWidth": 556
+      },
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 711,
+        "w": 463.078125,
+        "h": 109,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 701,
+        "w": 463.078125,
+        "h": 0,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    },
+    {
+      "name": "complete",
+      "width": 1280,
+      "height": 720,
+      "menu": null,
+      "title": null,
+      "dialog": {
+        "x": 355.84375,
+        "y": 54.453125,
+        "right": 924.15625,
+        "bottom": 665.546875,
+        "w": 568.3125,
+        "h": 611.09375,
+        "scrollWidth": 556,
+        "clientWidth": 556
+      },
+      "comms": {
+        "x": 408.453125,
+        "y": 602,
+        "right": 871.53125,
+        "bottom": 711,
+        "w": 463.078125,
+        "h": 109,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "live": {
+        "x": 408.453125,
+        "y": 701,
+        "right": 871.53125,
+        "bottom": 701,
+        "w": 463.078125,
+        "h": 0,
+        "scrollWidth": 463,
+        "clientWidth": 463
+      },
+      "rail": {
+        "x": 0,
+        "y": 592,
+        "right": 1280,
+        "bottom": 720,
+        "w": 1280,
+        "h": 128,
+        "scrollWidth": 1280,
+        "clientWidth": 1280
+      }
+    }
+  ],
+  "dialogue": [
+    {
+      "id": 1,
+      "speaker": "EMU",
+      "avatar": "player",
+      "color": "#91efe0",
+      "text": "学姐！Wonderhoy——！！"
+    },
+    {
+      "id": 2,
+      "speaker": "MAFUYU",
+      "avatar": "enemy",
+      "color": "#c1adfa",
+      "text": "……吵死了。"
+    },
+    {
+      "id": 4,
+      "speaker": "EMU",
+      "avatar": "player",
+      "color": "#91efe0",
+      "text": "Wonderhoy——！！"
+    },
+    {
+      "id": 5,
+      "speaker": "MAFUYU",
+      "avatar": "enemy",
+      "color": "#c1adfa",
+      "text": "这里不需要你的笑声。"
+    }
+  ],
+  "result": "passed"
+}

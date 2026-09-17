@@ -124,7 +124,7 @@ export class GameRuntime implements RuntimeControls {
     this.input.clear(); this.simulation.clearInput(); this.renderer?.resetEffects(); this.dialogue.start();
     this.phase = this.simulation.state.status; this.error = null;
     if (this.phase === 'playing') this.audio.play();
-    this.announce('Wonderhoy！学姐，我来玩啦！');
+    this.announce('Wonderhoy——！！');
     this.resetMetrics(); this.publish(); this.schedule();
     this.renderer?.render(this.simulation.state, 1, 0);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -144,7 +144,7 @@ export class GameRuntime implements RuntimeControls {
     this.simulation.continueEndless(); this.renderer?.resetEffects(); this.input.clear(); this.simulation.clearInput();
     this.phase = this.simulation.state.status;
     if (this.phase === 'playing') this.audio.play(); else this.audio.pause();
-    this.announce('无尽返场 / 笑梦还没玩够'); this.renderer?.render(this.simulation.state, 1, 0); this.publish(); this.schedule();
+    this.announce('无尽开始 / Wonderhoy 还没停'); this.renderer?.render(this.simulation.state, 1, 0); this.publish(); this.schedule();
   };
   returnToMenu = () => {
     if (this.phase === 'loading' || this.disposed) return;
@@ -236,14 +236,14 @@ export class GameRuntime implements RuntimeControls {
   private processEvents(events: CombatEvent[]) {
     this.renderer?.handleEvents(events); this.audio.handle(events); this.dialogue.handle(events, this.simulation.state.score);
     for (const event of events) {
-      if (event.type === 'wave' && this.simulation.state.mode === 'endless') this.announce('无尽返场 · 第 ' + this.simulation.state.wave + ' 场');
-      else if (event.type === 'boss') this.announce(event.encounterId === 's2:final' ? 'LACUNA / 25时闭园广播' : ENEMIES.boss.label);
+      if (event.type === 'wave' && this.simulation.state.mode === 'endless') this.announce('无尽 · 第 ' + this.simulation.state.wave + ' 波');
+      else if (event.type === 'boss') this.announce(event.encounterId === 's2:final' ? 'LACUNA / 空白崩坏' : ENEMIES.boss.label);
       else if (event.type === 'card') this.announce(event.text === 'cleared' ? `符卡 ${event.amount ?? ''} 击破` : `符卡 ${event.amount ?? ''} / ${event.text ?? ''}`, event.text === 'cleared' ? 0.55 : 1.6);
-      else if (event.type === 'levelup') this.announce(`武器 Lv${this.simulation.state.player.level} / 笑梦又有新点子了`, 1.5);
+      else if (event.type === 'levelup') this.announce(`武器 Lv${this.simulation.state.player.level} / 哇！更强了！`, 1.5);
       else if (event.type === 'support') this.announce(event.text === 'arrival' ? '小笑梦到场 · 靠近拾取子机' : event.text === 'catchup' ? `后台补给 · 武装提升至 Lv${event.amount ?? this.simulation.state.player.level}` : `小笑梦报到 ${event.amount ?? this.simulation.state.companions.length}/3 · 子机自动掩护`, 2.5);
-      else if (event.type === 'attack' && event.enemyType === 'boss' && event.text === 'phase') this.announce(`第 ${event.amount} 阶段 · 学姐准备换招`, 1.6);
+      else if (event.type === 'attack' && event.enemyType === 'boss' && event.text === 'phase') this.announce(`第 ${event.amount} 阶段 · 压抑崩裂`, 1.6);
       else if (event.type === 'attack' && event.text === 'arrival' && ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '')) this.announce(ENEMIES[event.enemyType!].label, 1.6);
-      else if (event.type === 'kill' && event.enemyType === 'miniboss') this.announce(this.simulation.state.mode === 'story' ? '追客失败 · 首领补给已领取' : '追客失败 · 下一场继续', 2);
+      else if (event.type === 'kill' && event.enemyType === 'miniboss') this.announce(this.simulation.state.mode === 'story' ? 'ECHO 击破 · 首领补给已领取' : 'ECHO 击破 · 下一波继续', 2);
       if (event.type === 'complete') this.recordCompletion(event);
     }
   }
@@ -288,13 +288,13 @@ export class GameRuntime implements RuntimeControls {
       moduleStates: this.simulation.moduleStates,
       heat: player.heat, overheated: player.overheated, dashCooldown: player.dashCooldown, perfectWindow: player.perfectWindow,
       bossHp: boss?.hp ?? 0, bossMaxHp: boss?.maxHp ?? 0, bossStage: state.bossStage || state.bossPending,
-      bossPhase: boss?.spell ? Math.floor(boss.spell.cardIndex / 2) + 1 : 1, bossAction: boss?.spell ? boss.spell.stage === 'intro' ? '符卡切换 · 学姐准备换招' : `${keyLabel(this.settings.keybindings.focus)} 慢移 · 跟随弹幕变化换位` : '', focus: player.focus,
+      bossPhase: boss?.spell ? Math.floor(boss.spell.cardIndex / 2) + 1 : 1, bossAction: boss?.spell ? boss.spell.stage === 'intro' ? '符卡切换 · 留意下一轮预告' : `${keyLabel(this.settings.keybindings.focus)} 慢移 · 跟随弹幕变化换位` : '', focus: player.focus,
       companions: state.companions?.length ?? 0,
       comms: this.dialogue.getMessage(this.settings.reducedMotion), announcement: state.elapsed < this.announcementUntil ? this.announcement : '',
       settings: { ...this.settings }, stats: { ...this.stats, ...graphics, enemies: state.enemies.length, bullets: state.bullets.length, pickups: state.pickups.length, voices: this.audio.voiceCount },
       saveStatus: this.saves.status === 'session-only' ? 'session' : Object.keys(profile.clears).length || Object.values(profile.bestScores.v5).some(scores => scores.story || scores.endless) ? 'saved' : 'empty',
       saveMessage: this.saves.error ?? this.saveMessage,
-      stageName: CAMPAIGN_STAGES[state.wave - 1]?.name ?? '闭园后继续营业', stageCount: CAMPAIGN_STAGES.length,
+      stageName: CAMPAIGN_STAGES[state.wave - 1]?.name ?? '无尽的空白', stageCount: CAMPAIGN_STAGES.length,
       cardName: card?.name ?? '', cardIndex: boss?.spell ? boss.spell.cardIndex + 1 : 0, cardCount: boss?.spell ? SPELL_CARDS[boss.spell.season][state.difficulty].length : 0,
       moduleRanks: { ...state.build.ranks }, evolutions: [...state.build.evolutions], rerollsRemaining: state.build.rerollsRemaining, choiceSource: state.build.pendingRewards[0]?.source ?? null, upgradeOfferId: state.build.offerId,
       arena: !!state.arena, modules: [...state.build.modules], upgradeChoices: [...state.build.choices], resonance: state.build.resonance, dashCharges: this.simulation.dashCharges,
@@ -417,7 +417,7 @@ function miniBossAction(state: string): string {
   if (state === 'dash') return '追猎突进 · 留意落点弹幕';
   if (state === 'laserWarmup') return '激光锁定 · 离开橙色走廊';
   if (state === 'laser') return '连锁激光 · 继续换位';
-  if (state === 'phaseShift') return '学姐加速 · 准备连招';
+  if (state === 'phaseShift') return '狂躁加速 · 准备连招';
   if (state === 'recover') return '出招间隙 · 集火反击';
-  return '学姐在找人 · 注意侧翼';
+  return '阴影逼近 · 注意侧翼';
 }

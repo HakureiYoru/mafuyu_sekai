@@ -1,9 +1,9 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "private": true,
   "type": "module",
-  "description": "Mafuyu Sekai — Wonderhoy 串门中，凤笑梦与朝比奈真冬的整蛊向同人弹幕游戏",
+  "description": "凤小梦大战朝比奈真冬 — Wonderhoy 与黑化真冬的整蛊向同人弹幕游戏",
   "engines": {
     "node": ">=22.13.0"
   },

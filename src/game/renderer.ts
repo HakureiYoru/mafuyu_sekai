@@ -26,7 +26,7 @@ const BADGE_TYPES: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minel
   'shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier', 'palisade', 'reprise', 'arm', 'node', 'core'];
 const badgeCell = (index: number) => ({ x: index % 8 * 128, y: index < 8 ? 128 : 384 + Math.floor((index - 8) / 8) * 128 });
 const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, supply: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
-const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '笑梦的零食 · 生命恢复', supply: '后台补给 · 技能恢复', coolant: '喝口水 · 快速冷却', bomb: '加场烟花 · 炸弹 +1', miniBomb: '谢幕礼花 · 范围爆破', blackHole: '观众集合 · 引力黑洞', support: '小笑梦 · 支援子机' };
+const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '好吃！· 生命恢复', supply: '再冲！· 技能补给', coolant: '好凉！· 快速冷却', bomb: 'Wonderhoy！· 炸弹 +1', miniBomb: '砰！！· 范围爆破', blackHole: '全过来！· 引力黑洞', support: '小笑梦 · 支援子机' };
 
 function canvasTexture(width: number, height: number, paint: (context: CanvasRenderingContext2D) => void): Texture {
   const canvas = document.createElement('canvas');
@@ -330,7 +330,7 @@ export class GameRenderer {
       this.edgeFeedback.addChild(sprite);
     }
     const canvas = this.app.canvas;
-    canvas.setAttribute('aria-label', 'Mafuyu Sekai 战斗画面');
+    canvas.setAttribute('aria-label', '凤小梦大战朝比奈真冬 战斗画面');
     canvas.style.display = 'block'; canvas.style.width = '100%'; canvas.style.height = '100%';
     canvas.style.cursor = 'none';
     canvas.addEventListener('pointermove', this.onPointerMove);
