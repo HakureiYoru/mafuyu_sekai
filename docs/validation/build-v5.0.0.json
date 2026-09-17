@@ -65,5 +65,6 @@
     "src/vite-env.d.ts": "fd8e9c0215c79868e07617f9ce2d0cf7baf7a0c7be01cf6b3f08f73afc2f6a22",
     "vercel.json": "343372e106bde257d519cb05e7253bb337bdc0d949f15d4b31772b761bdfe5af",
     "vite.config.ts": "24e13b9ab2be137e291bd77f16cbef31bb25ed9353c7f646870afb39688f8453"
-  }
+  },
+  "releaseCommit": "248af05da0bac8167fc0c120b1c130b334bd7d98"
 }

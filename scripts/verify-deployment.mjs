@@ -32,13 +32,18 @@ try {
   const response = await page.goto(url + '/?debug=1', { waitUntil: 'domcontentloaded', timeout: 60000 });
   assert.equal(response.status(), 200);
   const entry = await page.locator('script[type="module"][src]').getAttribute('src');
-  const asset = await page.request.get(new URL(entry, url).href);
-  assert.equal(asset.status(), 200);
+  // Use the browser's network configuration, which may differ from Node's proxy/DNS.
+  const deployedSha256 = await page.evaluate(async entryUrl => {
+    const asset = await fetch(entryUrl, { cache: 'no-store' });
+    if (!asset.ok) throw new Error(`Entry request failed: ${asset.status}`);
+    const hash = await window.crypto.subtle.digest('SHA-256', await asset.arrayBuffer());
+    return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+  }, new URL(entry, url).href);
   const localHtml = await readFile('dist/index.html', 'utf8');
   const localEntry = localHtml.match(/src="\.\/([^" ]+\.js)"/)?.[1];
   assert.ok(localEntry, 'A local production build is required for artifact verification.');
   const digest = content => createHash('sha256').update(content).digest('hex');
-  report.artifact = { entry, deployedSha256: digest(await asset.body()), localEntry, localSha256: digest(await readFile(`dist/${localEntry}`)) };
+  report.artifact = { entry, deployedSha256, localEntry, localSha256: digest(await readFile(`dist/${localEntry}`)) };
   assert.equal(report.artifact.deployedSha256, report.artifact.localSha256, 'The live game entry does not match the tested local production artifact.');
   await page.getByRole('button', { name: 'v' + version + ' · 更新日志', exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await page.getByRole('button', { name: /第二季/ }).count(), 0);
@@ -97,8 +102,10 @@ try {
   await page.waitForFunction(x => window.__MAFUYU_DEBUG__.state().player.x > x + 50, origin);
   await page.keyboard.up('KeyD');
   await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: '稍作停留', exact: true }).waitFor();
+  await page.locator('[aria-label="性能信息"]').evaluate(element => { element.style.visibility = 'hidden'; });
   await mkdir('.tmp', { recursive: true });
-  await page.screenshot({ path: '.tmp/deployed-v' + version + '.png' });
+  await page.screenshot({ path: '.tmp/deployed-v' + version + '.png', animations: 'disabled' });
   assert.equal(report.errors.length, 0);
   report.result = 'passed';
   console.log(JSON.stringify({ version, sha, url, result: report.result, encounters: report.encounters.map(e => e.id), choices: report.choices.length, errors: report.errors }, null, 2));

@@ -1,0 +1,234 @@
+{
+  "version": "5.0.0",
+  "sha": "248af05da0bac8167fc0c120b1c130b334bd7d98",
+  "url": "https://mafuyu-sekai.vercel.app",
+  "checkedAt": "2026-09-17T08:14:37.699Z",
+  "fixture": "Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.",
+  "errors": [],
+  "encounters": [
+    {
+      "id": "s1:echo",
+      "cards": [
+        {
+          "hp": 1200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:palisade",
+      "cards": [
+        {
+          "hp": 2000,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s1:mafuyu",
+      "cards": [
+        {
+          "hp": 697,
+          "card": 0,
+          "name": "零响针雨"
+        },
+        {
+          "hp": 750,
+          "card": 1,
+          "name": "交错织幕"
+        },
+        {
+          "hp": 800,
+          "card": 2,
+          "name": "逆相花庭"
+        },
+        {
+          "hp": 850,
+          "card": 3,
+          "name": "镜面折光"
+        },
+        {
+          "hp": 900,
+          "card": 4,
+          "name": "无声刻印"
+        },
+        {
+          "hp": 1000,
+          "card": 5,
+          "name": "空白终曲"
+        }
+      ]
+    },
+    {
+      "id": "s2:reprise",
+      "cards": [
+        {
+          "hp": 3200,
+          "card": null,
+          "name": ""
+        }
+      ]
+    },
+    {
+      "id": "s2:final",
+      "cards": [
+        {
+          "hp": 1500,
+          "card": 0,
+          "name": "切片弹墙"
+        },
+        {
+          "hp": 1700,
+          "card": 1,
+          "name": "斜向编织"
+        },
+        {
+          "hp": 1800,
+          "card": 2,
+          "name": "武装节点"
+        },
+        {
+          "hp": 1900,
+          "card": 3,
+          "name": "停驻复奏"
+        },
+        {
+          "hp": 2100,
+          "card": 4,
+          "name": "内外环交替"
+        },
+        {
+          "hp": 2200,
+          "card": 5,
+          "name": "分区终曲"
+        }
+      ]
+    }
+  ],
+  "choices": [
+    {
+      "phase": "upgrade",
+      "offer": "level:2:0",
+      "choices": [
+        "crossOrbit",
+        "slow",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:echo:0",
+      "choices": [
+        "returnWing",
+        "wingShots",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:3:0",
+      "choices": [
+        "returnWing",
+        "precision",
+        "graze"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:palisade:0",
+      "choices": [
+        "graze",
+        "precision",
+        "crossOrbit"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:4:0",
+      "choices": [
+        "piercing",
+        "graze",
+        "rearSpark"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s1:mafuyu:0",
+      "choices": [
+        "precision",
+        "graze",
+        "intercept"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "level:5:0",
+      "choices": [
+        "brakeField",
+        "wingShots",
+        "precision"
+      ]
+    },
+    {
+      "phase": "upgrade",
+      "offer": "encounter:s2:reprise:0",
+      "choices": [
+        "precision",
+        "crossOrbit",
+        "brakeField"
+      ]
+    }
+  ],
+  "artifact": {
+    "entry": "./assets/index-BMerQEtE.js",
+    "deployedSha256": "35b20e274315f3720bcfa088f7a44e805af40ba21f834c82f71441e493924807",
+    "localEntry": "assets/index-BMerQEtE.js",
+    "localSha256": "35b20e274315f3720bcfa088f7a44e805af40ba21f834c82f71441e493924807"
+  },
+  "saved": {
+    "version": 2,
+    "revision": 1,
+    "clears": {
+      "v5:207aef07-923c-4f54-9386-d21e468d71c1": {
+        "runId": "207aef07-923c-4f54-9386-d21e468d71c1",
+        "ruleset": "v5",
+        "difficulty": "normal",
+        "encounterId": "s2:final",
+        "score": 226000,
+        "source": "gameplay",
+        "completedAt": 1789632900686
+      }
+    },
+    "bestScores": {
+      "v5": {
+        "normal": {
+          "story": 226000,
+          "endless": 0
+        },
+        "hard": {
+          "story": 0,
+          "endless": 0
+        }
+      }
+    }
+  },
+  "restarted": {
+    "level": 1,
+    "xp": 0,
+    "companions": 0,
+    "modules": 0,
+    "bombs": 3,
+    "hp": 5,
+    "canvases": 1,
+    "raf": true
+  },
+  "result": "passed",
+  "deployment": {
+    "sha": "248af05da0bac8167fc0c120b1c130b334bd7d98",
+    "state": "success",
+    "url": "https://vercel.com/wenjun-hes-projects/mafuyu-sekai/3uJEuWbasEnFuxEV1sKBirAj7LVv",
+    "checkedAt": "2026-09-17T08:14:04.3449724Z"
+  }
+}
