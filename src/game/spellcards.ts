@@ -39,8 +39,8 @@ export interface SpellBossContext {
 }
 
 const CARD_NAMES = {
-  s1: ['零响针雨', '交错织幕', '逆相花庭', '镜面折光', '无声刻印', '空白终曲'],
-  s2: ['切片弹墙', '斜向编织', '武装节点', '停驻复奏', '内外环交替', '分区终曲'],
+  s1: ['点射·学姐在看你', '排队·请走这一边', '微笑·全角度营业', '再见·回头还有', '作词中·此处请留白', '礼貌·真的要送客了'],
+  s2: ['闭园·闸机逐片关闭', '斜线·谢绝抄近路', '水族箱·请勿敲玻璃', '返场·申请已退回', '绕圈·出口不在这里', '25时·全场请安静'],
 } as const;
 // Fixed campaign budgets: upgrades never cause enemies to scale with a player's actual build.
 const CARD_HP = { s1: [700, 750, 800, 850, 900, 1000], s2: [1500, 1700, 1800, 1900, 2100, 2200] } as const;

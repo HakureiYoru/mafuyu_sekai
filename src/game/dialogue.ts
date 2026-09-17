@@ -3,7 +3,17 @@ import type { CombatEvent, CommsMessage, EnemyType } from './types';
 
 type Line = { id: string; sender: string; color: string; text: string; maxed?: boolean };
 const data: Record<string, Line[]> = dialogueData;
-const family = (type?: EnemyType) => type === 'dasher' ? 'C' : type === 'sniper' || type === 'sprayer' ? 'A' : 'B';
+const families: Partial<Record<EnemyType, string>> = {
+  basic: 'B', dasher: 'C', sniper: 'A', sprayer: 'A', minelayer: 'B',
+  shield: 'B', weaver: 'A', returner: 'C', sampler: 'A', repairer: 'B', carrier: 'B',
+};
+const isBoss = (type?: EnemyType) => type === 'boss' || type === 'miniboss' || type === 'palisade' || type === 'reprise';
+const attackGroup = (type?: EnemyType) => type === 'miniboss' ? 'ECHO_ATTACK'
+  : type === 'palisade' ? 'PALISADE_ATTACK' : type === 'reprise' ? 'REPRISE_ATTACK' : 'BOSS_ATTACK';
+const entryGroup = (event: CombatEvent) => event.encounterId === 's2:final' ? 'LACUNA_ENTRY'
+  : event.encounterId === 's2:palisade' || event.enemyType === 'palisade' ? 'PALISADE_ENTRY'
+    : event.encounterId === 's2:reprise' || event.enemyType === 'reprise' ? 'REPRISE_ENTRY'
+      : event.encounterId === 's1:echo' || event.enemyType === 'miniboss' ? 'ECHO_ENTRY' : 'BOSS_ENTRY';
 
 /** Dialogue runs on simulation time; pausing never leaves orphaned timeouts. */
 export class Dialogue {
@@ -20,9 +30,9 @@ export class Dialogue {
     this.queue = []; this.age = 0;
     this.current = { id: ++this.sequence, speaker, avatar: speaker === 'EMU' ? 'player' : 'enemy', color: speaker === 'EMU' ? '#91efe0' : '#c1adfa', text };
   }
-  say(group: string, priority = false, replacements: Record<string, string> = {}) {
+  say(group: string, priority = false, replacements: Record<string, string> = {}, maxed?: boolean) {
     if (!priority && (this.time - (this.last.get(group) ?? -100)) < 8) return;
-    const options = data[group];
+    const options = data[group]?.filter(line => maxed === undefined || line.maxed === undefined || line.maxed === maxed);
     if (!options?.length) return;
     const selection = this.selections.get(group) ?? 0;
     const line = options[selection % options.length];
@@ -36,23 +46,31 @@ export class Dialogue {
   }
   handle(events: CombatEvent[], score: number) {
     for (const event of events) {
-      if (event.type === 'card') this.narrate(`${event.text ?? '下一张符卡'}。每一层弹幕都在变化，跟着空隙慢慢穿过去。`);
-      else if (event.type === 'boss' && event.encounterId === 's2:final') this.narrate('LACUNA，就在镜面的另一侧。把一路积攒的共鸣，完整地传过去。');
-      else if (event.type === 'attack' && event.text === 'arrival') this.narrate(event.enemyType === 'palisade' ? 'PALISADE 封住了前路。拆掉侧臂，弹墙就会松动。' : event.enemyType === 'reprise' ? 'REPRISE 的弹幕会停驻再折返。别站在它离开的轨迹上。' : '前路出现了强大的回声，准备迎战。');
-      else if (event.type === 'boss') this.say('BOSS_ENTRY', true);
+      if (event.type === 'card' && event.text === 'cleared') this.say('CARD_CLEARED', true);
+      else if (event.type === 'card') this.narrate(`「${event.text ?? '下一张符卡'}」——学姐，这也算普通问候？！`);
+      else if (event.type === 'boss' || (event.type === 'attack' && event.text === 'arrival')) {
+        const group = entryGroup(event);
+        // The spawn warning and actual arrival belong to the same entrance line.
+        if (this.time - (this.last.get(group) ?? -100) >= 3) this.say(group, true);
+      }
+      else if (event.type === 'attack' && event.text === 'encounterCleared') this.say('ENCOUNTER_CLEARED', true);
       else if (event.type === 'bossLow') this.say('BOSS_LOW_HP', true);
       else if (event.type === 'failure') { this.say('FAILURE_EVENT', true, { score: `${score}` }); this.age = 10; }
       else if (event.type === 'damage') this.say('PLAYER_DAMAGE', true);
       else if (event.type === 'leveldown') this.say('LEVEL_DOWN_EVENT', true);
-      else if (event.type === 'levelup') { this.say('LEVEL_UP_EVENT', true); this.say('EMU_LEVELUP'); }
+      else if (event.type === 'xpLoss') this.say('LEVEL_DOWN_EVENT');
+      else if (event.type === 'levelup') { this.say('LEVEL_UP_EVENT', true, {}, (event.amount ?? 1) >= 10); this.say('EMU_LEVELUP'); }
       else if (event.type === 'bomb') this.say('EMU_WONDERHOY', true);
       else if (event.type === 'pickup' && event.pickupType === 'hp') { this.say('HP_RECOVER_EVENT'); this.say('EMU_HEAL'); }
-      else if (event.type === 'spawn' && event.enemyType !== 'mine' && event.enemyType !== 'boss') this.say(`TYPE_${family(event.enemyType)}_SPAWN`);
-      else if (event.type === 'attack') this.say(event.enemyType === 'boss' ? 'BOSS_ATTACK' : `TYPE_${family(event.enemyType)}_ATTACK`);
-      else if (event.type === 'kill' && event.enemyType !== 'mine') this.say(`TYPE_${family(event.enemyType)}_DEATH`);
+      else if (event.type === 'attack' && isBoss(event.enemyType)) this.say(attackGroup(event.enemyType));
+      else if (event.enemyType && families[event.enemyType]) {
+        const family = families[event.enemyType];
+        if (event.type === 'spawn') this.say(`TYPE_${family}_SPAWN`);
+        else if (event.type === 'attack') this.say(`TYPE_${family}_ATTACK`);
+        else if (event.type === 'kill') this.say(`TYPE_${family}_DEATH`);
+      }
       else if (event.type === 'complete') {
-        this.queue = [];
-        this.current = { id: ++this.sequence, speaker: 'EMU', avatar: 'player', color: '#91efe0', text: 'Wonderhoy！这一次，我们一起走向光亮吧。' };
+        this.say('COMPLETE_EVENT', true);
         this.age = 10;
       }
     }

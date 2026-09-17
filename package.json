@@ -1,9 +1,9 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "private": true,
   "type": "module",
-  "description": "Mafuyu Sekai — Neon Overdrive, a fixed-step WebGL arcade shooter",
+  "description": "Mafuyu Sekai — Wonderhoy 串门中，凤笑梦与朝比奈真冬的整蛊向同人弹幕游戏",
   "engines": {
     "node": ">=22.13.0"
   },

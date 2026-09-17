@@ -2,1204 +2,1374 @@
   "SYSTEM_STATUS": [
     {
       "id": "START_INIT",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "……系统重构。这就是……新的绝望吗？"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "Wonderhoy！这么空，刚好搭个舞台！"
     },
     {
       "id": "START_ENGAGE",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "不要靠近。这里只有冷。好冷。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，先把礼花放下。……那是炮？"
     },
     {
       "id": "START_WAIT",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "……还没放弃吗？明明什么意义都没有。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐笑了！呜哇，脚自己往后退了！"
     },
     {
       "id": "START_FILTER",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "……监测到光源。立即遮蔽。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这里是空白的 SEKAI。不是待装修的游乐园。"
     },
     {
       "id": "START_CALIB",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "数据校准完毕。希望值置零。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "临时舞台，开——演！学姐坐第一排！"
     },
     {
       "id": "START_HIVE",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "Hive Mind：拒绝情感输入。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我只是说了“你好”。为什么要助跑？"
     },
     {
       "id": "START_DEFENSE",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "防御矩阵展开。凤笑梦是异常。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这里放旋转木马！那里……先躲学姐！"
     },
     {
       "id": "START_ASSIM",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "同化程序运行……别挣扎。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "二十五点了。凤同学还在试麦吗？"
     },
     {
       "id": "START_NOEXIT",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "真实：没有出口。请认清。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "迷路没关系！有学姐的地方就能问路！"
     }
   ],
   "TYPE_A_SPAWN": [
     {
       "id": "TA_1",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，在这个时间大吵大闹是不可以的哦。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，欢迎。……你怎么退到那么远了？"
     },
     {
       "id": "TA_2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "你也想变成好孩子吗？那就安静一点。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我有在微笑。你可以不用尖叫。"
     },
     {
       "id": "TA_3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请回去吧，这里没有你可以做的事情。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "走廊禁止奔跑。这里？……也请慢一点。"
     },
     {
       "id": "TA_4",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "如果你不听话的话，大家会困扰的。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请问，开园申请交给谁了？"
     },
     {
       "id": "TA_5",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，走廊禁止奔跑。要守规矩哦。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，你带来的音箱，比你还高。"
     },
     {
       "id": "TA_6",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "换身整洁的制服再来吧？现在的你太乱了。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这不是观众席。请不要给我递荧光棒。"
     },
     {
       "id": "TA_7",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "老师还在看着你。请表现得乖巧一点。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我只是来看看。你不必再喊一遍口号。"
     },
     {
       "id": "TA_8",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "你的笑声会吵到安静学习的大家。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "作业里没有“把学姐变成游乐设施”这一项。"
     },
     {
       "id": "TA_9",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请按照时间表行动，不要制造麻烦。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐有好多位！每一位都笑得一模一样！"
     },
     {
       "id": "TA_10",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "我们已经安排好一切，你只要离开就行。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "如果这是演出，出口应该有标志吧。"
     },
     {
       "id": "TA_11",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "不要妄想改写结果。那是不礼貌的。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请排队。……弹幕也会排队。"
     },
     {
       "id": "TA_12",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，请收起那份幼稚的热情。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，礼花放学后再讨论。"
     }
   ],
   "TYPE_A_ATTACK": [
     {
       "id": "TA_ATK_1",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "呵呵……凤同学真是‘特别’呢。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "只是普通的问候。稍微排得密了一点。"
     },
     {
       "id": "TA_ATK_2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "那种笑容，太刺眼了……请你遮起来。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐的问候，怎么每一颗都冲着我来！"
     },
     {
       "id": "TA_ATK_3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "这都是为了你好，凤同学。消失吧。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "别紧张。我已经提前画线了。"
     },
     {
       "id": "TA_ATK_4",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "不要把那种毫无根据的快乐带进来。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，左右移动就好。翻跟头也可以。"
     },
     {
       "id": "TA_ATK_5",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "优雅的学生不会像你这样乱闯。请退出。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这是送客用的。不是开场彩带。"
     },
     {
       "id": "TA_ATK_6",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "你的Wonderhoy只会污染空气。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我有控制音量。礼花没有。"
     },
     {
       "id": "TA_ATK_7",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请克制追逐梦想的冲动，那太危险了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "咻——！今天的节目是躲开学姐的关心！"
     },
     {
       "id": "TA_ATK_8",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "那样的期待会伤人，所以请不要出现。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "问候需要回应。用走位回应也可以。"
     },
     {
       "id": "TA_ATK_9",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "道歉还来得及。现在转身便好。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请不要沿着那条线来接我。"
     },
     {
       "id": "TA_ATK_10",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "我会帮你把笑容剪掉，像修正错题一样。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "你把瞄准线当红毯了吗？"
     },
     {
       "id": "TA_ATK_11",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请签署放弃书，这样比较有礼貌。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐！红地毯为什么会发光还会烫！"
     },
     {
       "id": "TA_ATK_12",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "就让我们把你也纳入优秀的沉默里吧。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "嗯，看见你了。离音箱也请远一点。"
     }
   ],
   "TYPE_A_DEATH": [
     {
       "id": "TA_DIE_1",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "啊……必须要去补习班了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "今天的问候先到这里。"
     },
     {
       "id": "TA_DIE_2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "这也是……没办法的事呢……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，你的返场方式很特别。"
     },
     {
       "id": "TA_DIE_3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "对不起……妈妈……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……请不要在退场时也撒礼花。"
     },
     {
       "id": "TA_DIE_4",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "老师……我没有做到最好……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "观众退场啦！谢谢学姐捧场！"
     },
     {
       "id": "TA_DIE_5",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "制服……弄皱了……对不起……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "荧光棒还给你。不是投降旗。"
     },
     {
       "id": "TA_DIE_6",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "凤同学……你真是任性……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "制服上的彩纸，稍后再收拾。"
     },
     {
       "id": "TA_DIE_7",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "请把作业……转交给我……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我回去写词。不要写进开园广播。"
     },
     {
       "id": "TA_DIE_8",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "我得回去练琴……不要告诉妈妈……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐刚刚是不是夸我了？一定是吧！"
     },
     {
       "id": "TA_DIE_9",
-      "sender": "MAFUYU_MASKED",
-      "color": "#8888aa",
-      "text": "笑容……好刺眼……我看不见了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "下次见。……不是现在再来一次。"
     }
   ],
   "TYPE_B_SPAWN": [
     {
       "id": "TB_1",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……什么都……感觉不到。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你连空白的地方都能搭舞台。"
     },
     {
       "id": "TB_2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……冷。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，安静的地方也可以只是安静。"
     },
     {
       "id": "TB_3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……你是……谁？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我在看水族箱。你为什么在外面游？"
     },
     {
       "id": "TB_4",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……不懂（Wakaranai）。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……“Wonderhoy”也有小声的版本吗？"
     },
     {
       "id": "TB_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……心跳……停止了。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这里的回音，本来没有这么忙。"
     },
     {
       "id": "TB_6",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……脚步……拖不动。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐不说话！那我把两个人的份都说完！"
     },
     {
       "id": "TB_7",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……声音……都是噪音。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你给空地也卖票？"
     },
     {
       "id": "TB_8",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……你来做什么……？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "纸花放在那里就好。水族箱里不用放。"
     },
     {
       "id": "TB_9",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……空气……好沉。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我只是路过。不要给我安排压轴。"
     },
     {
       "id": "TB_10",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……头里……都是空白。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "空白处发现学姐！探险大成功！"
     },
     {
       "id": "TB_11",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……请你……别点亮这里。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……排练要到几点？二十五点已经过了。"
     },
     {
       "id": "TB_12",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……被线……拉住了。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "“安静区”三个字，应该写大一点。"
     }
   ],
   "TYPE_B_ATTACK": [
     {
       "id": "TB_ATK_1",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……把你的温度……给我。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……借过。你把路布置成舞台了。"
     },
     {
       "id": "TB_ATK_2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……好重……你也变得……一样重吧。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "哇哇哇！后台也有学姐！"
     },
     {
       "id": "TB_ATK_3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……一起……堕落吧。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "靠近一点。不是让你开始近距离表演。"
     },
     {
       "id": "TB_ATK_4",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……这里……是深海……没有光。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我没参加巡游。只是刚好走这边。"
     },
     {
       "id": "TB_ATK_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……把笑容……挖出来。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐跟上啦！临时巡游队，出发！"
     },
     {
       "id": "TB_ATK_6",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……分享你的……梦的碎片。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你的退场路线为什么总在绕圈？"
     },
     {
       "id": "TB_ATK_7",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……一起……沉到最底。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请把音箱往那边搬。我会跟着检查。"
     },
     {
       "id": "TB_ATK_8",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……交出……那团颜色。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这不是水族箱。不能一直贴着边看。"
     },
     {
       "id": "TB_ATK_9",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……不要挣扎……越动越冷。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐慢慢走！我先咻地绕一圈！"
     },
     {
       "id": "TB_ATK_10",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……我会复制……你的心跳……然后静音。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……不要边后退边发开园传单。"
     },
     {
       "id": "TB_ATK_11",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……吸收……你的Wonderhoy……熄灭它。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "还有一颗。不是安可，是刚才没发完。"
     },
     {
       "id": "TB_ATK_12",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……贴近吧……直到分不清。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "你的杂技课，包括带着礼花跑步吗？"
     }
   ],
   "TYPE_B_DEATH": [
     {
       "id": "TB_DIE_1",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……啊……这种感觉是……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……这次能安静一会儿了。"
     },
     {
       "id": "TB_DIE_2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……坏掉了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "谢幕！等等，谢幕也要说 Wonderhoy！"
     },
     {
       "id": "TB_DIE_3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……我想……消失……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "音箱……请记得带走。"
     },
     {
       "id": "TB_DIE_4",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……线……断了？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……水族箱终于不用当售票处了。"
     },
     {
       "id": "TB_DIE_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……温度……又掉了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "下一个节目，请留一点空白。"
     },
     {
       "id": "TB_DIE_6",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……我……听不到……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐走啦？我准备下一场给她看！"
     },
     {
       "id": "TB_DIE_7",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……空……又回来了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你的体力，好像没有休息时间。"
     },
     {
       "id": "TB_DIE_8",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……光……太亮……止住……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我先退场。彩纸按颜色收好。"
     },
     {
       "id": "TB_DIE_9",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#555555",
-      "text": "……碎片……散开了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……居然真的把空地演热闹了。"
     }
   ],
   "TYPE_C_SPAWN": [
     {
       "id": "TC_1",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "吵死了吵死了吵死了（Usseewa）！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，跑得快不代表不用打招呼。"
     },
     {
       "id": "TC_2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "别看我！别看里面！！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐跑起来了！呜哇，笑容也跟过来了！"
     },
     {
       "id": "TC_3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "帕拉诺利亚（Paranoia）……别过来！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "只是来追上你的音箱。"
     },
     {
       "id": "TC_4",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "你是来嘲笑我的吗？是吗？是吗？！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请站远一点。我要把路让出来。"
     },
     {
       "id": "TC_5",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "不准笑！笑声=病毒=毁灭！！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "你的杂技，我大概看懂了一点。"
     },
     {
       "id": "TC_6",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "HELLOHELLOHELLO——断线啦！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这次是赛跑？我可是很会蹦蹦跳跳的！"
     },
     {
       "id": "TC_7",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "把目光转开！不需要检修我！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "先看地上的方向。不是让你给它鼓掌。"
     },
     {
       "id": "TC_8",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "我在噪点里发抖你听见没？！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我没有生气。只是走得比较快。"
     },
     {
       "id": "TC_9",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "不要迈进来，否则就爆炸！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐！慢一点问候也可以的！"
     },
     {
       "id": "TC_10",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "指令乱跳、心跳乱跳、全都乱跳！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，传单被你吹到那边了。"
     },
     {
       "id": "TC_11",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "撕裂！！撕裂！！别缝合梦！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "不必倒数。我会先告诉你方向。"
     },
     {
       "id": "TC_12",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "我不是你想要救的对象！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你把追赶也排进节目单了。"
     }
   ],
   "TYPE_C_ATTACK": [
     {
       "id": "TC_ATK_1",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "把那个‘笑容’给我撕碎！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "借过。请往旁边走。"
     },
     {
       "id": "TC_ATK_2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "好痛好痛好痛……你也来尝尝这种痛吧！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "咻咻——！学姐的问候追上来啦！"
     },
     {
       "id": "TC_ATK_3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "反正都是伪善！反正都会离开！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这次是直线。应该很好理解。"
     },
     {
       "id": "TC_ATK_4",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "Bug……Bug……把你也变成Bug！！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，迎面跑来不是接力。"
     },
     {
       "id": "TC_ATK_5",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "把你的未来日志交出来我全部烧掉！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这一段没有扶手！全靠我的杂技功夫！"
     },
     {
       "id": "TC_ATK_6",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "我会把Wonderhoy倒挂在天花板上！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "嗯，方向已经定好了。"
     },
     {
       "id": "TC_ATK_7",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "痛痛痛痛痛！给我更多痛！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "没有突然转弯。请不要自己转回来。"
     },
     {
       "id": "TC_ATK_8",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "谁允许你发光的？！熄灭！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐路过！学姐又路过！好多次路过！"
     },
     {
       "id": "TC_ATK_9",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "不准靠近！我的错误会传染！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "请让出通道。开园也要留通道。"
     },
     {
       "id": "TC_ATK_10",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "我要把你按进噪波里碎成像素！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "不是追星。我是在追那个音箱。"
     },
     {
       "id": "TC_ATK_11",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "哈哈哈……这不是笑，这是报警声！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "哇——！这比过山车还直来直去！"
     },
     {
       "id": "TC_ATK_12",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "所有人都会离开？那我先动手！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……跑完这一趟，可以调低音量了吗？"
     }
   ],
   "TYPE_C_DEATH": [
     {
       "id": "TC_DIE_1",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "Gura Gura……视野……在摇晃……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……跑过头了。"
     },
     {
       "id": "TC_DIE_2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "还是……找不到……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "冲线！学姐，要不要来个庆祝动作！"
     },
     {
       "id": "TC_DIE_3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "救救……我……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这里不是终点领奖台。"
     },
     {
       "id": "TC_DIE_4",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "警报……失真……看不见出口……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "下一趟，请先把音箱固定好。"
     },
     {
       "id": "TC_DIE_5",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "Bug……回收……失败……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……凤同学的体力，果然很好。"
     },
     {
       "id": "TC_DIE_6",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "不要……关灯……会更怕……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "呼！这个节目要加一个“非常刺激”！"
     },
     {
       "id": "TC_DIE_7",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "声音……断裂……不要丢下我……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "不是鞠躬。我在捡传单。"
     },
     {
       "id": "TC_DIE_8",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "笑容……还在追……停下……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "跑完了。请不要立刻宣布加赛。"
     },
     {
       "id": "TC_DIE_9",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#aa00aa",
-      "text": "我也想……被修复……只是……迟到了……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你已经在宣布了。"
     }
   ],
   "BOSS_ENTRY": [
     {
       "id": "BOSS_E1",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "那孩子是坏孩子……真冬，去把她赶走。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，玩够了吗？我准备了六次问候。"
     },
     {
       "id": "BOSS_E2",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "只要做个好孩子……就不会痛了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐亲自来啦！这笑容……我先站远一点！"
     },
     {
       "id": "BOSS_E3",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "站好。把不听话的孩子请出去。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我只是想安静写词。你带来了整座舞台。"
     },
     {
       "id": "BOSS_E4",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "真冬，别乱想。只要照做。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "压轴嘉宾是学姐！观众也是学姐！"
     },
     {
       "id": "BOSS_E5",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "凤笑梦，那份喧闹太不礼貌。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "嗯，我会微笑。你继续看路就好。"
     },
     {
       "id": "BOSS_E6",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "在母亲面前低头，就不会痛。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "不是惊吓屋。……至少申请表上没写。"
     }
   ],
   "BOSS_ATTACK": [
     {
       "id": "BOSS_A1",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "这是为了你好！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "只是普通的问候。范围稍微大了一点。"
     },
     {
       "id": "BOSS_A2",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "只要不后悔就可以哦？"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐！这个欢迎仪式是不是太周到啦！"
     },
     {
       "id": "BOSS_A3",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "你也想……被期待压死吗？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "水族箱是空的。这里怎么全是你的礼花。"
     },
     {
       "id": "BOSS_A4",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "好孩子要交出分数。把分数交来！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "看见预告了吗？看见了就不用过来接。"
     },
     {
       "id": "BOSS_A5",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "这张考卷盖满红字送给你。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "哇啊！我说想看烟花，没说想当烟花！"
     },
     {
       "id": "BOSS_A6",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "吞下这些期待，不准吐出来。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "词写了六段。问候也分六段。"
     },
     {
       "id": "BOSS_A7",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "痛？那就证明你还不够听话。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "那束光不是聚光灯。请不要站到中间。"
     },
     {
       "id": "BOSS_A8",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "我会用琴弦把你绑紧，不让你挣脱。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这不是追光灯！是灯真的在追我！"
     },
     {
       "id": "BOSS_A9",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "妈妈在看着，你也要乖乖跪下。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "不用谢。这一轮还有后半句。"
     }
   ],
   "BOSS_LOW_HP": [
     {
       "id": "BOSS_L1",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "不想让妈妈失望……不想……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……还要演吗？你的节目单比我的歌词长。"
     },
     {
       "id": "BOSS_L2",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "我是……我是……我想……找到……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐快看！安可的安可也准备好啦！"
     },
     {
       "id": "BOSS_L3",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "妈妈……我做得不够好吗……？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我说这一幕快结束了。不是整场谢幕。"
     },
     {
       "id": "BOSS_L4",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "不要放开我……我会乖……"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "原来“最后一个节目”可以有这么多个。"
     },
     {
       "id": "BOSS_L5",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "真冬……还在里面……求救……"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这一幕快过啦——用 Wonderhoy 收个尾！"
     },
     {
       "id": "BOSS_L6",
-      "sender": "MAFUYU_MOTHER",
-      "color": "#ff3300",
-      "text": "如果听话……是不是就能被抱住……？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……好。唱完这一段再说。"
     }
   ],
   "EMU_WONDERHOY": [
     {
       "id": "EW_A",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，你的声音太大了。这很不优雅。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "Wonderhoy——！礼花先替大家打个招呼！"
     },
     {
       "id": "EW_B",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……耳朵……好痛。那是……什么咒语？"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……凤同学，问候不需要覆盖整个场地。"
     },
     {
       "id": "EW_C",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "啊啊啊啊！住口！不要让那种光照进来！！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "轰啪！不小心把开园仪式办大了一点！"
     },
     {
       "id": "EW_GEN",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "不明白……完全不明白那个词的意义。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这是你的音量旋钮？只有最大一档吗？"
     },
     {
       "id": "EW_A2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请停止那个奇怪的口号，会让课堂失控。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "子弹太多啦！一起去观众席坐好！"
     },
     {
       "id": "EW_A3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "“Wonderhoy”？那不是课本里的词汇。请收回。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……这下整片 SEKAI 都听见了。"
     },
     {
       "id": "EW_B2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……Wonder……空洞的声音。好冷。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "紧急节目：把满屏都变成礼花！"
     },
     {
       "id": "EW_B3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……叫得太亮……心脏……裂开。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "我听见了。不必让下一条街也听见。"
     },
     {
       "id": "EW_C2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "Wonderhoy？！那是光束！！熄灭它！！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "Wonderhoy！我的安全距离是全——场！"
     },
     {
       "id": "EW_C3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "不要再喊！那个词会引发系统崩溃！"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……水族箱里的水刚才晃了一下。"
     },
     {
       "id": "EW_GEN2",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "侦测到未知语音：Wonderhoy。判定为威胁。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "啪啦啪啦！这一声连后台都听见啦！"
     },
     {
       "id": "EW_GEN3",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "正在屏蔽关键词“Wonderhoy”。不需要快乐。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这个词的音量，能写进字典里吗？"
     }
   ],
   "EMU_HEAL": [
     {
       "id": "EH_A",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请不要碰我。会传染那种‘无用的期待’的。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "补好啦！又能蹦蹦跳跳一大圈！"
     },
     {
       "id": "EH_B",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……温暖？恶心。好烫。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "中场休息结束！刚刚只有一小会儿！"
     },
     {
       "id": "EH_C",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "好痛！你的手好痛！别碰我的伤口！！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐放心，我是很结实的凤笑梦！"
     },
     {
       "id": "EH_A2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "你的善意会弄脏制服。请离远。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "呼——！重新把笑脸摆正！"
     },
     {
       "id": "EH_A3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "谢谢，但我不需要。请自重。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "补给也来捧场啦！谢谢谢谢！"
     },
     {
       "id": "EH_B2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……拥抱……像铁链……放开。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "没事没事，杂技演员很会站起来的！"
     },
     {
       "id": "EH_B3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……治疗？只是另一种束缚。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "精神回来啦！顺便把音量也调回来！"
     },
     {
       "id": "EH_C2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "不要靠近！我会咬你！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "不是谢幕！只是弯腰捡一下东西！"
     },
     {
       "id": "EH_C3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "别再撒花！那是诅咒！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "好！这次的谢幕动作还能再夸张一点！"
     }
   ],
   "EMU_LEVELUP": [
     {
       "id": "EL_A",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "未来早就决定好了。只要听话就可以了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "新节目！学姐学姐，先别走！"
     },
     {
       "id": "EL_B",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……未来？那是一片……灰色的墙。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "把“咻”升级成“咻咻咻”！"
     },
     {
       "id": "EL_C",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "没有那种东西！如果是那种充满谎言的未来……我就全部破坏掉！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "道具又多啦！后台还有地方放！"
     },
     {
       "id": "EL_A2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "梦想？那是大人的作业表，不是你的玩具。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐的表情没变……再加点礼花试试！"
     },
     {
       "id": "EL_A3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，成绩单已经写好了，不需要再挣扎。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "观众还没笑完，节目就不能停！"
     },
     {
       "id": "EL_B2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……梦想=噪点。看不清。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "越来越像游乐园啦！我说的是火力！"
     },
     {
       "id": "EL_B3",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……未来……只剩灰尘。别提。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "新道具到手！先取个很长很响的名字！"
     },
     {
       "id": "EL_C2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "谁说未来会闪光？让我把它砸碎。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "看我把下一幕变得更哇哇哇一点！"
     },
     {
       "id": "EL_C3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "你想升级？那就踩着我们的尸体啊！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "嘿咻！这个也搬到舞台上！"
     }
   ],
   "LEVEL_UP_EVENT": [
     {
       "id": "LV_UP_1",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "数值上升……真的有意义吗？",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，三件道具选一件。不是把桌子搬走。",
       "maxed": false
     },
     {
       "id": "LV_UP_2",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "别得意……下一次会更痛。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……休息的时候，你还在加节目。",
       "maxed": false
     },
     {
       "id": "LV_UP_3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请冷静，成绩虚高并不会改变本质。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "先选好再开演。我会等的。",
       "maxed": false
     },
     {
       "id": "LV_UP_4",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……成长？只是延迟坠落。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "这个“升级”，包括降低音量吗？",
       "maxed": false
     },
     {
       "id": "LV_UP_5",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "记录提升。仍旧判定为失败路径。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "你的节目单，又长了一行。",
       "maxed": false
     },
     {
       "id": "LV_UP_6",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "我会把这份升级拆成碎片。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……六个道具槽。不要挂在别人身上。",
       "maxed": false
     },
     {
       "id": "LV_UP_MAX",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "已经推到极限了……不要再逼我。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "已经十级了。扩建申请还没有结束吗？",
       "maxed": true
     },
     {
       "id": "LV_UP_MAX2",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#a0a0ff",
-      "text": "极限警报：再进一步将触发自毁。",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "等级到顶！舞台还能继续扩建！",
       "maxed": true
     },
     {
       "id": "LV_UP_MAX3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "还想突破？那就让身体彻底裂开吧。",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……原来满级以后，还是有安可。",
       "maxed": true
     }
   ],
   "LEVEL_DOWN_EVENT": [
     {
       "id": "LV_DN_1",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff6688",
-      "text": "系统回退……这样才安静。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "经验掉了一点，节目还在！"
     },
     {
       "id": "LV_DN_2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……温度下降。这样才对。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……少拿一点经验，不会把学过的忘掉。"
     },
     {
       "id": "LV_DN_3",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff6688",
-      "text": "真好，又回到受控范围内了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "刚才踩空啦！下一步照常蹦！"
     },
     {
       "id": "LV_DN_4",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……下降才像呼吸。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "先看脚下。道具不会因为这个收回。"
     },
     {
       "id": "LV_DN_5",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff00ff",
-      "text": "哈哈，看到没？希望坠落时声音真好听！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "等级还在！我就说没白练嘛！"
     },
     {
       "id": "LV_DN_6",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "保持低处才不会惹麻烦。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，先躲开，再数经验。"
     }
   ],
   "PLAYER_DAMAGE": [
     {
       "id": "DMG_1",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff6688",
-      "text": "警告：装甲破损。请停止挣扎。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "呜哇！学姐的招呼撞到我啦！"
     },
     {
       "id": "DMG_2",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "凤同学，安静一点会好受些。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，看弹幕。我的笑容不会移动。"
     },
     {
       "id": "DMG_3",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff6688",
-      "text": "这点痛算什么？继续尖叫吧！"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这个节目有点扎！先躲一下！"
     },
     {
       "id": "DMG_4",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ccccff",
-      "text": "请保持安静，不要乱动伤口。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "受伤了就先休息。不是让你往另一颗上跑。"
     },
     {
       "id": "DMG_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#aaaaaa",
-      "text": "……看到吗？温度正在流走。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "没倒没倒！这是临时加的踉跄动作！"
     },
     {
       "id": "DMG_6",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff6688",
-      "text": "伤害值记录。下一次会更高。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……慢一点也可以。不用每一步都演杂技。"
     }
   ],
   "HP_RECOVER_EVENT": [
     {
       "id": "HP_UP_1",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#88ff88",
-      "text": "……温暖？只是一瞬间而已。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "补给拿到了。现在可以好好看路了吧。"
     },
     {
       "id": "HP_UP_2",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#88ff88",
-      "text": "补丁完成。别以为这能改变什么。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "补给抵达！下一场继续精神满满！"
     },
     {
       "id": "HP_UP_3",
-      "sender": "MAFUYU_MASKED",
-      "color": "#88ff88",
-      "text": "整理仪容完毕。继续吧。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "嗯，站稳了。不要用翻跟头表示痊愈。"
     },
     {
       "id": "HP_UP_4",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#88ff88",
-      "text": "暂时缝好了，但裂缝还在。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "修整完毕！笑梦号再次出发！"
     },
     {
       "id": "HP_UP_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#88ff88",
-      "text": "……空洞里灌进一点温暖……马上就漏。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……你的恢复速度，和说话速度一样快。"
     },
     {
       "id": "HP_UP_6",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#88ff88",
-      "text": "自修复完毕。重新指数拒绝。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，捡到的是治疗，不是加场通知。"
     }
   ],
   "FAILURE_EVENT": [
     {
       "id": "FAIL_1",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff3333",
-      "text": "……系统关闭。Score {score}。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "哎呀，谢幕早了一点！这次得了 {score} 分！"
     },
     {
       "id": "FAIL_2",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#ff3333",
-      "text": "……结束了。你可以休息了。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "凤同学，先坐下。椅子不是下一件杂技道具。"
     },
     {
       "id": "FAIL_3",
-      "sender": "MAFUYU_SYSTEM",
-      "color": "#ff3333",
-      "text": "……记录：Score {score}。依旧无法改变结局。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "本场 {score} 分。……下次请记得看弹幕。"
     },
     {
       "id": "FAIL_4",
-      "sender": "MAFUYU_MASKED",
-      "color": "#ff3333",
-      "text": "凤同学，游戏到此为止。请回家反省。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "刚刚那段不算正式演出！先喝口水！"
     },
     {
       "id": "FAIL_5",
-      "sender": "MAFUYU_HOLLOW",
-      "color": "#ff3333",
-      "text": "……你也……停下了。好。"
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "……音箱总算休息了。你也休息一下。"
     },
     {
       "id": "FAIL_6",
-      "sender": "MAFUYU_GLITCH",
-      "color": "#ff3333",
-      "text": "倒下了？呵，还是被噪点吞了。"
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐还在等！我整理好道具就回来！"
+    }
+  ],
+  "ECHO_ENTRY": [
+    {
+      "id": "ECHO_ENTRY_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "ECHO 开场！学姐跑得好快，还有远程追光灯！"
+    },
+    {
+      "id": "ECHO_ENTRY_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "先躲冲刺的路线。停下来以后，还有一道光。"
+    }
+  ],
+  "PALISADE_ENTRY": [
+    {
+      "id": "PALISADE_ENTRY_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "PALISADE 把路拦啦！拆掉侧臂，再开园！"
+    },
+    {
+      "id": "PALISADE_ENTRY_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "侧臂可以拆。请不要真的掏出门票。"
+    }
+  ],
+  "REPRISE_ENTRY": [
+    {
+      "id": "REPRISE_ENTRY_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "REPRISE！弹幕谢幕后还会原路返场！"
+    },
+    {
+      "id": "REPRISE_ENTRY_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "停下来的弹幕也会碰到。回程前先让路。"
+    }
+  ],
+  "LACUNA_ENTRY": [
+    {
+      "id": "LACUNA_ENTRY_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "LACUNA 压轴！学姐，最后一场要笑着看哦！"
+    },
+    {
+      "id": "LACUNA_ENTRY_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "最后六段。看弹幕就好，不用一直看我的笑容。"
+    }
+  ],
+  "ENCOUNTER_CLEARED": [
+    {
+      "id": "ENCOUNTER_CLEARED_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这位学姐谢幕啦！补好道具，下一场出发！"
+    },
+    {
+      "id": "ENCOUNTER_CLEARED_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "还要继续？……那先把补给拿好。"
+    },
+    {
+      "id": "ENCOUNTER_CLEARED_3",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "前面的空地还很大！够我们再搭一个舞台！"
+    }
+  ],
+  "CARD_CLEARED": [
+    {
+      "id": "CARD_CLEARED_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "这一幕过啦！学姐还有什么新节目？"
+    },
+    {
+      "id": "CARD_CLEARED_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "嗯，这一段结束了。下一段还没开始。"
+    },
+    {
+      "id": "CARD_CLEARED_3",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "谢幕鞠躬！趁换幕赶快喘口气！"
+    }
+  ],
+  "COMPLETE_EVENT": [
+    {
+      "id": "COMPLETE_EVENT_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "Wonderhoy！学姐说“下次再来”！她没说不可以！"
+    },
+    {
+      "id": "COMPLETE_EVENT_2",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "Wonderhoy！临时游乐园谢幕！学姐……还是笑得好厉害！"
+    }
+  ],
+  "ECHO_ATTACK": [
+    {
+      "id": "ECHO_ATTACK_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "学姐又要咻过来啦！先看地上的路线！"
+    },
+    {
+      "id": "ECHO_ATTACK_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "跑完了，还有一道光。不是合影时间。"
+    },
+    {
+      "id": "ECHO_ATTACK_3",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "哇，冲刺接追光！学姐也会排连着的节目！"
+    }
+  ],
+  "PALISADE_ATTACK": [
+    {
+      "id": "PALISADE_ATTACK_1",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "侧臂在发弹幕。不是请你去那里检票。"
+    },
+    {
+      "id": "PALISADE_ATTACK_2",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "拆掉一边，就少一边开门迎客！"
+    },
+    {
+      "id": "PALISADE_ATTACK_3",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "门的位置会换。请不要等在上一扇门前。"
+    }
+  ],
+  "REPRISE_ATTACK": [
+    {
+      "id": "REPRISE_ATTACK_1",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "弹幕停住啦！等等，它们还要回来！"
+    },
+    {
+      "id": "REPRISE_ATTACK_2",
+      "sender": "MAFUYU",
+      "color": "#c1adfa",
+      "text": "原路返回。不会临时改道来接你。"
+    },
+    {
+      "id": "REPRISE_ATTACK_3",
+      "sender": "EMU",
+      "color": "#91efe0",
+      "text": "谢幕的队伍又回来了！我先把路让开！"
     }
   ]
 }

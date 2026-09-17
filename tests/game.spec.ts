@@ -210,7 +210,7 @@ test('ECHO freezes progression while limited reinforcements and locked lasers co
   await openGame(page);
   await page.getByRole('button', { name: '困难', exact: true }).click();
   await page.evaluate(() => window.__MAFUYU_DEBUG__.scenario('miniboss-arrival'));
-  await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: '迷你首领生命' })).toBeVisible();
   const before = await page.evaluate(() => {
     const s = window.__MAFUYU_DEBUG__.state(); const e = s.enemies.find(e => e.type === 'miniboss')!;
     return { waveTime: s.waveTime, maxHp: e.maxHp, bossStage: s.bossStage };
@@ -221,7 +221,7 @@ test('ECHO freezes progression while limited reinforcements and locked lasers co
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().waveTime)).toBe(before.waveTime);
   await page.evaluate(() => window.__MAFUYU_DEBUG__.restart());
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().minibossSpawned)).toBe(false);
-  await expect(page.getByRole('progressbar', { name: '游猎回声生命' })).toHaveCount(0);
+  await expect(page.getByRole('progressbar', { name: '迷你首领生命' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

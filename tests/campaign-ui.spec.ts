@@ -109,12 +109,14 @@ test('cross-tab scores merge and rejected storage stays usable in the current se
 
 test('a real lethal hit exposes failed score persistence on the failure screen before retry', async ({ page }) => {
   await open(page); await page.getByRole('button', { name: '开始游戏' }).click();
+  // Orphaned hazards are deliberately removed; use a living source for the lethal hit.
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.length)).toBeGreaterThan(0);
   await page.evaluate(() => {
     Storage.prototype.setItem = () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); };
     const state = window.__MAFUYU_DEBUG__.state(), player = state.player;
     state.score = 7654; player.hp = 1; player.invincible = 0;
     state.hazards.push({ id: 990002, x: player.x, y: player.y, radius: 120,
-      warning: 0, warningDuration: 0, life: 1, duration: 1, sourceId: -1, kind: 'bombard', active: true });
+      warning: 0, warningDuration: 0, life: 1, duration: 1, sourceId: state.enemies[0].id, kind: 'bombard', active: true });
   });
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase)).toBe('failed');
   await expect(page.getByRole('dialog').locator('.save-session')).toContainText('未保存到浏览器');

@@ -102,7 +102,7 @@ try {
   await page.waitForFunction(x => window.__MAFUYU_DEBUG__.state().player.x > x + 50, origin);
   await page.keyboard.up('KeyD');
   await page.keyboard.press('Escape');
-  await page.getByRole('heading', { name: '稍作停留', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '学姐，暂停一下！', exact: true }).waitFor();
   await page.locator('[aria-label="性能信息"]').evaluate(element => { element.style.visibility = 'hidden'; });
   await mkdir('.tmp', { recursive: true });
   await page.screenshot({ path: '.tmp/deployed-v' + version + '.png', animations: 'disabled' });

@@ -3,11 +3,11 @@ import type { EnemyType, SeasonId } from './types';
 export type EncounterId = 's1:echo' | 's1:mafuyu' | 's2:palisade' | 's2:reprise' | 's2:final';
 export interface CampaignStage { name: string; duration: number; enemyPool?: EnemyType[]; exitEncounter: EncounterId; midEncounter?: { time: number; id: EncounterId } }
 export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
-  { name: '光源接入', duration: 90, exitEncounter: 's1:echo' },
-  { name: '镜幕交界', duration: 90, exitEncounter: 's2:palisade' },
-  { name: '共鸣核心', duration: 60, exitEncounter: 's1:mafuyu' },
-  { name: '复奏断层', duration: 60, exitEncounter: 's2:reprise' },
-  { name: '终章前线', duration: 60, exitEncounter: 's2:final' },
+  { name: '空白场地试营业', duration: 90, exitEncounter: 's1:echo' },
+  { name: '学姐好像看过来了', duration: 90, exitEncounter: 's2:palisade' },
+  { name: '笑容压力测试', duration: 60, exitEncounter: 's1:mafuyu' },
+  { name: '再来一场就收工', duration: 60, exitEncounter: 's2:reprise' },
+  { name: '25时禁止喧哗', duration: 60, exitEncounter: 's2:final' },
 ];
 export const CAMPAIGN_DURATION = 360;
 export const ENCOUNTERS = CAMPAIGN_STAGES.map(stage => stage.exitEncounter);

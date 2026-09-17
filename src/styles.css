@@ -1618,12 +1618,13 @@ kbd {
 }
 
 /* The battlefield keeps one 16:9 view; status rails occupy their own layout space. */
-:root { --hud-top: 64px; --hud-bottom: 100px; }
+:root { --hud-top: 64px; --hud-bottom: 128px; }
 #game-shell { width: 100vw; height: 100dvh; aspect-ratio: auto; background: #050910; }
 #game-host { inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100vw, 177.7777778dvh); height: auto; aspect-ratio: 16 / 9; }
 #game-shell[data-in-run="true"] #game-host { width: min(100vw, calc((100dvh - var(--hud-top) - var(--hud-bottom)) * 16 / 9)); top: calc((100dvh + var(--hud-top) - var(--hud-bottom)) / 2); }
 .app { font-size: clamp(14px, 1.2vw, 18px); }
 .menu-simple { gap: 10px; width: min(100%, 480px); }
+.menu-tagline { margin: 0 0 8px; font-size: 13px; line-height: 1.6; color: #abc1d2; }
 .season-options { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 10px; margin-bottom: 6px; }
 .season-options button { border: 1px solid #405069; background: #0a1323; border-radius: 5px; padding: 12px 8px; font-size: 15px; line-height: 1.4; }
 .season-options button span { display: block; font-size: 12px; margin-top: 4px; color: #91a5c0; }
@@ -1682,6 +1683,8 @@ kbd {
 .upgrade-branch { display: flex; justify-content: space-between; gap: 10px; align-items: center; color: #92c4b7; font-size: 12px; margin-bottom: 28px; }
 .upgrade-branch kbd { font-size: 12px; }
 .upgrade-card>strong { color: #e2f7ef; font-size: 21px; font-weight: 500; }
+.module-flavor { display: block; font-size: 11px; font-weight: 400; line-height: 1.6; color: #a5b7c7; margin-top: 8px; }
+.upgrade-card>.module-flavor { color: #b8cdbf; font-size: 12px; }
 .upgrade-card p { font-size: 14px; color: #a9bcd5; line-height: 1.75; flex: 1; margin: 17px 0 22px; }
 .upgrade-confirm { border-top: 1px solid #334354; padding-top: 14px; display: flex; justify-content: space-between; font-size: 12px; color: #b8d9d3; }
 .branch-drone { border-color: #665883; }.branch-drone .upgrade-branch { color: #c5a6ec; }
@@ -1756,7 +1759,7 @@ kbd {
 .module-slots>span.is-equipped { color: #b9d7e6; border-color: #496879; }
 .module-slots>span.is-evolved { color: #d8c6ff; border-color: #8671b4; }
 .module-slots b { font-size: 9px; font-weight: 500; color: #c2f4ed; flex-shrink: 0; }
-.battle-comms p { min-height: 14px; max-height: 14px; margin: 4px 0; }
+.battle-comms p { min-height: 28px; max-height: 28px; margin: 3px 0; }
 .battle-comms .module-summary { font-size: 10px; }
 .upgrade-toolbar { margin: 16px 0; display: flex; align-items: center; gap: 20px; justify-content: space-between; }
 .upgrade-toolbar>span { font-size: 12px; color: #9db2ca; line-height: 1.7; }
