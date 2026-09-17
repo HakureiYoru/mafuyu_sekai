@@ -1,0 +1,264 @@
+{
+  "measuredAt": "2026-09-17T17:16:35.401Z",
+  "method": "Paired fresh-Lv1 normal-HP campaigns; seeds 60001 and 60002, normal difficulty, balanced build preference, high pickup collection. Existing scripts/balance-v6.mjs controller.",
+  "sourceHashesBefore": {
+    "src/game/simulation.ts": "3255194a7975c940be7172f367e80fb2d26492b7b6a47858028417238ff925a7",
+    "src/game/config.ts": "4c87546f26042b3569fa4238395667627d65ea95b83fe5094207f41659a3aa65",
+    "src/game/settings.ts": "1105a18cebc99dfd9d8c728b33e4d3dab9af01ce902cc1d6961bfc6b519c1dae",
+    "src/game/difficulty.ts": "3f0205a0d67c30316dd510d27206d48b73631de6ae29a8dc996d0c5c5e1f1c28",
+    "src/game/miniboss-ai.ts": "536888a6f6ce86ff3f8e1eb9dc9c10868724e5461757a411c4cfbe8dd725c482",
+    "src/game/math.ts": "31c5728c823f0f323100ed84abd273e5b632e0efcf0484a84cd57b3cc14b67d9",
+    "src/game/boss-actions.ts": "bcd780a7375a7145f48daf0b38a9d1826facdf5120494ff3d32f931e20e3845b",
+    "src/game/pool.ts": "0ed3f11dda733add37f64fbe7fe7e7dffe7e7b0a0f4e4e6cf1a54cb2f32080c5",
+    "src/game/attack-budget.ts": "8e200a7bb7366ca9109912f30b4dc61af6f7e65dec597f35814633529b8ecae8",
+    "src/game/module-combat.ts": "63821d4c3edf6db817f3c655569a6f8c133fa670aeb76a7737ba525c7a011d3a",
+    "src/game/upgrades.ts": "8eef05af49c54641a61bf7b0e8975bf8785e285c7519dfe77be5ec51f2242d74",
+    "src/game/elite-ai.ts": "d7285986af3ae6f0988403707dceadd724b0ef996c1b97f3f571c0f7a33f9be0",
+    "src/game/season2-ai.ts": "7cb61ca71dabde1ade77c280648929d459f516e9c9ce86b526220766b8e35aad",
+    "src/game/enemy-ai.ts": "e44bddf9504e77a4c771d43e7c8a7a322fb34e7e0f4c76a44a671a3a91c61e71",
+    "src/game/threat-director.ts": "e13386b72a18f68d274503d06ef6b578b29fe0aa8707e6650c2ccf01bc73ee10",
+    "src/game/projectile-motion.ts": "aa7b389fd787035592bbed32bf89b3d0f989a9c50891bad83fb318f8ec691792",
+    "src/game/campaign.ts": "b317f136998ec22031856435da32eaa095ac89010c32eb4e0e2e5b7ef8941b82",
+    "src/game/spellcards.ts": "ce55cb8eae009a66fd7f03bcdda610a68a00d37431c61063d2e354b05404debf",
+    "src/game/fairness.test.ts": "4216a4d952aab8dde520c7d2e2b8764680f5e7903f6e94d81212c7504229777b",
+    "scripts/balance-v6.mjs": "784a3bcdd01adc9f40812fbe700aa8b4b103a54a7d6695a01b55122f24b0e7e6",
+    "scripts/simulation-loader.mjs": "4f6801a8b0ec4ee27900488088754ffbe311445e8a8f45e1903c613ee9551d6c"
+  },
+  "sourceHashesAfter": {
+    "src/game/simulation.ts": "3255194a7975c940be7172f367e80fb2d26492b7b6a47858028417238ff925a7",
+    "src/game/config.ts": "4c87546f26042b3569fa4238395667627d65ea95b83fe5094207f41659a3aa65",
+    "src/game/settings.ts": "1105a18cebc99dfd9d8c728b33e4d3dab9af01ce902cc1d6961bfc6b519c1dae",
+    "src/game/difficulty.ts": "3f0205a0d67c30316dd510d27206d48b73631de6ae29a8dc996d0c5c5e1f1c28",
+    "src/game/miniboss-ai.ts": "536888a6f6ce86ff3f8e1eb9dc9c10868724e5461757a411c4cfbe8dd725c482",
+    "src/game/math.ts": "31c5728c823f0f323100ed84abd273e5b632e0efcf0484a84cd57b3cc14b67d9",
+    "src/game/boss-actions.ts": "bcd780a7375a7145f48daf0b38a9d1826facdf5120494ff3d32f931e20e3845b",
+    "src/game/pool.ts": "0ed3f11dda733add37f64fbe7fe7e7dffe7e7b0a0f4e4e6cf1a54cb2f32080c5",
+    "src/game/attack-budget.ts": "8e200a7bb7366ca9109912f30b4dc61af6f7e65dec597f35814633529b8ecae8",
+    "src/game/module-combat.ts": "63821d4c3edf6db817f3c655569a6f8c133fa670aeb76a7737ba525c7a011d3a",
+    "src/game/upgrades.ts": "8eef05af49c54641a61bf7b0e8975bf8785e285c7519dfe77be5ec51f2242d74",
+    "src/game/elite-ai.ts": "c1021137b4c61de680c7e3ca59d218485995d6266b42f4800a9977415c9ea184",
+    "src/game/season2-ai.ts": "7cb61ca71dabde1ade77c280648929d459f516e9c9ce86b526220766b8e35aad",
+    "src/game/enemy-ai.ts": "e44bddf9504e77a4c771d43e7c8a7a322fb34e7e0f4c76a44a671a3a91c61e71",
+    "src/game/threat-director.ts": "e13386b72a18f68d274503d06ef6b578b29fe0aa8707e6650c2ccf01bc73ee10",
+    "src/game/projectile-motion.ts": "aa7b389fd787035592bbed32bf89b3d0f989a9c50891bad83fb318f8ec691792",
+    "src/game/campaign.ts": "b317f136998ec22031856435da32eaa095ac89010c32eb4e0e2e5b7ef8941b82",
+    "src/game/spellcards.ts": "ce55cb8eae009a66fd7f03bcdda610a68a00d37431c61063d2e354b05404debf",
+    "src/game/fairness.test.ts": "4216a4d952aab8dde520c7d2e2b8764680f5e7903f6e94d81212c7504229777b",
+    "scripts/balance-v6.mjs": "784a3bcdd01adc9f40812fbe700aa8b4b103a54a7d6695a01b55122f24b0e7e6",
+    "scripts/simulation-loader.mjs": "4f6801a8b0ec4ee27900488088754ffbe311445e8a8f45e1903c613ee9551d6c"
+  },
+  "sourceChanges": [
+    "src/game/elite-ai.ts"
+  ],
+  "limitations": [
+    "Two seeds are diagnostic, not a new full balance matrix or human playtest.",
+    "Changing kill timing changes drops, upgrades and movement later in the campaign; per-stage TTK need not fall in every run.",
+    "No hard-mode or endless playthrough timings were remeasured."
+  ],
+  "runs": [
+    {
+      "label": "before",
+      "status": "complete",
+      "cases": [
+        {
+          "seed": 60001,
+          "result": "complete",
+          "elapsed": 829.183,
+          "choices": 23,
+          "elites": [
+            {
+              "id": "elite:1:0",
+              "type": "dasher",
+              "maxHp": 360,
+              "level": 2,
+              "totalRanks": 1,
+              "seconds": 14.9
+            },
+            {
+              "id": "elite:2:0",
+              "type": "shield",
+              "maxHp": 650,
+              "level": 6,
+              "totalRanks": 6,
+              "seconds": 29.733
+            },
+            {
+              "id": "elite:3:0",
+              "type": "returner",
+              "maxHp": 900,
+              "level": 8,
+              "totalRanks": 9,
+              "seconds": 15.917
+            },
+            {
+              "id": "elite:4:0",
+              "type": "dasher",
+              "maxHp": 1250,
+              "level": 10,
+              "totalRanks": 13,
+              "seconds": 23.55
+            },
+            {
+              "id": "elite:5:0",
+              "type": "carrier",
+              "maxHp": 1750,
+              "level": 10,
+              "totalRanks": 18,
+              "seconds": 36.633
+            }
+          ]
+        },
+        {
+          "seed": 60002,
+          "result": "complete",
+          "elapsed": 787.583,
+          "choices": 22,
+          "elites": [
+            {
+              "id": "elite:1:1",
+              "type": "basic",
+              "maxHp": 360,
+              "level": 2,
+              "totalRanks": 1,
+              "seconds": 11.9
+            },
+            {
+              "id": "elite:2:0",
+              "type": "shield",
+              "maxHp": 650,
+              "level": 6,
+              "totalRanks": 7,
+              "seconds": 26.05
+            },
+            {
+              "id": "elite:3:1",
+              "type": "sampler",
+              "maxHp": 900,
+              "level": 8,
+              "totalRanks": 11,
+              "seconds": 14.683
+            },
+            {
+              "id": "elite:4:1",
+              "type": "returner",
+              "maxHp": 1250,
+              "level": 10,
+              "totalRanks": 15,
+              "seconds": 17.267
+            },
+            {
+              "id": "elite:5:0",
+              "type": "carrier",
+              "maxHp": 1750,
+              "level": 10,
+              "totalRanks": 19,
+              "seconds": 27.483
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "status": "complete",
+      "cases": [
+        {
+          "seed": 60001,
+          "result": "complete",
+          "elapsed": 812.8,
+          "choices": 23,
+          "elites": [
+            {
+              "id": "elite:1:0",
+              "type": "dasher",
+              "maxHp": 360,
+              "level": 2,
+              "totalRanks": 1,
+              "seconds": 14.9
+            },
+            {
+              "id": "elite:2:0",
+              "type": "shield",
+              "maxHp": 450,
+              "level": 6,
+              "totalRanks": 6,
+              "seconds": 22.7
+            },
+            {
+              "id": "elite:3:0",
+              "type": "returner",
+              "maxHp": 700,
+              "level": 8,
+              "totalRanks": 9,
+              "seconds": 16.85
+            },
+            {
+              "id": "elite:4:0",
+              "type": "dasher",
+              "maxHp": 900,
+              "level": 10,
+              "totalRanks": 13,
+              "seconds": 15.617
+            },
+            {
+              "id": "elite:5:0",
+              "type": "carrier",
+              "maxHp": 1100,
+              "level": 10,
+              "totalRanks": 18,
+              "seconds": 25.817
+            }
+          ]
+        },
+        {
+          "seed": 60002,
+          "result": "complete",
+          "elapsed": 773.117,
+          "choices": 23,
+          "elites": [
+            {
+              "id": "elite:1:1",
+              "type": "basic",
+              "maxHp": 360,
+              "level": 2,
+              "totalRanks": 1,
+              "seconds": 11.9
+            },
+            {
+              "id": "elite:2:0",
+              "type": "shield",
+              "maxHp": 450,
+              "level": 6,
+              "totalRanks": 7,
+              "seconds": 19.433
+            },
+            {
+              "id": "elite:3:1",
+              "type": "sampler",
+              "maxHp": 700,
+              "level": 8,
+              "totalRanks": 11,
+              "seconds": 11.4
+            },
+            {
+              "id": "elite:4:1",
+              "type": "returner",
+              "maxHp": 800,
+              "level": 10,
+              "totalRanks": 15,
+              "seconds": 18.7
+            },
+            {
+              "id": "elite:5:0",
+              "type": "carrier",
+              "maxHp": 1100,
+              "level": 10,
+              "totalRanks": 20,
+              "seconds": 16.85
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

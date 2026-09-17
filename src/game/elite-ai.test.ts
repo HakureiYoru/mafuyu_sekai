@@ -38,7 +38,7 @@ describe('ten two-action mandatory elites', () => {
   it('provides exactly two distinct templates per stage with fixed increasing health', () => {
     expect(ELITE_GROUPS.map(group => group.length)).toEqual([2, 2, 2, 2, 2]);
     expect(new Set(ELITE_GROUPS.flat().map(item => item.id)).size).toBe(10);
-    expect(ELITE_GROUPS.map(group => group[0].hp)).toEqual([360, 650, 900, 1250, 1750]);
+    expect(ELITE_GROUPS.map(group => group.map(template => template.hp))).toEqual([[360, 360], [450, 450], [700, 700], [900, 800], [1100, 1000]]);
   });
   it.each(ELITE_GROUPS.flat().map(definition => [definition.name, definition.stage, ELITE_GROUPS[definition.stage - 1].indexOf(definition)] as const))(
     '%s attacks and moves, leaves no unbounded pending history, and never grants itself immunity', (_name, stage, variant) => {

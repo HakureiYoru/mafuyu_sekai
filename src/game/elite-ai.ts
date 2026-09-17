@@ -8,10 +8,10 @@ type ElitePattern = 'leaper' | 'chaser' | 'gate' | 'beam' | 'messenger' | 'sampl
 export interface EliteDefinition { id: ElitePattern; name: string; type: EnemyType; hp: number; radius: number; stage: number }
 export const ELITE_GROUPS: readonly (readonly [EliteDefinition, EliteDefinition])[] = [
   [{ id: 'leaper', name: '跃袭标兵', type: 'dasher', hp: 360, radius: 46, stage: 1 }, { id: 'chaser', name: '追声快手', type: 'basic', hp: 360, radius: 46, stage: 1 }],
-  [{ id: 'gate', name: '噤声门卫', type: 'shield', hp: 650, radius: 52, stage: 2 }, { id: 'beam', name: '横梁巡查', type: 'sniper', hp: 650, radius: 48, stage: 2 }],
-  [{ id: 'messenger', name: '折光信使', type: 'returner', hp: 900, radius: 48, stage: 3 }, { id: 'sampler', name: '旧影记录员', type: 'sampler', hp: 900, radius: 48, stage: 3 }],
-  [{ id: 'hunter', name: '回声猎手', type: 'dasher', hp: 1250, radius: 50, stage: 4 }, { id: 'thrower', name: '停拍投手', type: 'returner', hp: 1250, radius: 50, stage: 4 }],
-  [{ id: 'executor', name: '裂核执刑者', type: 'carrier', hp: 1750, radius: 54, stage: 5 }, { id: 'ring', name: '环阵监察', type: 'weaver', hp: 1750, radius: 54, stage: 5 }],
+  [{ id: 'gate', name: '噤声门卫', type: 'shield', hp: 450, radius: 52, stage: 2 }, { id: 'beam', name: '横梁巡查', type: 'sniper', hp: 450, radius: 48, stage: 2 }],
+  [{ id: 'messenger', name: '折光信使', type: 'returner', hp: 700, radius: 48, stage: 3 }, { id: 'sampler', name: '旧影记录员', type: 'sampler', hp: 700, radius: 48, stage: 3 }],
+  [{ id: 'hunter', name: '回声猎手', type: 'dasher', hp: 900, radius: 50, stage: 4 }, { id: 'thrower', name: '停拍投手', type: 'returner', hp: 800, radius: 50, stage: 4 }],
+  [{ id: 'executor', name: '裂核执刑者', type: 'carrier', hp: 1100, radius: 54, stage: 5 }, { id: 'ring', name: '环阵监察', type: 'weaver', hp: 1000, radius: 54, stage: 5 }],
 ];
 export interface EliteTelegraph {
   kind: 'fan' | 'beam' | 'wall' | 'ring' | 'sample'; x: number; y: number; angle: number; spread: number;

@@ -72,9 +72,9 @@ describe('v6 integrated combat contracts', () => {
     const sim = quiet(); const elite = internals(sim).spawnElite(2, 0, 2400, 2000, 'fixture:elite');
     elite.exposedUntil = 2;
     sim.damageEnemy(elite, 10, { x: 2000, y: 2000, angle: 0, kind: 'normal' });
-    expect(elite.hp).toBeCloseTo(650 - 13.5);
+    expect(elite.hp).toBeCloseTo(elite.maxHp - 13.5);
     sim.damageEnemy(elite, 10, { x: 2000, y: 2100, angle: 0, kind: 'normal' });
-    expect(elite.hp).toBeCloseTo(650 - 23.5);
+    expect(elite.hp).toBeCloseTo(elite.maxHp - 23.5);
   });
   it('all 36 modules and 18 evolutions stay deterministic with bounded attack entities at high ranks', () => {
     const results = [30, 60, 120, 144].map(hz => {
