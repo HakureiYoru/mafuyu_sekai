@@ -1166,13 +1166,13 @@ export class GameSimulation {
       this.grid.query(e.x - range, e.y - range, e.x + range, e.y + range, this.candidates);
       for (const other of this.candidates) {
         if (other.id <= e.id || other.hp <= 0 || other.type === 'mine' || other.type === 'boss') continue;
-        const movable = e.state === 'chase' || e.state === 'recover';
-        const otherMovable = other.state === 'chase' || other.state === 'recover';
+        const movable = e.state === 'chase' || e.state === 'recover' && e.role === 'mob';
+        const otherMovable = other.state === 'chase' || other.state === 'recover' && other.role === 'mob';
         if (!movable && !otherMovable) continue;
         const dx = e.x - other.x, dy = e.y - other.y, distance = Math.hypot(dx, dy), overlap = e.radius + other.radius - distance;
         if (overlap <= 0) continue;
         const force = Math.min(overlap * 0.3, 50 * dt), nx = distance > EPSILON ? dx / distance : Math.cos(e.id), ny = distance > EPSILON ? dy / distance : Math.sin(e.id);
-        // Committed attacks keep the same origin as their warning. Neighbours yield around them.
+        // Preserve attack origins and major enemies' stationary recovery; neighbours yield around them.
         if (movable) { e.x = clamp(e.x + nx * force, e.radius, WORLD.width - e.radius); e.y = clamp(e.y + ny * force, e.radius, WORLD.height - e.radius); }
         if (otherMovable) { other.x = clamp(other.x - nx * force, other.radius, WORLD.width - other.radius); other.y = clamp(other.y - ny * force, other.radius, WORLD.height - other.radius); }
       }

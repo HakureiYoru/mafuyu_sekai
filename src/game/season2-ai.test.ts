@@ -73,6 +73,43 @@ describe('second-season ownership and shared warnings', () => {
     expect(h.e.action).toMatchObject({ targetX, targetY, angle, phase: 'warning' });
     expect(h.e.action!.remaining).toBeGreaterThan(0); expect(h.e.exposedUntil ?? 0).toBe(0);
   });
+  it.each(difficulties)('%s PALISADE uses stationary volleys and a full rest even against a retreating player after losing its arms', difficulty => {
+    for (const broken of [false, true]) for (const phase2 of [false, true]) {
+      const h = harness('palisade', difficulty), cfg = season2Attacks(difficulty).palisade;
+      h.player.vx = 300; h.tick();
+      if (broken) for (const arm of h.enemies.filter(e => e.type === 'arm')) { arm.hp = 0; onSeason2Death(arm, h.ctx); }
+      if (phase2) h.e.hp = h.e.maxHp * 0.4;
+      h.run(1200);
+      expect(h.shots.length).toBeGreaterThan(12);
+      expect(h.events.some(event => event.text?.startsWith('action-'))).toBe(false);
+      expect(h.e.action).toBeUndefined();
+      h.until(() => h.e.state === 'volley');
+      h.until(() => h.e.state === 'recover');
+      const position = { x: h.e.x, y: h.e.y }, shots = h.shots.length;
+      for (let tick = 0; tick < Math.floor((cfg.recovery - STEP) / STEP); tick++) {
+        h.tick();
+        expect(h.e.state).toBe('recover');
+        expect({ x: h.e.x, y: h.e.y }).toEqual(position);
+        expect(h.shots).toHaveLength(shots);
+      }
+      expect(cfg.recovery).toBeGreaterThanOrEqual(1.3);
+    }
+  });
+  it.each(difficulties)('%s REPRISE stays still for the complete exposed recovery after every interception', difficulty => {
+    const h = harness('reprise', difficulty), cfg = season2Attacks(difficulty).reprise;
+    h.player.vx = 300; h.tick();
+    expect(h.e.action?.warning).toBe(cfg.dashWarning);
+    h.until(() => h.e.action?.phase === 'recover');
+    const position = { x: h.e.x, y: h.e.y }, shots = h.shots.length;
+    for (let tick = 0; tick < Math.floor((cfg.dashRecovery - STEP) / STEP); tick++) {
+      h.tick();
+      expect(h.e.action?.phase).toBe('recover');
+      expect({ x: h.e.x, y: h.e.y }).toEqual(position);
+      expect(h.shots).toHaveLength(shots);
+      expect(h.e.exposedUntil).toBeGreaterThan(h.ctx.elapsed);
+    }
+    expect(cfg.dashRecovery).toBeGreaterThanOrEqual(1.2);
+  });
   it('returns cached profiles but creates isolated finite per-enemy state', () => {
     expect(season2Attacks()).toBe(season2Attacks('normal'));
     expect(season2Attacks('hard')).toBe(season2Attacks('hard'));
@@ -299,15 +336,27 @@ describe('destructible parts and finite death derivatives', () => {
     h.until(() => h.shots.length > 0);
     expect(h.shots.every(shot => shot.sourceId !== arm.id)).toBe(true);
   });
-  it('cancels the old wall when both arms break before giving its fallback a new full warning', () => {
-    const h = harness('palisade'); h.tick(); h.run(50);
+  it.each(difficulties)('%s cancels the old wall on arm break and warns both separated core fans before firing', difficulty => {
+    const h = harness('palisade', difficulty), cfg = season2Attacks(difficulty).palisade; h.tick(); h.run(40);
     for (const arm of h.enemies.filter(e => e.type === 'arm')) { arm.hp = 0; onSeason2Death(arm, h.ctx); }
     expect(h.e.state).toBe('recover'); h.run(20); expect(h.shots).toHaveLength(0);
-    h.until(() => h.e.state === 'charge'); expect(season2Telegraphs(h.e).some(cue => cue.kind === 'fan')).toBe(true);
+    h.until(() => h.e.state === 'charge');
+    const warnings = season2Telegraphs(h.e, difficulty), locked = h.e.season2!.lockedAngle;
+    expect(warnings).toHaveLength(2);
+    expect(warnings.every(cue => cue.kind === 'fan')).toBe(true);
+    expect(warnings.map(cue => cue.angle)).toEqual([locked - cfg.coreFanOffset, locked + cfg.coreFanOffset]);
+    h.player.y += 170;
     const start = h.ctx.elapsed; h.until(() => h.shots.length > 0);
-    expect(h.ctx.elapsed - start).toBeGreaterThanOrEqual(season2Attacks().palisade.warning - 1e-8);
-    expect(h.shots).toHaveLength(5);
-    expect(h.events.some(event => event.text === 'action-sidestep' || event.text === 'action-dash')).toBe(true);
+    expect(h.ctx.elapsed - start).toBeGreaterThanOrEqual(cfg.warning - 1e-8);
+    expect(h.shots).toHaveLength(cfg.coreFanCount * 2);
+    h.until(() => h.e.state === 'recover');
+    expect(h.shots).toHaveLength(cfg.coreFanCount * 2 * cfg.batches);
+    for (const shot of h.shots) {
+      const relative = Math.abs(angleDelta(locked, shot.angle));
+      expect(relative).toBeGreaterThanOrEqual(cfg.coreFanOffset - cfg.coreFanSpread / 2 - 1e-8);
+      expect(relative).toBeLessThanOrEqual(cfg.coreFanOffset + cfg.coreFanSpread / 2 + 1e-8);
+    }
+    expect(h.events.some(event => event.text?.startsWith('action-'))).toBe(false);
   });
   it('retires orphaned arms without manufacturing a death reward or another generation', () => {
     const h = harness('arm'); h.e.parentId = 999; h.tick();

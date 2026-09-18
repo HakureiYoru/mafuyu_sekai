@@ -46,6 +46,17 @@ function defeatFinal(sim: GameSimulation) {
 }
 
 describe('deterministic fixed-step combat', () => {
+  it('keeps a recovering large enemy still while nearby mobs yield around it', () => {
+    const sim = quiet(), large = sim.spawnEnemy('palisade', 2000, 1600)!;
+    large.state = 'recover'; large.timer = 2;
+    const mob = sim.spawnEnemy('basic', large.x + 20, large.y)!;
+    mob.speed = 0;
+    const start = { x: large.x, y: large.y }, mobStart = mob.x;
+    ticks(sim, 60);
+    expect(large.state).toBe('recover');
+    expect({ x: large.x, y: large.y }).toEqual(start);
+    expect(mob.x).toBeGreaterThan(mobStart);
+  });
   it('produces the same movement, shots, cooldowns, and wave at 30/60/120/144 Hz', () => {
     const results = [30, 60, 120, 144].map(hz => {
       const sim = quiet(531); const clock = new FixedClock(); let shots = 0;

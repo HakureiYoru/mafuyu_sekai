@@ -56,13 +56,16 @@ function emission(e: Enemy, ctx: EliteAiContext, shots: EliteShot[], kind: Elite
 function reserve(e: Enemy, ctx: EliteAiContext, shots: number, hazards: number, duration: number): boolean {
   return !ctx.reserveAttack || ctx.reserveAttack(e.id, shots, hazards, duration);
 }
+function movementRecovery(difficulty: Difficulty): number { return difficulty === 'hard' ? 1.2 : 1.4; }
 function dash(e: Enemy, ctx: EliteAiContext, side = 0, retrace = false): boolean {
   const brain = e.elite!, hard = ctx.difficulty === 'hard';
-  const target = retrace && brain.returnPoint ? brain.returnPoint : bossActionTarget(e, ctx.player, brain.stage === 1 ? 270 : 330, side);
+  const target = retrace && brain.returnPoint ? brain.returnPoint : bossActionTarget(e, ctx.player, e.radius >= 52 ? 230 : brain.stage === 1 ? 270 : 330, side);
   const previous = { x: e.x, y: e.y };
+  const warning = hard ? 0.5 : 0.65, duration = side ? 0.5 : brain.stage === 1 ? 0.45 : 0.46;
+  const recovery = movementRecovery(ctx.difficulty);
   const accepted = beginBossAction(e, { kind: retrace ? 'retrace' : side ? 'sidestep' : 'dash', ...target,
-    warning: hard ? 0.5 : 0.65, duration: side ? 0.5 : brain.stage === 1 ? 0.45 : 0.46, recovery: hard ? 0.6 : 0.8 }, ctx);
-  if (accepted) { if (!retrace) brain.returnPoint = previous; brain.nextAttack = ctx.elapsed + (hard ? 1.56 : 1.91); }
+    warning, duration, recovery }, ctx);
+  if (accepted) { if (!retrace) brain.returnPoint = previous; brain.nextAttack = ctx.elapsed + warning + duration + recovery; }
   return accepted;
 }
 
@@ -108,24 +111,26 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
     e.vx = direction.x * (hard ? 360 : 310) * sign; e.vy = direction.y * (hard ? 360 : 310) * sign; e.state = 'chase'; return;
   }
   if (!ctx.canCommit()) { e.state = 'chase'; e.vx = e.vy = 0; return; }
-  if (brain.extraDash > 0) { if (dash(e, ctx)) brain.extraDash--; return; }
-  const second = brain.cycle > 1 && brain.cycle % 2 === 0;
+  // A full volley separates lunges; large bodies reposition sideways only after two ranged attacks.
+  brain.extraDash = 0;
+  const second = brain.cycle % 2 === 1;
   const angle = Math.atan2(ctx.player.y - e.y, ctx.player.x - e.x), releases: EliteRelease[] = [];
   e.angle = angle; e.vx = e.vy = 0;
-  const move = definition.id === 'leaper' && !second || definition.id === 'chaser' && !second
-    || ['gate', 'sampler', 'executor'].includes(definition.id) && second || definition.id === 'hunter'
-    || ['beam', 'thrower', 'ring'].includes(definition.id) && second;
+  const large = ['gate', 'executor', 'ring'].includes(definition.id);
+  const move = large ? brain.cycle % 3 === 2 : ['leaper', 'chaser', 'hunter'].includes(definition.id) ? !second
+    : ['sampler', 'beam', 'thrower'].includes(definition.id) && second;
   if (move) {
-    const side = ['chaser', 'beam', 'thrower', 'ring'].includes(definition.id) ? (brain.cycle % 2 ? -1 : 1) * 0.85 : 0;
-    const landingFan = second && ['hunter', 'beam', 'thrower', 'ring'].includes(definition.id);
-    if (landingFan && !reserve(e, ctx, 6, 0, 1.4)) return;
-    if (dash(e, ctx, side, definition.id === 'hunter' && second)) {
+    const side = large ? (brain.cycle % 2 ? -1 : 1) * Math.PI / 2
+      : ['chaser', 'beam', 'thrower'].includes(definition.id) ? (brain.cycle % 2 ? -1 : 1) * 0.85 : 0;
+    const landingFan = ['beam', 'thrower', 'ring'].includes(definition.id);
+    if (landingFan && !reserve(e, ctx, 6, 0, (hard ? 0.5 : 0.65) + 0.5 + movementRecovery(ctx.difficulty) + 0.15)) return;
+    if (dash(e, ctx, side, definition.id === 'hunter' && brain.cycle % 4 === 2)) {
       if (landingFan && e.action) {
         const a = e.action, bearing = Math.atan2(ctx.player.y - a.targetY, ctx.player.x - a.targetX);
         brain.pending.push(emission(e, ctx, fanShots(a.targetX, a.targetY, bearing, 6, 1.3, 250), 'fan', bearing, 1.3,
-          a.warning + a.duration + 0.05, { x: a.targetX, y: a.targetY }));
+          a.warning + a.duration + a.recovery + 0.05, { x: a.targetX, y: a.targetY }));
+        brain.nextAttack = brain.pending[brain.pending.length - 1].at + (hard ? 0.6 : 0.8);
       }
-      if (definition.id === 'executor') brain.extraDash = 1;
       brain.cycle++; cue(e, ctx, 'elite-move');
     }
     return;
@@ -187,10 +192,10 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
   }
   let duration = Math.max(...releases.map(item => item.at - ctx.elapsed), warning);
   const movingVolley = definition.id === 'messenger' && !second;
-  if (movingVolley) duration = (hard ? 0.5 : 0.65) + 0.55 + 0.05;
+  if (movingVolley) duration = (hard ? 0.5 : 0.65) + 0.55 + movementRecovery(ctx.difficulty) + 0.05;
   if (!reserve(e, ctx, releases.reduce((count, item) => count + item.shots.length, 0), 0, duration + 0.1)) return;
   if (movingVolley && beginBossAction(e, { kind: 'sidestep', ...bossActionTarget(e, ctx.player, 240, brain.cycle % 2 ? -0.9 : 0.9),
-    warning: hard ? 0.5 : 0.65, duration: 0.55, recovery: hard ? 0.6 : 0.8 }, ctx)) {
+    warning: hard ? 0.5 : 0.65, duration: 0.55, recovery: movementRecovery(ctx.difficulty) }, ctx)) {
     for (const release of releases) {
       release.at = ctx.elapsed + duration; release.cue.x = e.action!.targetX; release.cue.y = e.action!.targetY;
       release.cue.warning = release.cue.remaining = duration;

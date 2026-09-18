@@ -145,6 +145,8 @@ describe('ECHO pursuit and committed combos', () => {
   });
 
   it.each(['normal', 'hard'] as const)('%s alternates pursuit fans with predeclared crossfire rings and fixed safe gaps', difficulty => {
+    const pursuit = harness(difficulty, 2); pursuit.player.invincible = 1000; pursuit.tick(); pursuit.until('recover');
+    expect(pursuit.shots.some(s => s.options?.shape === 'rice')).toBe(true);
     const h = harness(difficulty, 2); h.enemy.miniboss!.cycle = 1; h.player.invincible = 1000;
     h.tick(); expect(h.enemy.miniboss!.combo).toBe('crossfire');
     const previews: ReturnType<typeof miniBossLandingTelegraph>[] = [];
@@ -156,7 +158,7 @@ describe('ECHO pursuit and committed combos', () => {
       h.tick();
     }
     expect(h.enemy.state).toBe('recover'); expect(previews.some(p => p.pattern === 'ring')).toBe(true);
-    expect(h.shots.some(s => s.options?.shape === 'rice')).toBe(true); expect(h.shots.some(s => s.options?.shape === 'orb')).toBe(true);
+    expect(h.shots.every(s => s.options?.shape === 'orb')).toBe(true);
     for (const preview of previews.filter(p => p.pattern === 'ring')) {
       const ring = h.shots.filter(s => s.options?.shape === 'orb' && Math.hypot(s.x - preview.x, s.y - preview.y) < 0.01);
       expect(ring.length).toBeGreaterThan(5);
@@ -194,13 +196,15 @@ describe('ECHO pursuit and committed combos', () => {
   it('finishes the old combo before a single low-health transition, and creates clean state on restart', () => {
     const h = harness('hard'); h.player.invincible = 1000; h.tick(); h.enemy.hp = h.enemy.maxHp * 0.45;
     h.tick(); expect(h.enemy.miniboss!.phase).toBe(1); h.until('recover');
-    expect(h.events.filter(e => e.text === 'windup')).toHaveLength(3); h.tick();
+    expect(h.events.filter(e => e.text === 'windup')).toHaveLength(1);
+    const recovered = h.ctx.elapsed; h.tick(); expect(h.enemy.state).toBe('recover');
+    h.until('chase'); expect(h.ctx.elapsed - recovered).toBeGreaterThanOrEqual(1.2 - 1e-8); h.tick();
     expect(h.enemy.state).toBe('phaseShift'); expect(h.enemy.miniboss!.phase).toBe(2);
     h.until('chase'); h.tick(); h.until('recover');
-    expect(h.events.filter(e => e.text === 'windup')).toHaveLength(7);
+    expect(h.events.filter(e => e.text === 'windup')).toHaveLength(2);
     expect(h.events.filter(e => e.text === 'phase')).toHaveLength(1);
     const fresh = harness('hard'); fresh.tick();
-    expect(fresh.enemy.miniboss).toMatchObject({ phase: 1, cycle: 1, chainIndex: 1, dashesLeft: 3, lasersLeft: 2, laserIndex: 0, combo: 'pursuit' });
+    expect(fresh.enemy.miniboss).toMatchObject({ phase: 1, cycle: 1, chainIndex: 1, dashesLeft: 1, lasersLeft: 2, laserIndex: 0, combo: 'pursuit' });
   });
 
   it('freezes without side effects for terminal actors or invalid simulation steps', () => {
@@ -217,6 +221,50 @@ describe('ECHO pursuit and committed combos', () => {
     const h = harness(difficulty, 2); h.tick(); h.until('dash'); h.player.x = 3800; h.player.y = 3800; h.until('recover');
     expect(h.events.filter(event => event.text === 'laser')).toHaveLength(0); expect(h.shots).toHaveLength(0);
     expect(h.counts.damage).toBe(0); expect(h.counts.commits).toBe(1);
+  });
+
+  for (const difficulty of ['normal', 'hard'] as const) for (const phase of [1, 2] as const) {
+    it(`${difficulty} phase ${phase} makes only one lunge and exposes a quiet stationary opening before its ranged attacks`, () => {
+      const h = harness(difficulty, phase), rest = difficulty === 'hard' ? 1.2 : 1.4;
+      h.player.invincible = 1000; h.tick(); h.until('aim');
+      const landed = h.ctx.elapsed, x = h.enemy.x, y = h.enemy.y;
+      expect(h.enemy.miniboss!.dashesLeft).toBe(0);
+      expect(h.enemy.exposedUntil! - landed).toBeCloseTo(rest);
+      for (let tick = 0; tick < rest * 60 - 1; tick++) {
+        h.tick();
+        expect(h.enemy.state).toBe('aim'); expect(h.enemy.vx).toBe(0); expect(h.enemy.vy).toBe(0);
+        expect(h.enemy.x).toBe(x); expect(h.enemy.y).toBe(y); expect(h.shots).toHaveLength(0);
+        expect(h.events.filter(event => event.text === 'laser')).toHaveLength(0);
+      }
+      h.tick();
+      expect(h.ctx.elapsed - landed).toBeCloseTo(rest);
+      expect(h.enemy.state).toBe('laserWarmup'); expect(h.shots.length).toBeGreaterThan(0);
+      h.until('recover');
+      expect(h.events.filter(event => event.text === 'windup')).toHaveLength(1);
+      const recovered = h.ctx.elapsed, finalRest = difficulty === 'hard' ? 1.2 : 1.5;
+      for (let tick = 0; tick < finalRest * 60 - 1; tick++) {
+        h.tick(); expect(h.enemy.state).toBe('recover'); expect(h.enemy.x).toBe(x); expect(h.enemy.y).toBe(y);
+      }
+      h.tick();
+      expect(h.ctx.elapsed - recovered).toBeCloseTo(finalRest); expect(h.enemy.state).toBe('chase');
+    });
+  }
+
+  it.each(['normal', 'hard'] as const)('%s lateral action also rests fully before locking the next beam', difficulty => {
+    const h = harness(difficulty, 2), rest = difficulty === 'hard' ? 1.2 : 1.4;
+    h.player.invincible = 1000; h.enemy.miniboss!.cycle = 2; h.tick();
+    expect(h.enemy.action?.kind).toBe('sidestep');
+    for (let tick = 0; tick < 180 && h.enemy.action?.phase !== 'recover'; tick++) h.tick();
+    expect(h.enemy.action?.phase).toBe('recover');
+    const landed = h.ctx.elapsed, x = h.enemy.x, y = h.enemy.y;
+    for (let tick = 0; tick < rest * 60 - 1; tick++) {
+      h.tick(); expect(h.enemy.action?.phase).toBe('recover');
+      expect(h.enemy.x).toBe(x); expect(h.enemy.y).toBe(y);
+      expect(h.events.filter(event => event.text === 'laser')).toHaveLength(0);
+    }
+    h.tick();
+    expect(h.ctx.elapsed - landed).toBeCloseTo(rest);
+    expect(h.enemy.action).toBeUndefined(); expect(h.enemy.state).toBe('laserWarmup');
   });
 });
 
@@ -245,7 +293,7 @@ describe('ECHO route and warning fairness', () => {
         const dashes = h.events.filter(e => e.text === 'windup').length, lasers = h.events.filter(e => e.text === 'laser').length;
         attempts.push({ damage: h.counts.damage, dashes, lasers });
         if (h.enemy.state === 'recover' && h.counts.damage === 0 && dashes === cfg.dash.counts[phase - 1] && lasers === cfg.laser.counts[phase - 1]) {
-          expect(h.shots.length).toBeGreaterThan(5); expect(h.player.invincible).toBe(0); expect(h.player.dashTime).toBe(0); return;
+          expect(h.shots.length).toBeGreaterThanOrEqual(cfg.landing.fanCount); expect(h.player.invincible).toBe(0); expect(h.player.dashTime).toBe(0); return;
         }
       }
       expect(attempts, 'Every complete-combo ordinary route took damage').toContainEqual({ damage: 0,
@@ -253,7 +301,7 @@ describe('ECHO route and warning fairness', () => {
     });
   }
 
-  it('hard phase two: a real movement-and-dash input sequence survives all four dashes and three lasers without damage or extra resources', () => {
+  it('hard phase two: a real movement-and-dash input sequence survives the single lunge and three lasers without damage or extra resources', () => {
     const attempts: { damage: number; dashes: number; lasers: number; playerDashes: number }[] = [];
     for (const side of [1, -1]) for (const radius of [300, 420, 520]) for (const firstDash of [18, 30, 45, 60, 90]) {
       const sim = new GameSimulation(3407, 'hard'), p = sim.state.player;
@@ -273,10 +321,10 @@ describe('ECHO route and warning fairness', () => {
       const lasers = events.filter(e => e.type === 'attack' && e.enemyType === 'miniboss' && e.text === 'laser').length;
       const playerDashes = events.filter(e => e.type === 'dash').length;
       attempts.push({ damage, dashes, lasers, playerDashes });
-      if (enemy.state === 'recover' && damage === 0 && dashes === 4 && lasers === 3 && playerDashes > 0) {
+      if (enemy.state === 'recover' && damage === 0 && dashes === 1 && lasers === 3 && playerDashes > 0) {
         expect(p.hp).toBe(BALANCE.player.hp); expect(p.bombs).toBe(BALANCE.player.bombs);
-        expect(events.some(e => e.type === 'enemyShot')).toBe(true); expect(sim.state.tick).toBeGreaterThan(300);
-        expect(enemy.miniboss!.chainIndex).toBe(4); expect(enemy.miniboss!.laserIndex).toBe(3); return;
+        expect(events.some(e => e.type === 'enemyShot')).toBe(true); expect(sim.state.tick * STEP).toBeGreaterThanOrEqual(4.9);
+        expect(enemy.miniboss!.chainIndex).toBe(1); expect(enemy.miniboss!.laserIndex).toBe(3); return;
       }
     }
     throw new Error(`No full-combo dash route survived: ${JSON.stringify(attempts)}`);
@@ -292,9 +340,14 @@ describe('ECHO route and warning fairness', () => {
         const brain = h.enemy.miniboss!; brain.dashesLeft = 1; brain.lasersLeft = 1;
         h.permit(false); h.run(12);
         const direction = normalize(moveX, moveY); h.player.vx = direction.x * 300; h.player.vy = direction.y * 300;
+        for (let i = 0; i < 180 && state() !== 'aim' && h.player.hp > 0; i++) h.tick();
+        if (state() !== 'aim') return false;
+        // Use the new stationary opening to stop safely, instead of leaving the screen during recovery.
+        h.player.vx = h.player.vy = 0;
         for (let i = 0; i < 180 && state() !== 'laserWarmup' && h.player.hp > 0; i++) h.tick();
         if (state() !== 'laserWarmup') return false;
         // Continue the same walk through the short laser; all real landing projectiles remain in flight.
+        h.player.vx = direction.x * 300; h.player.vy = direction.y * 300;
         h.until('recover'); h.enemy.hp = 0;
         return h.counts.damage === 0 && h.counts.contact === 0 && h.shots.length > 0 && h.player.invincible === 0;
       });

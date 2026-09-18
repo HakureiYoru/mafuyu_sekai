@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { ASSET_URLS, BALANCE } from './game/config';
-import type { GameSettings, HudSnapshot, ModuleId, RuntimeControls } from './game/types';
+import type { GameSettings, HudSnapshot, ModuleId, RuntimeControls, UpgradeChoiceId } from './game/types';
 import changelog from 'virtual:changelog';
 import { MODULES, EVOLUTIONS, choiceView, buildModuleViews } from './game/upgrades';
+import { evolutionPaths, choiceEvolutionHints } from './game/upgrade-guidance';
+import { compactChoiceDescription } from './game/upgrade-copy';
 import { BINDING_LABELS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, rebindKey } from './game/settings';
 import type { BindingAction } from './game/settings';
 import { BattleComms, useCommsPlacement } from './components/BattleComms';
@@ -28,6 +30,7 @@ function Icon({ name, className = '' }: { name: IconName; className?: string }) 
 
 const buildLayers = (s: HudSnapshot) => s.modules.reduce((total, id) => total + (s.moduleRanks[id] ?? 1), 0);
 const rankLabel = (rank: number) => rank <= 5 ? ['I', 'II', 'III', 'IV', 'V'][Math.max(0, rank - 1)] : `Lv.${rank}`;
+const snapshotBuild = (s: HudSnapshot) => ({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] });
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -167,11 +170,34 @@ function Hud({ snapshot: s, runtime, openSettings }: { snapshot: HudSnapshot; ru
   </div>;
 }
 
-function EvolutionRecipes({ snapshot: s }: { snapshot: HudSnapshot }) {
-  return <details className="evolution-recipes"><summary>进化组合 <span>已获得 {s.evolutions.length} 种</span></summary><p>主模块达到 II、搭配达到 I，即可在精英或首领奖励中选择进化；进化后仍能继续升层。</p><div>{Object.values(EVOLUTIONS).map(item => <p key={item.id} className={s.evolutions.includes(item.id) ? 'is-evolved' : ''}><strong>{item.name}</strong><span>{MODULES[item.primary].name} II ＋ {MODULES[item.partner].name} I</span></p>)}</div></details>;
+function EvolutionRecipes({ snapshot: s, expanded = false, moduleId }: { snapshot: HudSnapshot; expanded?: boolean; moduleId?: ModuleId }) {
+  const paths = evolutionPaths(snapshotBuild(s)).filter(path => !moduleId || path.primary === moduleId || path.partner === moduleId);
+  return <details className="evolution-recipes" open={expanded}><summary>进化组合 <span>已获得 {s.evolutions.length} 种</span></summary><p>主模块 II ＋ 搭配 I 凑齐配方后，在精英或首领奖励中选到进化卡才会进化。</p><div>{paths.map(path => <p key={path.id} className={`recipe-path is-${path.status}`} data-evolution={path.id}>
+    <strong>{path.name}<small>{path.status === 'evolved' ? '已进化' : path.status === 'ready' ? '配方齐全' : path.status === 'progress' ? `还差 ${path.stepsRemaining} 次强化` : '尚未开始'}</small></strong>
+    <span className="evolution-requirements"><span className={path.primaryRank >= 2 ? 'is-met' : ''}>{MODULES[path.primary].name} II · {path.primaryRank ? `已有 ${rankLabel(path.primaryRank)}` : '未获得'}</span><span className={path.partnerRank >= 1 ? 'is-met' : ''}>{MODULES[path.partner].name} I · {path.partnerRank ? `已有 ${rankLabel(path.partnerRank)}` : '未获得'}</span></span>
+    <span className="recipe-next">{path.status === 'evolved' ? '主模块仍可继续升层' : path.status === 'ready' ? s.upgradeChoices.includes(`evolution:${path.id}`) ? '本次可选进化卡' : '等待精英／首领奖励中的进化卡' : `还缺：${path.missing.join('、')}`}</span>
+  </p>)}</div></details>;
 }
 
 function UpgradeChoice({ snapshot: s, runtime }: { snapshot: HudSnapshot; runtime: RuntimeControls }) {
+  const [inspection, setInspection] = useState<'build' | UpgradeChoiceId | null>(null);
+  const returnButton = useRef<HTMLButtonElement>(null);
+  const inspectionTrigger = useRef<'build' | UpgradeChoiceId | null>(null);
+  const triggerButtons = useRef(new Map<'build' | UpgradeChoiceId, HTMLButtonElement>());
+  useEffect(() => {
+    if (inspection) returnButton.current?.focus();
+    else if (inspectionTrigger.current) triggerButtons.current.get(inspectionTrigger.current)?.focus();
+  }, [inspection]);
+  const rememberTrigger = (target: 'build' | UpgradeChoiceId, node: HTMLButtonElement | null) => {
+    if (node) triggerButtons.current.set(target, node);
+    else triggerButtons.current.delete(target);
+  };
+  const inspect = (target: 'build' | UpgradeChoiceId) => { inspectionTrigger.current = target; setInspection(target); };
+  const build = snapshotBuild(s), touch = s.controlMode === 'touch';
+  const paths = evolutionPaths(build);
+  const directions = paths.filter(path => path.status === 'ready' || path.status === 'progress').slice(0, 2);
+  const inspected = inspection && inspection !== 'build' ? choiceView(build, inspection) : null;
+  const inspectedModule = inspected ? inspected.kind === 'evolution' ? EVOLUTIONS[inspected.id.slice(10) as keyof typeof EVOLUTIONS].primary : inspected.kind === 'resource' ? null : inspected.id as ModuleId : null;
   const press = useRef<{ pointerId: number; x: number; y: number; dragged: boolean } | null>(null);
   const trackDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = press.current;
@@ -179,8 +205,24 @@ function UpgradeChoice({ snapshot: s, runtime }: { snapshot: HudSnapshot; runtim
   };
   const branches = { main: '主炮', drone: '子机', resource: '机动与资源' };
   const kinds = { module: '新模块', rank: '继续升层', evolution: '组合进化', resource: '补给' };
-  return <Dialog title={s.choiceSource === 'boss' ? '首领奖励' : s.choiceSource === 'elite' ? '精英奖励' : '选择强化'} eyebrow={`${s.modules.length} 种模块 · ${buildLayers(s)} 层 · ${s.evolutions.length} 种进化`} className="upgrade-dialog">
-    <p className="dialog-description">笑梦：「哇！变强！」{s.controlMode === 'touch' ? '战斗已暂停，点选一项强化。' : '战斗已暂停，按 1 / 2 / 3 或点击选择后继续。'}{s.orientationBlocked ? '横屏后继续战斗。' : ''}</p>
+  return <Dialog title={inspection === 'build' ? '本局构筑与组合' : inspected ? inspected.name : s.choiceSource === 'boss' ? '首领奖励' : s.choiceSource === 'elite' ? '精英奖励' : '选择强化'} eyebrow={`${s.modules.length} 种模块 · ${buildLayers(s)} 层 · ${s.evolutions.length} 种进化`} className={`upgrade-dialog ${inspection ? 'is-inspecting' : ''}`}>
+    {inspection ? <div className="upgrade-inspection" onKeyDown={event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setInspection(null); }
+      if (/^(Digit|Numpad)[123]$/.test(event.code)) { event.preventDefault(); event.stopPropagation(); }
+    }}>
+      <button ref={returnButton} className="text-button upgrade-inspection-back" onClick={() => setInspection(null)}>← 返回选卡</button>
+      {inspected ? <>
+        <p className="dialog-description">{kinds[inspected.kind]}{inspected.rank !== null ? ` · ${rankLabel(inspected.rank)}` : ''} · 查看详情不会选择强化</p>
+        {inspectedModule && <ModulePreview id={inspectedModule} rank={inspected.rank ?? s.moduleRanks[inspectedModule] ?? 1} evolved={inspected.kind === 'evolution'} reducedMotion={s.settings.reducedMotion} />}
+        <p className="upgrade-full-description">{inspected.description}</p>
+        {choiceEvolutionHints(build, inspected.id).map(hint => <p key={hint.id} className={`upgrade-combo-hint hint-${hint.status}`}><strong>{hint.name}</strong> · {hint.text}</p>)}
+        {inspectedModule && <EvolutionRecipes snapshot={s} moduleId={inspectedModule} expanded />}
+      </> : <><PausedModules snapshot={s} expanded={false} recipesExpanded /><button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button></>}
+    </div> : <>
+    <p className="upgrade-intro">{touch ? '战斗已暂停 · 点卡片选择，点详情查看说明' : '战斗已暂停 · 按 1 / 2 / 3 或点击卡片选择'}{s.orientationBlocked ? ' · 横屏后继续' : ''}</p>
+    <section className="upgrade-paths" aria-label="当前组合方向">
+      {directions.length ? directions.map(path => <div key={path.id} className={`upgrade-path is-${path.status}`}><strong>{path.name}</strong><span>{path.status === 'ready' ? s.upgradeChoices.includes(`evolution:${path.id}`) ? '配方齐全 · 本次可选进化' : '配方齐全 · 等精英／首领进化卡' : `还缺 ${path.missing.join('、')}`}</span></div>) : <div className="upgrade-path"><strong>{s.evolutions.length ? '继续拓展组合' : '从这次选择开始组合'}</strong><span>主模块 II ＋ 搭配 I，精英／首领奖励选进化卡</span></div>}
+    </section>
     <div className="upgrade-cards" onPointerDownCapture={event => {
       press.current = event.pointerType === 'touch' ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY, dragged: false } : null;
     }} onPointerMoveCapture={trackDrag} onPointerUpCapture={trackDrag} onPointerCancelCapture={() => { if (press.current) press.current.dragged = true; }} onClickCapture={event => {
@@ -188,13 +230,13 @@ function UpgradeChoice({ snapshot: s, runtime }: { snapshot: HudSnapshot; runtim
       if (event.detail !== 0 && press.current?.dragged) { event.preventDefault(); event.stopPropagation(); }
       press.current = null;
     }}>{s.upgradeChoices.map((id, index) => {
-      const item = choiceView({ modules: [...s.modules], ranks: s.moduleRanks }, id);
+      const item = choiceView(build, id);
       const previewId = item.kind === 'evolution' ? EVOLUTIONS[id.slice(10) as keyof typeof EVOLUTIONS].primary : item.kind === 'resource' ? null : id as ModuleId;
-      return <button key={s.upgradeOfferId + ':' + id} className={`upgrade-card branch-${item.branch} choice-${item.kind}`} onClick={() => runtime.chooseUpgrade(id, s.upgradeOfferId ?? undefined)}><span className="upgrade-branch">{branches[item.branch]} · {kinds[item.kind]}<kbd>{index + 1}</kbd></span><strong>{item.name}{item.rank !== null && <small className="upgrade-rank">{item.kind === 'rank' ? `${rankLabel(item.rank - 1)} → ${rankLabel(item.rank)}` : rankLabel(item.rank)}</small>}</strong>{previewId && <ModulePreview id={previewId} rank={item.rank ?? s.moduleRanks[previewId] ?? 1} evolved={item.kind === 'evolution'} reducedMotion={s.settings.reducedMotion} />}{item.flavor && <small className="module-flavor">{item.flavor}</small>}<p>{item.description}</p><span className="upgrade-confirm">选择强化 <Icon name="arrow" /></span></button>;
+      const hints = choiceEvolutionHints(build, id), visibleHints = hints.slice(0, touch ? 1 : 2);
+      return <div key={s.upgradeOfferId + ':' + id} className="upgrade-option"><button className={`upgrade-card branch-${item.branch} choice-${item.kind}`} data-choice={id} onClick={() => runtime.chooseUpgrade(id, s.upgradeOfferId ?? undefined)}><span className="upgrade-branch">{branches[item.branch]} · {kinds[item.kind]}<kbd>{index + 1}</kbd></span><strong>{item.name}{item.rank !== null && <small className="upgrade-rank">{item.kind === 'rank' ? `${rankLabel(item.rank - 1)} → ${rankLabel(item.rank)}` : rankLabel(item.rank)}</small>}</strong>{previewId && <ModulePreview id={previewId} rank={item.rank ?? s.moduleRanks[previewId] ?? 1} evolved={item.kind === 'evolution'} reducedMotion={s.settings.reducedMotion} />}{item.flavor && <small className="module-flavor">{item.flavor}</small>}<p className="upgrade-description">{touch ? compactChoiceDescription(build, id) : item.description}</p><span className="upgrade-combo">{visibleHints.length ? visibleHints.map(hint => <span key={hint.id} className={`upgrade-combo-hint hint-${hint.status}`}><strong>{hint.name}</strong><span>{hint.text}</span></span>) : <span className="upgrade-combo-hint"><span>{item.kind === 'resource' ? '补充本局资源' : '继续强化现有能力'}</span></span>}</span><span className="upgrade-confirm">选择强化 <Icon name="arrow" /></span></button><button className="text-button upgrade-detail" aria-label={`查看${item.name}详情`} ref={node => rememberTrigger(id, node)} onClick={() => inspect(id)}>详情{hints.length > visibleHints.length ? ` · ${hints.length} 条组合` : ''}</button></div>;
     })}</div>
-    <div className="upgrade-toolbar"><span>{s.modules.length ? `模块可一直增加与升层；本局已强化 ${buildLayers(s)} 层。` : '模块在本局持续生效，受伤不会丢失。'}</span><button className="button button-secondary button-small" disabled={s.rerollsRemaining === 0} onClick={() => runtime.rerollUpgrades()}>重抽 · {s.rerollsRemaining}</button></div>
-    <PausedModules snapshot={s} expanded={false} />
-    <button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button>
+    <div className="upgrade-toolbar"><button className="text-button upgrade-browse" ref={node => rememberTrigger('build', node)} onClick={() => inspect('build')}>本局构筑与组合</button><button className="button button-secondary button-small" disabled={s.rerollsRemaining === 0} onClick={() => runtime.rerollUpgrades()}>重抽 · {s.rerollsRemaining}</button></div>
+    </>}
   </Dialog>;
 }
 
@@ -222,12 +264,12 @@ function Settings({ settings, controlMode, setSettings, onClose }: { settings: G
   </Dialog>;
 }
 
-function PausedModules({ snapshot: s, expanded = true }: { snapshot: HudSnapshot; expanded?: boolean }) {
+function PausedModules({ snapshot: s, expanded = true, recipesExpanded = false }: { snapshot: HudSnapshot; expanded?: boolean; recipesExpanded?: boolean }) {
   const labels = { ready: '就绪', active: '生效中', cooldown: '冷却', consumed: '本局已消耗' };
   return <><details className="paused-modules" open={expanded}><summary>本局模块 <span>{s.modules.length} 种 · {buildLayers(s)} 层</span></summary><div>{buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => {
     const state = s.moduleStates.find(module => module.id === item.id);
     return <article key={item.id}><div><strong>{item.name} {rankLabel(item.rank)}{item.evolution ? ' ✦' : ''}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{item.description}</p>{item.flavor && <small className="module-flavor">{item.flavor}</small>}</article>;
-  })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><EvolutionRecipes snapshot={s} /></>;
+  })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><EvolutionRecipes snapshot={s} expanded={recipesExpanded} /></>;
 }
 
 function RunResults({ snapshot }: { snapshot: HudSnapshot }) {
@@ -271,7 +313,7 @@ export default function App({ runtime }: { runtime: RuntimeControls }) {
     {snapshot.controlMode === 'touch' && snapshot.phase === 'playing' && !snapshot.orientationBlocked && <TouchControls snapshot={snapshot} runtime={runtime} />}
     {snapshot.phase === 'menu' && <Menu runtime={runtime} snapshot={snapshot} openSettings={openSettings} openChangelog={() => setChangelogOpen(true)} />}
     {snapshot.phase === 'loading' && <section className="screen-overlay loading-screen" aria-label="加载游戏"><span className="loading-mark" aria-hidden="true">✦</span><div className="eyebrow">凤小梦大战朝比奈真冬</div><h1>加载中……</h1><div className="loading-progress"><Meter value={snapshot.loading} label="资源加载进度" /><span>{Math.round(snapshot.loading * 100)}%</span></div><p>笑梦：Wonderhoy！！ 真冬：……还没开始就这么吵。</p></section>}
-    {snapshot.phase === 'upgrade' && <UpgradeChoice snapshot={snapshot} runtime={runtime} />}
+    {snapshot.phase === 'upgrade' && <UpgradeChoice key={snapshot.upgradeOfferId} snapshot={snapshot} runtime={runtime} />}
     {!settingsOpen && snapshot.phase === 'paused' && (snapshot.orientationBlocked ? <RotatePrompt runtime={runtime} openSettings={openSettings} /> : <Dialog title="先别喊了。" eyebrow="PAUSED" onClose={() => runtime.resume()}><p className="dialog-description">真冬：「……终于安静了。」战斗已暂停。</p><RunResults snapshot={snapshot} /><div className="dialog-actions"><button className="button button-primary" onClick={() => runtime.resume()}><Icon name="play" />继续游戏 {snapshot.controlMode === 'keyboardMouse' && <kbd>ESC</kbd>}</button><button className="button button-secondary" onClick={openSettings}><Icon name="settings" />体验设置</button>{snapshot.controlMode === 'touch' && <FullscreenButton runtime={runtime} />}<button className="text-button centered" onClick={() => runtime.returnToMenu()}>结束本局，返回主菜单</button></div><PausedModules snapshot={snapshot} /><ControlsGuide settings={snapshot.settings} compact touch={snapshot.controlMode === 'touch'} /></Dialog>)}
     {!settingsOpen && snapshot.phase === 'failed' && <Dialog title="……终于闭嘴了。" eyebrow="SILENCE." className="result-dialog failure-dialog"><div className="result-emblem" aria-hidden="true">✧</div><p className="dialog-description">笑梦：「呜哇……」本局结束，再次挑战从 Lv1 开始。</p><RunResults snapshot={snapshot} /><SaveNotice snapshot={snapshot} /><div className="result-detail"><span>{snapshot.stageName} · 推进 {Math.floor(snapshot.progression / 360 * 100)}%</span><span>最高纪录 {snapshot.bestScore.toLocaleString('en-US')}</span></div><div className="dialog-actions"><button className="button button-primary" disabled={snapshot.orientationBlocked} onClick={() => runtime.restart()}><Icon name="restart" />再次挑战</button><button className="button button-secondary" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}
     {!settingsOpen && snapshot.phase === 'complete' && <Dialog title="Wonderhoy——！！" eyebrow="ONE MORE WONDERHOY!" className="result-dialog complete-dialog"><div className="result-emblem" aria-hidden="true">✦</div><p className="dialog-description">真冬：「为什么……还没停……」继续无尽会保留本局构筑。</p><RunResults snapshot={snapshot} /><SaveNotice snapshot={snapshot} /><div className="dialog-actions"><button className="button button-secondary" disabled={snapshot.orientationBlocked} onClick={() => runtime.continueEndless()}><Icon name="spark" />继续 · 无尽挑战<Icon name="arrow" /></button><button className="button button-secondary" disabled={snapshot.orientationBlocked} onClick={() => runtime.restart()}><Icon name="restart" />重新开始</button><button className="text-button centered" onClick={() => runtime.returnToMenu()}>返回主菜单</button></div></Dialog>}

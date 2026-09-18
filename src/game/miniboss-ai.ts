@@ -10,23 +10,23 @@ export const MINIBOSS_ATTACKS = {
   phaseThreshold: 0.45, phaseShift: 0.7,
   positioning: { minRange: 155, maxRange: 850, viewPadding: 80, edgeMargin: 88, preferredRange: 330, speed: 240 },
   dash: { warning: 0.6, phase2Warning: 0.5, speed: 920, duration: 0.46, clearance: 64,
-    counts: [2, 3], prediction: 0.18, maxLead: 90 },
-  settle: 0.28,
+    counts: [1, 1], prediction: 0.18, maxLead: 90 },
+  settle: 1.4,
   landing: { fanCount: 5, fanSpread: 1.25, fanSpeed: 255, ringCount: 16, ringSpeed: 225, gap: 1.1, radius: 8, range: 750,
     turnRate: 0.18, turnDelay: 0.3, turnDuration: 0.45 },
   laser: { warning: 0.7, phase2Warning: 0.65, duration: 0.34, width: 60, length: 1600, counts: [1, 2], gap: 0.16, crossAngle: 0.08 },
-  recovery: 0.85, phase2Recovery: 0.65,
+  recovery: 1.5, phase2Recovery: 1.5,
 } as const;
 
 const HARD_ATTACKS = {
   ...MINIBOSS_ATTACKS,
   positioning: { ...MINIBOSS_ATTACKS.positioning, speed: 300 },
   dash: { ...MINIBOSS_ATTACKS.dash, warning: 0.45, phase2Warning: 0.4, speed: 1080, duration: 0.44,
-    counts: [3, 4], prediction: 0.25, maxLead: 120 },
-  settle: 0.22,
+    counts: [1, 1], prediction: 0.25, maxLead: 120 },
+  settle: 1.2,
   landing: { ...MINIBOSS_ATTACKS.landing, fanCount: 7, fanSpread: 1.45, fanSpeed: 280, ringCount: 20, ringSpeed: 245, gap: 1 },
   laser: { ...MINIBOSS_ATTACKS.laser, warning: 0.55, phase2Warning: 0.5, duration: 0.38, width: 72, length: 1800, counts: [2, 3], gap: 0.12 },
-  recovery: 0.65, phase2Recovery: 0.5,
+  recovery: 1.2, phase2Recovery: 1.2,
 } as const;
 
 export function miniBossAttacks(difficulty: Difficulty = 'normal') {
@@ -66,7 +66,7 @@ export interface MiniBossLandingTelegraph {
 export function miniBossLandingTelegraph(e: Enemy, difficulty: Difficulty = 'normal'): MiniBossLandingTelegraph {
   const brain = e.miniboss, cfg = miniBossAttacks(difficulty).landing;
   return { x: brain?.targetX ?? e.x, y: brain?.targetY ?? e.y, angle: brain?.burstAngle ?? e.angle,
-    pattern: brain?.combo === 'crossfire' && brain.chainIndex % 2 === 0 ? 'ring' : 'fan',
+    pattern: brain?.combo === 'crossfire' ? 'ring' : 'fan',
     spread: cfg.fanSpread + 2 * cfg.turnRate * cfg.turnDuration, gap: cfg.gap, range: cfg.range };
 }
 
@@ -186,8 +186,8 @@ export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): 
     if (!e.action) { brain.dashesLeft = 0; brain.lasersLeft = cfg.laser.counts[brain.phase - 1]; brain.laserIndex = 0; beginLaser(e, brain, ctx); }
     return;
   }
-  // Finish committed warnings/attacks before changing phase; low health never produces an unannounced replacement.
-  if (brain.phase === 1 && e.hp / Math.max(1, e.maxHp) <= cfg.phaseThreshold && (e.state === 'chase' || e.state === 'recover')) {
+  // Finish committed attacks and their full recovery before changing phase.
+  if (brain.phase === 1 && e.hp / Math.max(1, e.maxHp) <= cfg.phaseThreshold && e.state === 'chase') {
     brain.phase = 2; brain.dashesLeft = brain.lasersLeft = 0;
     e.state = 'phaseShift'; e.timer = cfg.phaseShift; stop(e); cue(e, ctx, 'phase');
     return;
@@ -210,7 +210,11 @@ export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): 
     const vx = (brain.targetX - e.x) / remaining * travel / dt;
     const vy = (brain.targetY - e.y) / remaining * travel / dt;
     e.timer = Math.max(0, e.timer - dt); e.angle = brain.lockedAngle;
-    if (e.timer <= EPSILON) { e.state = 'aim'; e.timer = cfg.settle; }
+    if (e.timer <= EPSILON) {
+      e.state = 'aim'; e.timer = cfg.settle;
+      e.exposedUntil = Math.max(e.exposedUntil ?? 0, ctx.elapsed + cfg.settle);
+      cue(e, ctx, 'core-exposed');
+    }
     // Preserve the fractional final displacement even though this tick transitions to the stationary settle state.
     e.vx = vx; e.vy = vy;
     return;
@@ -264,7 +268,7 @@ export function updateMiniBossAi(e: Enemy, dt: number, ctx: MiniBossAiContext): 
   if (ctx.reserveAttack && !ctx.reserveAttack(e.id, cfg.dash.counts[brain.phase - 1] * cfg.landing.ringCount, 0, duration)) return;
   brain.cycle++; brain.combo = brain.cycle % 2 ? 'pursuit' : 'crossfire';
   if (brain.cycle % 3 === 0 && beginBossAction(e, { kind: 'sidestep', ...bossActionTarget(e, ctx.player, 350, brain.cycle % 2 ? 1.05 : -1.05),
-    warning: ctx.difficulty === 'hard' ? 0.5 : 0.65, duration: 0.45, recovery: ctx.difficulty === 'hard' ? 0.5 : 0.7 }, ctx)) return;
+    warning: ctx.difficulty === 'hard' ? 0.5 : 0.65, duration: 0.45, recovery: cfg.settle }, ctx)) return;
   brain.dashesLeft = cfg.dash.counts[brain.phase - 1]; brain.lasersLeft = cfg.laser.counts[brain.phase - 1];
   brain.laserIndex = brain.chainIndex = 0;
   if (!beginCharge(e, brain, ctx)) recover(e, brain, ctx);

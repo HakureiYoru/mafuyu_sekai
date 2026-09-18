@@ -367,7 +367,7 @@ export class GameRuntime implements RuntimeControls {
       controlMode: this.controlMode, orientationBlocked: this.orientationBlocked, touch: { ...this.touch.hud },
       phase: this.phase, loading: this.progress, error: this.error, mode: state.mode,
       score: state.score, bestScore: profile.bestScores.v6[state.difficulty][state.mode], historicalBestScore: Math.max(legacy.bestScores.s1[state.difficulty], legacy.bestScores.s2[state.difficulty], legacyV5.bestScores[state.difficulty].story, legacyV5.bestScores[state.difficulty].endless), difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
-      minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? `${ENEMIES[miniboss.type].label} · ${miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.type === 'palisade' ? '优先破坏侧臂，穿过弹墙间隙' : '留意停驻弹的原路折返'}` : '',
+      minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? `${ENEMIES[miniboss.type].label} · ${miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.state === 'recover' ? '收招休息 · 集火反击' : miniboss.type === 'palisade' ? miniboss.season2?.lostArms.length === 2 ? '双扇弹幕 · 中间留有通路' : '优先破坏侧臂，穿过弹墙间隙' : '留意停驻弹的原路折返'}` : '',
       waveBlocked: this.simulation.isWaveBlocked(),
       elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, hpReserve: player.hpReserve, bombs: player.bombs,
       level: player.level, xp: player.xp, xpNeeded: xpNeeded(player.level),
@@ -505,7 +505,8 @@ export type DebugScenario = 'boss' | 'boss-laser' | 'boss-nova' | 'boss-bombard'
 type DebugWindow = Window & { __MAFUYU_DEBUG__?: DebugControls };
 
 function miniBossAction(state: string): string {
-  if (state === 'charge') return '连续突进锁向 · 横向避开';
+  if (state === 'charge') return '突进路线锁定 · 横向避开';
+  if (state === 'aim') return '落地收招 · 趁机输出';
   if (state === 'dash') return '追猎突进 · 留意落点弹幕';
   if (state === 'laserWarmup') return '激光锁定 · 离开橙色走廊';
   if (state === 'laser') return '连锁激光 · 继续换位';

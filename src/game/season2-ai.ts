@@ -14,14 +14,13 @@ export interface Season2Brain {
   points: Vec2[]; auxTimer: number; shotsLeft: number; partsSpawned: boolean; deathHandled: boolean;
   healedIds: number[]; heading: number; partIds: number[]; lostArms: number[];
   guardTargetId: number | null; rightAngle: number; rightOrigin: Vec2; nextSide: -1 | 1;
-  actionBurst: boolean; returnPoint: Vec2 | null; observedVelocity: Vec2; observedTurn: number;
+  actionBurst: boolean; returnPoint: Vec2 | null;
 }
 
 export function createSeason2Brain(_type: EnemyType): Season2Brain {
   return { phase: 1, cycle: 0, lockedAngle: 0, targetId: null, points: [], auxTimer: 0, shotsLeft: 0,
     partsSpawned: false, deathHandled: false, healedIds: [], heading: 0, partIds: [], lostArms: [],
-    guardTargetId: null, rightAngle: 0, rightOrigin: { x: 0, y: 0 }, nextSide: 1, actionBurst: false, returnPoint: null,
-    observedVelocity: { x: 0, y: 0 }, observedTurn: 0 };
+    guardTargetId: null, rightAngle: 0, rightOrigin: { x: 0, y: 0 }, nextSide: 1, actionBurst: false, returnPoint: null };
 }
 
 export const SEASON2_ATTACKS = {
@@ -31,9 +30,9 @@ export const SEASON2_ATTACKS = {
   sampler: { interval: 0.3, samples: 3, warning: 1.1, stagger: 0.18, radius: 50, duration: 0.28, cooldown: 3.8 },
   repairer: { warning: 1.2, cooldown: 3.5, range: 540, fraction: 0.2, maxTargets: 6 },
   carrier: { cores: 3, coreCap: 12, radius: 27, warning: 0.95, speed: 210, lifetime: 2.4 },
-  palisade: { warning: 1.2, recovery: 1.2, cooldown: 0.9, phaseThreshold: 0.5, phaseShift: 1.1, armOffset: 145, batches: 2, batchGap: 0.85,
-    fanCount: 5, fanSpread: 1.1, fanSpeed: 180, fanRadius: 8 },
-  reprise: { warning: 1.05, recovery: 1.2, cooldown: 0.6, phaseThreshold: 0.5, phaseShift: 1.1,
+  palisade: { warning: 1.2, recovery: 1.6, cooldown: 0.9, phaseThreshold: 0.5, phaseShift: 1.1, armOffset: 145, batches: 2, batchGap: 0.85,
+    fanCount: 5, fanSpread: 1.1, fanSpeed: 180, fanRadius: 8, coreFanCount: 3, coreFanSpread: 0.45, coreFanOffset: 0.55, coreFanSpeed: 190 },
+  reprise: { warning: 1.05, recovery: 1.5, dashWarning: 0.8, dashRecovery: 1.5, cooldown: 0.6, phaseThreshold: 0.5, phaseShift: 1.1,
     fanCount: 11, ringCount: 18, spread: 2.2, speed: 240, outbound: 1.65, pause: 0.65, phase2Gap: 0.5, gap: 0.65 },
 } as const;
 
@@ -43,8 +42,8 @@ const HARD_ATTACKS = {
   weaver: { ...SEASON2_ATTACKS.weaver, warning: 1, gapWidth: 48, cooldown: 2.7 },
   returner: { ...SEASON2_ATTACKS.returner, warning: 0.75, spread: 0.65 },
   sampler: { ...SEASON2_ATTACKS.sampler, warning: 1, cooldown: 3.3 },
-  palisade: { ...SEASON2_ATTACKS.palisade, warning: 0.8, batches: 3, batchGap: 0.75, recovery: 1, fanCount: 7 },
-  reprise: { ...SEASON2_ATTACKS.reprise, warning: 0.95, fanCount: 15, ringCount: 22, recovery: 1, phase2Gap: 0.45 },
+  palisade: { ...SEASON2_ATTACKS.palisade, warning: 1, batches: 3, batchGap: 0.75, recovery: 1.3, fanCount: 7, coreFanCount: 4 },
+  reprise: { ...SEASON2_ATTACKS.reprise, warning: 0.95, fanCount: 15, ringCount: 22, recovery: 1.2, dashWarning: 0.7, dashRecovery: 1.2, phase2Gap: 0.45 },
 } as const;
 
 /** Values here are before the simulation's one global difficulty multiplier. */
@@ -93,13 +92,8 @@ function approach(e: Enemy, p: Player, dt: number, range: number): void {
 }
 function snapshot(e: Enemy, p: Player): void { memory(e).lockedAngle = Math.atan2(p.y - e.y, p.x - e.x); }
 /** A finite velocity lead is sampled before the complete path warning and never tracks after it. */
-function ledPosition(p: Player, seconds: number, turn = 0): Vec2 {
+function ledPosition(p: Player, seconds: number): Vec2 {
   const length = Math.hypot(p.vx, p.vy), scale = length > 300 ? 300 / length : 1;
-  if (Math.abs(turn) > 0.05) {
-    const angle = Math.atan2(p.vy, p.vx), speed = length * scale;
-    return { x: p.x + speed / turn * (Math.sin(angle + turn * seconds) - Math.sin(angle)),
-      y: p.y + speed / turn * (Math.cos(angle) - Math.cos(angle + turn * seconds)) };
-  }
   return { x: p.x + p.vx * seconds * scale, y: p.y + p.vy * seconds * scale };
 }
 function boundedDestination(e: Enemy, point: Vec2, range: number): Vec2 {
@@ -140,7 +134,12 @@ export function season2Telegraph(e: Enemy, difficulty: Difficulty = 'normal'): S
   const base = { x: e.x, y: e.y, angle: brain.lockedAngle, radius: e.radius, spread: 0, points: brain.points,
     warning: e.timer, remaining: e.timer, color: 0xffae8c };
   if (e.type === 'shield' && e.state !== 'recover') return { ...base, kind: 'shield', angle: e.angle, spread: cfg.shield.arc, warning: cfg.shield.warning };
-  if (e.type === 'palisade' && e.state === 'charge' && brain.lostArms.length === 2) return { ...base, kind: 'fan', spread: 0.6, radius: 1000, warning: cfg.palisade.warning };
+  if (e.type === 'palisade' && brain.lostArms.length === 2) {
+    if (e.state !== 'charge' && (e.state !== 'volley' || brain.shotsLeft === 0)) return null;
+    return { ...base, kind: 'fan', angle: brain.lockedAngle - cfg.palisade.coreFanOffset,
+      spread: cfg.palisade.coreFanSpread, radius: 1000, warning: cfg.palisade.warning,
+      remaining: e.state === 'charge' ? e.timer : Math.max(0, brain.auxTimer) };
+  }
   if ((e.type === 'weaver' || e.type === 'palisade') && ['charge', 'volley'].includes(e.state)) {
     return { ...base, kind: 'wall', points: season2WallPoints(e, difficulty), warning: e.type === 'palisade' ? cfg.palisade.warning : cfg.weaver.warning,
       gapOffset: cfg.weaver.gapOffset, gapWidth: cfg.weaver.gapWidth, halfWidth: cfg.weaver.halfWidth, travel: cfg.weaver.travel, color: 0xe4acff };
@@ -158,6 +157,9 @@ export function season2Telegraph(e: Enemy, difficulty: Difficulty = 'normal'): S
 export function season2Telegraphs(e: Enemy, difficulty: Difficulty = 'normal'): Season2Telegraph[] {
   const primary = season2Telegraph(e, difficulty), brain = e.season2, cfg = season2Attacks(difficulty).palisade;
   const warnings = primary ? [primary] : [];
+  if (primary?.kind === 'fan' && e.type === 'palisade' && brain?.lostArms.length === 2) {
+    warnings.push({ ...primary, angle: brain.lockedAngle + cfg.coreFanOffset });
+  }
   if (e.action && brain?.actionBurst && e.action.phase !== 'recover') {
     const a = e.action, warning = a.warning + a.duration;
     warnings.push({ kind: 'fan', x: a.targetX, y: a.targetY, angle: brain.lockedAngle, radius: 1100, spread: 1.4,
@@ -174,6 +176,9 @@ export function season2Telegraphs(e: Enemy, difficulty: Difficulty = 'normal'): 
 export function season2AttackIntent(e: Enemy, ctx: Pick<Season2AiContext, 'player' | 'difficulty'>): AttackIntent {
   const cfg = season2Attacks(ctx.difficulty), angle = e.type === 'shield' ? e.angle : Math.atan2(ctx.player.y - e.y, ctx.player.x - e.x);
   const base: AttackIntent = { sourceId: e.id, x: e.x, y: e.y, kind: 'fan', angle, range: 1200, width: 40, spread: 0.6, warning: 1, duration: 2.5 };
+  if (e.type === 'palisade' && e.season2?.lostArms.length === 2) return { ...base,
+    spread: cfg.palisade.coreFanOffset * 2 + cfg.palisade.coreFanSpread, warning: cfg.palisade.warning,
+    speed: cfg.palisade.coreFanSpeed * difficultyConfig(ctx.difficulty).bulletSpeed };
   if (e.type === 'weaver' || e.type === 'palisade') return { ...base, kind: 'wall', width: cfg.weaver.halfWidth * 2, range: cfg.weaver.travel,
     warning: e.type === 'palisade' ? cfg.palisade.warning : cfg.weaver.warning, duration: cfg.weaver.travel / cfg.weaver.speed,
     speed: cfg.weaver.speed * difficultyConfig(ctx.difficulty).bulletSpeed, releaseDuration: e.type === 'palisade' ? cfg.palisade.batchGap * (cfg.palisade.batches - 1) : 0,
@@ -221,6 +226,16 @@ function rightFan(e: Enemy, ctx: Season2AiContext): void {
   if (!arm || brain.lostArms.includes(1) || (arm.disabledUntil ?? 0) > ctx.elapsed) return;
   for (let i = 0; i < cfg.fanCount; i++) ctx.shootAt(arm, brain.rightOrigin.x, brain.rightOrigin.y,
     brain.rightAngle + (i / (cfg.fanCount - 1) - 0.5) * cfg.fanSpread, cfg.fanSpeed, cfg.fanRadius, 0xffbd83, { shape: 'kunai' });
+  cue(e, ctx, 'release');
+}
+
+/** Broken arms leave a central lane between two fully warned, stationary fans. */
+function coreFans(e: Enemy, ctx: Season2AiContext): void {
+  const cfg = season2Attacks(ctx.difficulty).palisade, brain = memory(e);
+  for (const side of [-1, 1]) for (let i = 0; i < cfg.coreFanCount; i++) {
+    const angle = brain.lockedAngle + side * cfg.coreFanOffset + (i / (cfg.coreFanCount - 1) - 0.5) * cfg.coreFanSpread;
+    ctx.shootAt(e, e.x, e.y, angle, cfg.coreFanSpeed, cfg.fanRadius, 0xffc58b, { shape: 'orb' });
+  }
   cue(e, ctx, 'release');
 }
 
@@ -312,12 +327,6 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
   if ((e.disabledUntil ?? 0) > ctx.elapsed) { stop(e); return; }
   if (e.type === 'palisade') initializeArms(e, ctx);
   const boss = e.type === 'palisade' || e.type === 'reprise';
-  if (boss) {
-    const old = brain.observedVelocity, moving = Math.hypot(p.vx, p.vy) > 30 && Math.hypot(old.x, old.y) > 30;
-    const turn = moving ? clamp(angleDelta(Math.atan2(old.y, old.x), Math.atan2(p.vy, p.vx)) / dt, -1.4, 1.4) : 0;
-    brain.observedTurn += (turn - brain.observedTurn) * Math.min(1, dt * 10);
-    old.x = p.vx; old.y = p.vy;
-  }
   if (e.action) {
     const oldPhase = e.action.phase, a = e.action;
     updateBossAction(e, dt, ctx);
@@ -342,8 +351,11 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
     stop(e); e.timer = Math.max(0, e.timer - dt); brain.auxTimer -= dt;
     if (brain.shotsLeft > 0 && brain.auxTimer <= EPSILON) {
       if (e.type === 'palisade') {
-        if (brain.nextSide === -1) wall(e, ctx); else rightFan(e, ctx);
-        brain.nextSide = brain.nextSide === -1 ? 1 : -1; brain.auxTimer += cfg.palisade.batchGap / 2;
+        if (brain.lostArms.length === 2) { coreFans(e, ctx); brain.auxTimer += cfg.palisade.batchGap; }
+        else {
+          if (brain.nextSide === -1) wall(e, ctx); else rightFan(e, ctx);
+          brain.nextSide = brain.nextSide === -1 ? 1 : -1; brain.auxTimer += cfg.palisade.batchGap / 2;
+        }
       }
       if (e.type === 'reprise') { repriseBurst(e, ctx, 1); brain.auxTimer += cfg.reprise.phase2Gap; }
       brain.shotsLeft--;
@@ -354,7 +366,7 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
         ? boundedDestination(e, ledPosition(p, ctx.difficulty === 'hard' ? 0.65 : 0.85), 650)
         : bossActionTarget(e, p, 300, brain.cycle % 2 ? 0.95 : -0.95);
       const origin = { x: e.x, y: e.y };
-      if (beginBossAction(e, { kind: 'sidestep', ...target, warning: ctx.difficulty === 'hard' ? 0.5 : 0.65, duration: 0.55, recovery: 0.65 }, ctx)) {
+      if (beginBossAction(e, { kind: 'sidestep', ...target, warning: cfg.reprise.dashWarning, duration: 0.55, recovery: cfg.reprise.dashRecovery }, ctx)) {
         brain.returnPoint = origin; return;
       }
     }
@@ -409,11 +421,14 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
       }
       brain.targetId = null; recover(e, 0.65, cfg.repairer.cooldown);
     } else if (e.type === 'palisade') {
-      wall(e, ctx); e.state = 'volley'; brain.shotsLeft = cfg.palisade.batches * 2 - 1; brain.nextSide = 1;
-      brain.auxTimer = cfg.palisade.batchGap / 2; e.timer = cfg.palisade.batchGap * (cfg.palisade.batches - 0.5) + 0.5;
       if (brain.lostArms.length === 2) {
-        for (const offset of [-0.3, 0, 0.3]) ctx.shootAt(e, e.x, e.y, e.angle + offset, 190, 8, 0xffc58b, { shape: 'orb' });
+        coreFans(e, ctx); brain.shotsLeft = cfg.palisade.batches - 1;
+        brain.auxTimer = cfg.palisade.batchGap; e.timer = cfg.palisade.batchGap * (cfg.palisade.batches - 1) + 0.5;
+      } else {
+        wall(e, ctx); brain.shotsLeft = cfg.palisade.batches * 2 - 1; brain.nextSide = 1;
+        brain.auxTimer = cfg.palisade.batchGap / 2; e.timer = cfg.palisade.batchGap * (cfg.palisade.batches - 0.5) + 0.5;
       }
+      e.state = 'volley';
     } else if (e.type === 'reprise') {
       repriseBurst(e, ctx, 0); e.state = 'volley'; brain.shotsLeft = brain.phase === 2 ? 1 : 0;
       brain.auxTimer = cfg.reprise.phase2Gap;
@@ -442,26 +457,19 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
     warning(e, ctx, cfg.repairer.warning); return;
   }
   const separation = Math.hypot(p.x - e.x, p.y - e.y);
-  const retreating = boss && separation > 300 && ((p.x - e.x) * p.vx + (p.y - e.y) * p.vy) / Math.max(1, separation) > 120;
-  if (retreating || e.type === 'palisade' && (brain.cycle % 3 !== 0 || brain.lostArms.length === 2)
-    || e.type === 'reprise' && brain.returnPoint !== null && brain.cycle % 3 === 2) {
+  // PALISADE pressures with its arm patterns, never by charging its large body through the player.
+  const retreating = e.type === 'reprise' && separation > 300 && ((p.x - e.x) * p.vx + (p.y - e.y) * p.vy) / Math.max(1, separation) > 120;
+  if (retreating || e.type === 'reprise' && brain.returnPoint !== null && brain.cycle % 3 === 2) {
     if (!ctx.canCommit()) return;
-    const retrace = e.type === 'reprise' && !retreating, side = !retrace && !retreating && brain.cycle % 3 === 1;
-    const stripped = e.type === 'palisade' && brain.lostArms.length === 2;
-    const lead = ledPosition(p, ctx.difficulty === 'hard' ? 0.85 : 1.05, stripped ? brain.observedTurn : 0);
-    if (stripped && side && Math.abs(brain.observedTurn) < 0.2) {
-      const inward = normalize(e.x - p.x, e.y - p.y); lead.x += inward.x * 110; lead.y += inward.y * 110;
-    }
     const target = retreating ? boundedDestination(e, ledPosition(p, ctx.difficulty === 'hard' ? 0.95 : 1.15), 700)
-      : retrace ? brain.returnPoint! : stripped ? boundedDestination(e, lead, side ? 560 : 650)
-      : bossActionTarget(e, p, side ? 300 : 370, side ? (brain.cycle % 2 ? 1 : -1) * 0.9 : 0);
+      : brain.returnPoint!;
     const count = ctx.difficulty === 'hard' ? 7 : 5;
     if (ctx.reserveAttack && !ctx.reserveAttack(e.id, count, 0, 1.35)) return;
-    const landingAim = retreating || stripped ? ledPosition(p, ctx.difficulty === 'hard' ? 1.25 : 1.5, stripped ? brain.observedTurn : 0) : p;
+    const landingAim = retreating ? ledPosition(p, ctx.difficulty === 'hard' ? 1.25 : 1.5) : p;
     brain.lockedAngle = Math.atan2(landingAim.y - target.y, landingAim.x - target.x);
-    if (beginBossAction(e, { kind: retrace ? 'retrace' : side ? 'sidestep' : 'dash', ...target,
-      warning: ctx.difficulty === 'hard' ? 0.5 : 0.7, duration: side ? 0.55 : 0.5, recovery: ctx.difficulty === 'hard' ? 0.6 : 0.8 }, ctx)) {
-      brain.actionBurst = true; brain.returnPoint = retreating && e.type === 'reprise' ? { x: e.x, y: e.y } : null; brain.cycle++;
+    if (beginBossAction(e, { kind: retreating ? 'dash' : 'retrace', ...target,
+      warning: cfg.reprise.dashWarning, duration: 0.5, recovery: cfg.reprise.dashRecovery }, ctx)) {
+      brain.actionBurst = true; brain.returnPoint = retreating ? { x: e.x, y: e.y } : null; brain.cycle++;
     }
     return;
   }
@@ -470,7 +478,7 @@ export function updateSeason2Ai(e: Enemy, dt: number, ctx: Season2AiContext): vo
   if (!ctx.canCommit(kind, season2AttackIntent(e, ctx))) return;
   // Reserve a wall's full unclipped capacity: a new locked bearing may reveal points clipped at the old bearing.
   const bullets = e.type === 'shield' ? 3 : e.type === 'returner' ? 2 : e.type === 'weaver' ? 40
-    : e.type === 'palisade' ? (40 + cfg.palisade.fanCount) * cfg.palisade.batches
+    : e.type === 'palisade' ? (brain.lostArms.length === 2 ? cfg.palisade.coreFanCount * 2 : 40 + cfg.palisade.fanCount) * cfg.palisade.batches
       : e.type === 'reprise' ? Math.max(cfg.reprise.ringCount, cfg.reprise.fanCount) * (brain.phase === 2 ? 2 : 1) : 0;
   const duration = e.type === 'palisade' ? cfg.palisade.warning + cfg.palisade.batchGap * cfg.palisade.batches + 0.2
     : e.type === 'reprise' ? cfg.reprise.warning + cfg.reprise.phase2Gap + 0.2 : 1.6;
