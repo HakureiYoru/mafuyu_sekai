@@ -160,6 +160,8 @@ try {
     return { modules: s.modules.length, layers: Object.values(s.moduleRanks).reduce((sum, rank) => sum + rank, 0), evolutions: s.evolutions.length };
   });
   const savedText = await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v3'));
+  // Reload creates a new window and resets the injected probe; retain the completed run's evidence.
+  const duckRampsBeforeReload = legacyAudio ? await page.evaluate(() => window.__MAFUYU_AUDIO_DUCKS__) : 0;
   await page.reload();
   await page.getByRole('button', { name: '开始游戏', exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await page.evaluate(() => localStorage.getItem('mafuyu-sekai:profile:v3')), savedText);
@@ -197,10 +199,12 @@ try {
   await page.screenshot({ path: '.tmp/deployed-v' + version + suffix + '.png', animations: 'disabled' });
   assert.equal(report.errors.length, 0);
   if (legacyAudio) {
-    report.audioCompatibility = await page.evaluate(() => ({
+    const reloadedProbe = await page.evaluate(() => ({
       holdAvailable: typeof window.AudioParam.prototype.cancelAndHoldAtTime === 'function',
-      duckRamps: window.__MAFUYU_AUDIO_DUCKS__,
+      duckRampsAfterReload: window.__MAFUYU_AUDIO_DUCKS__,
     }));
+    report.audioCompatibility = { ...reloadedProbe, duckRampsBeforeReload,
+      duckRamps: duckRampsBeforeReload + reloadedProbe.duckRampsAfterReload };
     assert.equal(report.audioCompatibility.holdAvailable, false);
     assert.ok(report.audioCompatibility.duckRamps > 0, 'The real danger ducking path must run without the optional hold API.');
   }
