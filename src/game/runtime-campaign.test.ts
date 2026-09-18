@@ -193,3 +193,37 @@ describe('runtime continuous campaign persistence and scheduling', () => {
     expect(game.getSnapshot().stats.simulationHz).toBeCloseTo(60, 0);
   });
 });
+
+
+describe('first-batch runtime regressions', () => {
+  it('does not deep-copy profile/history during repeated HUD publications', async () => {
+    const getters = [vi.spyOn(SaveRepository.prototype, 'getProfile'), vi.spyOn(SaveRepository.prototype, 'getLegacyHistory'),
+      vi.spyOn(SaveRepository.prototype, 'getLegacyV5History')];
+    try {
+      const game = await runtime(); game.start();
+      const internal = game as unknown as Internals;
+      const before = getters.map(getter => getter.mock.calls.length);
+      for (let i = 0; i < 120; i++) internal.publish();
+      expect(getters.map(getter => getter.mock.calls.length)).toEqual(before);
+      internal.simulation.state.score = 9999; game.returnToMenu();
+      expect(game.getSnapshot().bestScore).toBe(9999);
+      expect(getters.map(getter => getter.mock.calls.length)).toEqual(before.map(count => count + 1));
+    } finally { for (const getter of getters) getter.mockRestore(); }
+  });
+  it('refreshes cached scores when another tab saves, without restarting combat', async () => {
+    const game = await runtime(); game.start({ difficulty: 'normal' });
+    new SaveRepository(storage).recordScore('story', 'normal', 7777);
+    const event = new Event('storage'); Object.assign(event, { key: PROFILE_KEY, newValue: storage.getItem(PROFILE_KEY) });
+    browser.dispatchEvent(event);
+    expect(game.getSnapshot()).toMatchObject({ phase: 'playing', bestScore: 7777, saveStatus: 'saved' });
+  });
+  it('randomizes ordinary starts but forwards explicit seeds, including zero, unchanged', async () => {
+    const game = await runtime(); const internal = game as unknown as Internals;
+    const reset = vi.spyOn(internal.simulation, 'reset');
+    game.start(); const first = reset.mock.calls.at(-1)![1];
+    game.start(); const second = reset.mock.calls.at(-1)![1];
+    expect(first).not.toBe(second); expect(typeof first).toBe('number');
+    for (const seed of [7, 7, 0, 0]) { game.start({ seed }); expect(reset.mock.calls.at(-1)![1]).toBe(seed); }
+    reset.mockRestore();
+  });
+});

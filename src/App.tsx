@@ -86,7 +86,7 @@ function FullscreenButton({ runtime }: { runtime: RuntimeControls }) {
   const [notice, setNotice] = useState('');
   return <div className="fullscreen-control"><button type="button" className="text-button" onClick={() => {
     setNotice('');
-    void runtime.requestFullscreen().catch(() => setNotice('当前浏览器不支持全屏，可直接横屏游玩。'));
+    void runtime.requestFullscreen().catch((error: unknown) => setNotice(error instanceof Error ? error.message : '未能进入全屏，可直接横屏游玩。'));
   }}>全屏游玩</button>{notice && <p role="status">{notice}</p>}</div>;
 }
 

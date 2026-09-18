@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem, retainEffectNumberFont } from './effects';
+import { resolveRenderResolution } from './render-resolution';
 import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
 import { bossActionTelegraph } from './boss-actions';
@@ -307,12 +308,12 @@ export class GameRenderer {
       this.playerBeams, this.mineHazards, this.warnings, this.combatMarks, this.companionLayer, this.bulletLayer,
       this.bulletCoreLayer, this.playerLayer, this.playerMarks, this.effects.labels, this.pickupHintLayer);
     this.pickupHint = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 17,
-      fontWeight: '700', fill: 0xdffff3, stroke: { color: 0x0b1820, width: 5 } }, resolution: 1.5 });
+      fontWeight: '700', fill: 0xdffff3, stroke: { color: 0x0b1820, width: 5 } }, resolution: 2 });
     this.pickupHint.anchor.set(0.5); this.pickupHint.visible = false;
     this.pickupHintLayer.addChild(this.pickupHint);
     const hint = (color: number) => {
       const text = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 19,
-        fontWeight: '700', fill: color, stroke: { color: 0x0a1320, width: 5 } }, resolution: 1.5 });
+        fontWeight: '700', fill: color, stroke: { color: 0x0a1320, width: 5 } }, resolution: 2 });
       text.anchor.set(0.5); text.visible = false; this.pickupHintLayer.addChild(text); return text;
     };
     this.skillHint = hint(0xffebba); this.commandHint = hint(0xbceeff);
@@ -415,14 +416,12 @@ export class GameRenderer {
   resize() {
     if (!this.initialized) return;
     const rect = this.host.getBoundingClientRect();
-    const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
-    const factor = QUALITY[this.settings.quality].scale;
-    const touch = this.controlMode === 'touch';
-    const scale = Math.min(width / VIEW.width, height / VIEW.height) * Math.min(window.devicePixelRatio || 1, touch ? 1.5 : 2);
-    const mobileBudget = { low: 960 * 540, medium: 1280 * 720, high: 1600 * 900 }[this.settings.quality];
-    const limit = touch ? Math.sqrt(mobileBudget / (VIEW.width * VIEW.height)) : Math.sqrt(1920 * 1080 / (VIEW.width * VIEW.height)) * factor;
-    const resolution = Math.max(0.25, Math.min(scale, limit));
-    this.app.renderer.resize(VIEW.width, VIEW.height, resolution);
+    const resolution = resolveRenderResolution(rect.width, rect.height, window.devicePixelRatio, this.settings.quality, this.controlMode);
+    // CSS owns the displayed size; the simulation and pointer mapping stay at VIEW.
+    // Do not reallocate/clear an unchanged drawing buffer on redundant resize events.
+    if (Math.abs(this.app.renderer.resolution - resolution) > 0.0001) {
+      this.app.renderer.resize(VIEW.width, VIEW.height, resolution);
+    }
     this.app.canvas.style.width = '100%'; this.app.canvas.style.height = '100%';
   }
 

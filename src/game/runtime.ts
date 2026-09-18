@@ -1,5 +1,8 @@
 import { DEFAULT_SETTINGS, ENEMIES, VIEW, xpNeeded } from './config';
 import { FixedClock, RenderGate } from './clock';
+import { createRunSeed } from './run-seed';
+import { requestGameFullscreen } from './fullscreen';
+import { watchDevicePixelRatio } from './render-resolution';
 import { InputController } from './input';
 import { TouchInputController } from './touch-input';
 import { resolveControlMode, viewportSize } from './mobile';
@@ -35,10 +38,13 @@ const emptyStats = (): PerformanceStats => ({ fps: 0, renderFps: 0, simulationHz
 export class GameRuntime implements RuntimeControls {
   private difficulty = loadDifficulty();
   private saves = new SaveRepository();
+  // Refresh only at persistence boundaries, never in the combat HUD hot path.
+  private savedHud = this.readSavedHud();
   private saveMessage = '';
   private runId = '';
   private practiceRun = false;
-  private simulation = new GameSimulation(12345, this.difficulty);
+  private runSeed = 12345;
+  private simulation = new GameSimulation(this.runSeed, this.difficulty);
   private renderer: GameRenderer | null = null;
   private input: InputController;
   private touch: TouchInputController;
@@ -71,6 +77,7 @@ export class GameRuntime implements RuntimeControls {
   private debug = new URLSearchParams(window.location.search).has('debug');
   private abort = new AbortController();
   private resizeObserver: ResizeObserver;
+  private stopWatchingDensity: () => void;
   private contextLost = false;
 
   constructor(private host: HTMLElement) {
@@ -85,11 +92,9 @@ export class GameRuntime implements RuntimeControls {
       interrupt: () => this.pause(), change: () => { if (this.snapshot) this.publish(); },
     });
     this.updateViewport(false);
-    this.resizeObserver = new ResizeObserver(() => {
-      if (!this.renderer || this.disposed) return;
-      try { this.renderer.resize(); if (this.phase !== 'playing') this.renderer.render(this.simulation.state, 1, 0); } catch (error) { this.fail(error); }
-    });
+    this.resizeObserver = new ResizeObserver(this.resizeRenderer);
     this.resizeObserver.observe(host);
+    this.stopWatchingDensity = watchDevicePixelRatio(this.resizeRenderer);
     window.addEventListener('resize', this.onViewportChange, { signal: this.abort.signal });
     window.addEventListener('orientationchange', this.onOrientationChange, { signal: this.abort.signal });
     window.visualViewport?.addEventListener('resize', this.onViewportChange, { signal: this.abort.signal });
@@ -100,6 +105,7 @@ export class GameRuntime implements RuntimeControls {
     window.addEventListener('storage', event => {
       if (event.key !== PROFILE_KEY && event.key !== PROFILE_BACKUP_KEY && event.key !== null) return;
       const result = this.saves.mergeExternal(event.newValue);
+      this.savedHud = this.readSavedHud();
       if (result.changed) this.saveMessage = '其他标签页的通关与纪录已同步；当前挑战继续保留。';
       this.publish();
     }, { signal: this.abort.signal });
@@ -136,7 +142,11 @@ export class GameRuntime implements RuntimeControls {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
 
   private clearInputs(): void { this.input.clear(); this.touch.clear(); this.simulation.clearInput(); this.renderer?.setTouchAim(null); }
-  private onViewportChange = () => this.updateViewport(true);
+  private resizeRenderer = () => {
+    if (!this.renderer || this.disposed) return;
+    try { this.renderer.resize(); if (this.phase !== 'playing') this.renderer.render(this.simulation.state, 1, 0); } catch (error) { this.fail(error); }
+  };
+  private onViewportChange = () => { this.updateViewport(true); this.resizeRenderer(); };
   private onOrientationChange = () => {
     if (this.controlMode === 'touch') { this.clearInputs(); this.pause(); }
     this.updateViewport(true);
@@ -168,13 +178,7 @@ export class GameRuntime implements RuntimeControls {
     if (this.phase !== 'playing' || this.controlMode !== 'touch' || this.orientationBlocked) return;
     this.touch.command(action); this.publish();
   };
-  requestFullscreen = async (): Promise<void> => {
-    try {
-      if (!document.fullscreenElement && this.shell.requestFullscreen) await this.shell.requestFullscreen();
-      const orientation = window.screen?.orientation as (ScreenOrientation & { lock?: (value: string) => Promise<void> }) | undefined;
-      if (document.fullscreenElement && orientation?.lock) await orientation.lock('landscape');
-    } catch { /* Optional enhancement: browser landscape remains playable without it. */ }
-  };
+  requestFullscreen = (): Promise<void> => requestGameFullscreen(this.shell);
 
   start = (options: Partial<RunStartOptions> = {}) => {
     if (this.disposed) return;
@@ -182,10 +186,12 @@ export class GameRuntime implements RuntimeControls {
     this.refreshControlMode();
     if (this.orientationBlocked) { this.publish(); return; }
     this.saves.mergeExternal();
+    this.savedHud = this.readSavedHud();
     this.difficulty = options.difficulty === 'hard' || options.difficulty === 'normal' ? options.difficulty : this.difficulty;
     this.runId = crypto.randomUUID(); this.practiceRun = false;
     this.stopLoop(); this.audio.stop();
-    this.simulation.reset('story', options.seed, this.difficulty, { difficulty: this.difficulty });
+    this.runSeed = options.seed ?? createRunSeed(this.runSeed);
+    this.simulation.reset('story', this.runSeed, this.difficulty, { difficulty: this.difficulty });
     this.clearInputs(); this.touch.reset(); this.renderer?.resetEffects(); this.dialogue.start();
     this.phase = this.simulation.state.status; this.error = null;
     if (this.phase === 'playing') this.audio.play();
@@ -333,6 +339,7 @@ export class GameRuntime implements RuntimeControls {
     if (this.practiceRun) return;
     const { mode, difficulty, score } = this.simulation.state;
     this.saves.recordScore(mode, difficulty, score);
+    this.savedHud = this.readSavedHud();
   }
   private recordCompletion(event: CombatEvent) {
     const state = this.simulation.state, final = 's2:final';
@@ -341,6 +348,7 @@ export class GameRuntime implements RuntimeControls {
       || !state.campaign.defeatedEncounters.includes(final)) return;
     const result = this.saves.recordCompletion({ runId: this.runId, difficulty: state.difficulty,
       encounterId: final, score: state.score, source: 'gameplay' });
+    this.savedHud = this.readSavedHud();
     if (result.changed) this.saveMessage = result.status === 'saved' ? '通关与成绩已保存。下次从 Lv1 开始新的构筑。' : '未保存到浏览器；本次通关暂存于当前页面。';
   }
   private stopLoop() { if (this.raf !== null) cancelAnimationFrame(this.raf); this.raf = null; this.clock.reset(); this.renderGate.reset(); this.lastRender = null; }
@@ -355,18 +363,29 @@ export class GameRuntime implements RuntimeControls {
     this.stats.fps = mean > 0 ? 1000 / mean : 0; this.stats.frameP95 = percentile(0.95); this.stats.frameP99 = percentile(0.99);
     this.stats.renderFps = this.stats.fps;
   }
+  private readSavedHud() {
+    const profile = this.saves.getProfile();
+    const legacy = this.saves.getLegacyHistory(), legacyV5 = this.saves.getLegacyV5History();
+    const historical = (difficulty: Difficulty) => Math.max(legacy.bestScores.s1[difficulty], legacy.bestScores.s2[difficulty],
+      legacyV5.bestScores[difficulty].story, legacyV5.bestScores[difficulty].endless);
+    return {
+      bestScores: profile.bestScores.v6,
+      historicalBestScores: { normal: historical('normal'), hard: historical('hard') },
+      hasRecord: Object.keys(profile.clears).length > 0 || Object.values(profile.bestScores.v6).some(scores => scores.story > 0 || scores.endless > 0),
+    };
+  }
   private publish() {
     const state = this.simulation.state, player = state.player;
     const boss = state.enemies.find(enemy => enemy.role === 'boss' || enemy.type === 'boss');
     const miniboss = state.enemies.find(enemy => enemy.role === 'miniboss' || enemy.type === 'miniboss');
-    const profile = this.saves.getProfile(), legacy = this.saves.getLegacyHistory(), legacyV5 = this.saves.getLegacyV5History();
+    const saved = this.savedHud;
     const elite = state.enemies.find(enemy => enemy.role === 'elite' && enemy.hp > 0);
     const card = boss?.spell ? spellCardDefinition(boss, state.difficulty) : null;
     const graphics = this.renderer?.getStats() ?? { particles: 0, textures: 0 };
     this.snapshot = {
       controlMode: this.controlMode, orientationBlocked: this.orientationBlocked, touch: { ...this.touch.hud },
       phase: this.phase, loading: this.progress, error: this.error, mode: state.mode,
-      score: state.score, bestScore: profile.bestScores.v6[state.difficulty][state.mode], historicalBestScore: Math.max(legacy.bestScores.s1[state.difficulty], legacy.bestScores.s2[state.difficulty], legacyV5.bestScores[state.difficulty].story, legacyV5.bestScores[state.difficulty].endless), difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
+      score: state.score, bestScore: saved.bestScores[state.difficulty][state.mode], historicalBestScore: saved.historicalBestScores[state.difficulty], difficulty: state.difficulty, wave: state.wave, waveProgress: state.campaign.progression / 360, progression: state.campaign.progression,
       minibossHp: miniboss?.hp ?? 0, minibossMaxHp: miniboss?.maxHp ?? 0, minibossAction: miniboss ? `${ENEMIES[miniboss.type].label} · ${miniboss.type === 'miniboss' ? miniBossAction(miniboss.state) : miniboss.state === 'recover' ? '收招休息 · 集火反击' : miniboss.type === 'palisade' ? miniboss.season2?.lostArms.length === 2 ? '双扇弹幕 · 中间留有通路' : '优先破坏侧臂，穿过弹墙间隙' : '留意停驻弹的原路折返'}` : '',
       waveBlocked: this.simulation.isWaveBlocked(),
       elapsed: state.elapsed, kills: state.kills, hp: player.hp, maxHp: player.maxHp, hpReserve: player.hpReserve, bombs: player.bombs,
@@ -379,7 +398,7 @@ export class GameRuntime implements RuntimeControls {
       companions: state.companions?.length ?? 0,
       comms: this.dialogue.getMessage(this.settings.reducedMotion), commsPrevious: this.dialogue.getPreviousMessage(), announcement: state.elapsed < this.announcementUntil ? this.announcement : '',
       settings: { ...this.settings }, stats: { ...this.stats, ...graphics, enemies: state.enemies.length, bullets: state.bullets.length, pickups: state.pickups.length, voices: this.audio.voiceCount },
-      saveStatus: this.saves.status === 'session-only' ? 'session' : Object.keys(profile.clears).length || Object.values(profile.bestScores.v6).some(scores => scores.story || scores.endless) ? 'saved' : 'empty',
+      saveStatus: this.saves.status === 'session-only' ? 'session' : saved.hasRecord ? 'saved' : 'empty',
       saveMessage: this.saves.error ?? this.saveMessage,
       stageName: CAMPAIGN_STAGES[state.wave - 1]?.name ?? '无尽的空白', stageCount: CAMPAIGN_STAGES.length,
       cardName: card?.name ?? '', cardIndex: boss?.spell ? boss.spell.cardIndex + 1 : 0, cardCount: boss?.spell ? SPELL_CARDS[boss.spell.season][state.difficulty].length : 0,
@@ -401,13 +420,14 @@ export class GameRuntime implements RuntimeControls {
   }
   destroy() {
     if (this.disposed) return;
-    this.disposed = true; this.stopLoop(); this.abort.abort(); this.resizeObserver.disconnect();
+    this.disposed = true; this.stopLoop(); this.abort.abort(); this.resizeObserver.disconnect(); this.stopWatchingDensity();
     this.input.destroy(); this.touch.destroy(); this.audio.destroy(); this.renderer?.destroy(); this.renderer = null; this.listeners.clear();
     if (this.debug) Reflect.deleteProperty(window, '__MAFUYU_DEBUG__');
   }
   private installDebug() {
     (window as DebugWindow).__MAFUYU_DEBUG__ = {
       snapshot: () => this.getSnapshot(),
+      seed: () => this.runSeed,
       state: () => this.simulation.state,
       resources: () => this.simulation.resourceCounts,
       stress: () => { this.start(); this.practiceRun = true; this.simulation.debugStress(); this.renderer?.debugStress(); this.resetMetrics(); this.publish(); },
@@ -461,7 +481,8 @@ export class GameRuntime implements RuntimeControls {
         this.stopLoop(); this.audio.stop(); this.clearInputs(); this.touch.reset(); this.refreshControlMode(); this.renderer?.resetEffects();
         const season = options?.season ?? 's2';
         this.practiceRun = true; this.runId = crypto.randomUUID();
-        this.simulation.reset(options?.mode ?? 'endless', 20260912, this.difficulty, { difficulty: this.difficulty });
+        this.runSeed = 20260912;
+        this.simulation.reset(options?.mode ?? 'endless', this.runSeed, this.difficulty, { difficulty: this.difficulty });
         const state = this.simulation.state;
         state.seasonId = season; state.player.level = 8;
         state.pickups.push({ id: 900001, type: 'support', x: state.player.x, y: state.player.y, value: 3, age: 0 });
@@ -493,6 +514,7 @@ export class GameRuntime implements RuntimeControls {
 export interface DebugControls {
   touch(action: TouchAction): void;
   resources(): GameSimulation['resourceCounts'];
+  seed(): number;
   snapshot(): HudSnapshot; state(): WorldState; stress(): void; scenario(name: DebugScenario): void;
   lifecycle(): { rafActive: boolean; phase: GamePhase; listeners: number; disposed: boolean; contextLost: boolean };
   pause(): void; resume(): void; restart(): void; settings(settings: Partial<GameSettings>): void;
