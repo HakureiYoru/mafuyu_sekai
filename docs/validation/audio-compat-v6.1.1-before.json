@@ -1,0 +1,27 @@
+{
+  "version": "6.1.0",
+  "artifact": "assets/index-CgvKEerw.js",
+  "command": "npx playwright test --config playwright.mobile.config.ts -g \"missing AudioParam\"",
+  "browser": "Chromium",
+  "scenario": "Native AudioParam.prototype.cancelAndHoldAtTime set to undefined before page initialization; real touch stop-fire; real spawned-enemy contact damage",
+  "result": "failed",
+  "durationMs": 14244,
+  "playerHpAfterContact": 4,
+  "expectedPhase": "playing",
+  "actualPhase": "error",
+  "browserError": "Game stopped safely: TypeError: t.cancelAndHoldAtTime is not a function",
+  "callPath": [
+    "duckMusic",
+    "handle",
+    "processEvents",
+    "FixedClock.advance",
+    "frame"
+  ],
+  "webkitPlatform": {
+    "os": "Windows",
+    "AudioContext": "undefined",
+    "webkitAudioContext": "undefined",
+    "AudioParam": "undefined",
+    "note": "Native Web Audio unavailable in this Playwright WebKit build. Initial unguarded test setup errored; final regression explicitly skips only the native-audio-specific case while retaining all silent touch flows."
+  }
+}

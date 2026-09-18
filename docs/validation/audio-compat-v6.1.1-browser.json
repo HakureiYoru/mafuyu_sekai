@@ -1,0 +1,248 @@
+{
+  "version": "6.1.1",
+  "command": "npx playwright test --config playwright.mobile.config.ts",
+  "artifact": "assets/index-2Wwam-9q.js",
+  "artifactSha256": "a863815ec2e65e41f9df111aebae20b98374f971162adab9ba9e6b3d107d14aa",
+  "stats": {
+    "startTime": "2026-09-18T05:47:03.349Z",
+    "duration": 56545.368,
+    "expected": 25,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "nativeAudioRegression": "Chromium removed only AudioParam.cancelAndHoldAtTime; retained native context and parameter scheduling. Real touch stop-fire, real enemy contact damage, PALISADE warning, pause and resume passed without game error or console/pageerror. Native duck ramp was observed.",
+  "webkitLimitation": "Windows Playwright WebKit exposes neither AudioContext, webkitAudioContext nor AudioParam. Native audio-specific regression skipped; other WebKit touch and silent fallback flows passed. Actual iPhone/Android audio remains unverified.",
+  "cases": [
+    {
+      "name": "touch start does not wait for audio downloads and auto-fire produces a real first shot",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1435,
+      "skipReasons": []
+    },
+    {
+      "name": "tapping a visible boss arm locks the part, and its defeat releases the lock",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1078,
+      "skipReasons": []
+    },
+    {
+      "name": "touch heat control cools automatically and a dash still releases the empowered beam",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 3699,
+      "skipReasons": []
+    },
+    {
+      "name": "touch stop-fire, damage and boss warnings survive a missing AudioParam hold API",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 3481,
+      "skipReasons": []
+    },
+    {
+      "name": "three real touch points have independent releases; cancellation pauses and clears all held input",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1869,
+      "skipReasons": []
+    },
+    {
+      "name": "a final upgrade selected in portrait cannot resume the simulation through the orientation gate",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1853,
+      "skipReasons": []
+    },
+    {
+      "name": "touch settings and saved run score survive refresh without adding starting power",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 2790,
+      "skipReasons": []
+    },
+    {
+      "name": "scrolling a reward card does not choose it; a separate tap commits exactly once",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1745,
+      "skipReasons": []
+    },
+    {
+      "name": "twenty touch restarts retain one canvas and one loop without old movement or target state",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 2413,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 568×320, safe areas, and corresponding portrait",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1372,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 667×375, safe areas, and corresponding portrait",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1271,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 844×390, safe areas, and corresponding portrait",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1289,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 932×430, safe areas, and corresponding portrait",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1397,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 1024×768, safe areas, and corresponding portrait",
+      "browser": "mobile-chromium",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1541,
+      "skipReasons": []
+    },
+    {
+      "name": "touch start does not wait for audio downloads and auto-fire produces a real first shot",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1456,
+      "skipReasons": []
+    },
+    {
+      "name": "tapping a visible boss arm locks the part, and its defeat releases the lock",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1144,
+      "skipReasons": []
+    },
+    {
+      "name": "touch heat control cools automatically and a dash still releases the empowered beam",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 3880,
+      "skipReasons": []
+    },
+    {
+      "name": "touch stop-fire, damage and boss warnings survive a missing AudioParam hold API",
+      "browser": "mobile-webkit",
+      "outcome": "skipped",
+      "result": "skipped",
+      "durationMs": 222,
+      "skipReasons": [
+        "This browser build has no native Web Audio; the remaining touch cases cover its silent fallback."
+      ]
+    },
+    {
+      "name": "three real touch points have independent releases; cancellation pauses and clears all held input",
+      "browser": "mobile-webkit",
+      "outcome": "skipped",
+      "result": "skipped",
+      "durationMs": 222,
+      "skipReasons": [
+        "Chromium CDP covers genuine simultaneous touch points; WebKit exercises single-touch flows separately."
+      ]
+    },
+    {
+      "name": "a final upgrade selected in portrait cannot resume the simulation through the orientation gate",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 2124,
+      "skipReasons": []
+    },
+    {
+      "name": "touch settings and saved run score survive refresh without adding starting power",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 3569,
+      "skipReasons": []
+    },
+    {
+      "name": "scrolling a reward card does not choose it; a separate tap commits exactly once",
+      "browser": "mobile-webkit",
+      "outcome": "skipped",
+      "result": "skipped",
+      "durationMs": 195,
+      "skipReasons": [
+        "Native multi-step touch scrolling is driven through Chromium CDP."
+      ]
+    },
+    {
+      "name": "twenty touch restarts retain one canvas and one loop without old movement or target state",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 4892,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 568×320, safe areas, and corresponding portrait",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1518,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 667×375, safe areas, and corresponding portrait",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1560,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 844×390, safe areas, and corresponding portrait",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1546,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 932×430, safe areas, and corresponding portrait",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1725,
+      "skipReasons": []
+    },
+    {
+      "name": "touch layout 1024×768, safe areas, and corresponding portrait",
+      "browser": "mobile-webkit",
+      "outcome": "expected",
+      "result": "passed",
+      "durationMs": 1710,
+      "skipReasons": []
+    }
+  ]
+}

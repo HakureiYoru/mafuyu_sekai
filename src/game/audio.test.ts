@@ -92,6 +92,43 @@ describe('event mixing and bounded Web Audio lifecycle', () => {
     expect(duck.gain.ramps.at(-1)?.time).toBeCloseTo(10.48);
   });
 
+  it('holds the current music level when cancelAndHoldAtTime is unavailable', () => {
+    const context = Context.current, gain = context.gains[2].gain;
+    Object.defineProperty(gain, 'cancelAndHoldAtTime', { value: undefined });
+    const cancel = vi.spyOn(gain, 'cancelScheduledValues'), hold = vi.spyOn(gain, 'setValueAtTime');
+    gain.value = 0.82;
+    expect(() => audio.handle([{ type: 'damage', x: 0, y: 0 }])).not.toThrow();
+    expect(cancel).toHaveBeenCalledWith(10);
+    expect(hold).toHaveBeenCalledWith(0.82, 10);
+    expect(cancel.mock.invocationCallOrder[0]).toBeLessThan(hold.mock.invocationCallOrder[0]);
+    expect(gain.ramps).toEqual([{ value: 10 ** (-4 / 20), time: 10.03 }, { value: 1, time: 10.28 }]);
+    expect(audio.voiceCount).toBe(1);
+  });
+
+  it('reschedules overlapping danger cues and resets music on pause without the optional hold API', () => {
+    const context = Context.current, gain = context.gains[2].gain;
+    Object.defineProperty(gain, 'cancelAndHoldAtTime', { value: undefined });
+    audio.handle([{ type: 'boss', x: 0, y: 0 }]);
+    context.currentTime = 10.15; gain.value = 0.75;
+    audio.handle([{ type: 'attack', enemyType: 'sampler', text: 'windup', x: 0, y: 0 }]);
+    expect(gain.cancelled).toEqual([10, 10.15]);
+    expect(gain.ramps).toHaveLength(2);
+    expect(gain.ramps[1].time).toBeCloseTo(10.43);
+    expect(gain.value).toBe(0.75);
+    audio.pause();
+    expect(gain.ramps).toEqual([]); expect(gain.value).toBe(1); expect(audio.voiceCount).toBe(0);
+    audio.play(); context.currentTime = 10.2;
+    expect(() => audio.handle([{ type: 'card', text: '下一符卡', x: 0, y: 0 }])).not.toThrow();
+    expect(gain.ramps).toHaveLength(2); expect(audio.voiceCount).toBe(1);
+  });
+
+  it('keeps native hold automation when the browser supports it', () => {
+    const gain = Context.current.gains[2].gain;
+    const native = vi.spyOn(gain, 'cancelAndHoldAtTime'), fallback = vi.spyOn(gain, 'cancelScheduledValues');
+    audio.handle([{ type: 'damage', x: 0, y: 0 }]);
+    expect(native).toHaveBeenCalledWith(10); expect(fallback).not.toHaveBeenCalled();
+  });
+
   it('clears voices, duck automation and throttle history when paused or restarted', () => {
     audio.handle([{ type: 'damage', x: 0, y: 0 }, { type: 'shot', x: 0, y: 0 }]);
     audio.pause();

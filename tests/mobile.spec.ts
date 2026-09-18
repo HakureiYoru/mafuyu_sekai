@@ -95,6 +95,53 @@ test('touch heat control cools automatically and a dash still releases the empow
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.heat)).toBeLessThanOrEqual(heat);
 });
 
+test('touch stop-fire, damage and boss warnings survive a missing AudioParam hold API', async ({ page }) => {
+  test.skip(!await page.evaluate(() => typeof AudioContext !== 'undefined' && typeof AudioParam !== 'undefined'),
+    'This browser build has no native Web Audio; the remaining touch cases cover its silent fallback.');
+  await page.addInitScript(() => {
+    Object.defineProperty(AudioParam.prototype, 'cancelAndHoldAtTime', { configurable: true, writable: true, value: undefined });
+    // Observe real Web Audio scheduling, without replacing the context or faking combat events.
+    const probe = { duckRamps: 0 };
+    Object.assign(window, { __audioCompatibilityProbe: probe });
+    const ramp = AudioParam.prototype.linearRampToValueAtTime;
+    AudioParam.prototype.linearRampToValueAtTime = function (value, endTime) {
+      if (Math.abs(value - 10 ** (-4 / 20)) < 0.0001) probe.duckRamps++;
+      return ramp.call(this, value, endTime);
+    };
+  });
+  const duckRamps = () => page.evaluate(() => (window as unknown as { __audioCompatibilityProbe: { duckRamps: number } }).__audioCompatibilityProbe.duckRamps);
+  await start(page);
+  expect(await page.evaluate(() => typeof AudioParam.prototype.cancelAndHoldAtTime)).toBe('undefined');
+  await control(page, 'fire').tap();
+  await expect(control(page, 'fire')).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().enemies.length)).toBeGreaterThan(0);
+  // Put a real spawned enemy in contact; the simulation emits damage and invokes the native audio bus.
+  await page.evaluate(() => {
+    const s = window.__MAFUYU_DEBUG__.state(), p = s.player, enemy = s.enemies[0];
+    p.invincible = 0; s.spawnTimer = 3600;
+    enemy.x = enemy.prevX = p.x; enemy.y = enemy.prevY = p.y;
+  });
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().player.hp)).toBe(4);
+  await expect.poll(() => phase(page)).toBe('playing');
+  await expect.poll(duckRamps).toBeGreaterThan(0);
+  await page.evaluate(() => { window.__MAFUYU_DEBUG__.state().player.invincible = 3600; });
+  await control(page, 'fire').tap();
+  await expect(control(page, 'fire')).toHaveAttribute('aria-pressed', 'true');
+  const beforeWarning = await duckRamps();
+  await targetFixture(page);
+  await expect.poll(duckRamps).toBeGreaterThan(beforeWarning);
+  await expect.poll(() => phase(page)).toBe('playing');
+  await page.getByRole('button', { name: '暂停游戏', exact: true }).tap();
+  await expect.poll(() => phase(page)).toBe('paused');
+  const tick = await page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick);
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick)).toBe(tick);
+  await page.getByRole('button', { name: /继续游戏/ }).tap();
+  await expect.poll(() => phase(page)).toBe('playing');
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick)).toBeGreaterThan(tick);
+  await expect(page.getByText('游戏暂时遇到问题', { exact: true })).toHaveCount(0);
+});
+
 test('three real touch points have independent releases; cancellation pauses and clears all held input', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Chromium CDP covers genuine simultaneous touch points; WebKit exercises single-touch flows separately.');
   await start(page);

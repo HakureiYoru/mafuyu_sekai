@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 
 const url = process.env.MAFUYU_DEPLOYMENT_URL ?? 'https://mafuyu-sekai.vercel.app';
 const touch = process.env.MAFUYU_DEPLOYMENT_TOUCH === '1';
+const legacyAudio = process.env.MAFUYU_DEPLOYMENT_LEGACY_AUDIO === '1';
 const suffix = touch ? '-touch' : '';
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -16,6 +17,15 @@ const page = await browser.newPage(touch ? { viewport: { width: 844, height: 390
 const report = { version, sha, url, checkedAt: new Date().toISOString(), fixture: 'Isolated browser profile. Only approach timers are accelerated by debug.advanceStage; all five gate elites, five mandatory bosses and twelve cards are defeated through the real damage/completion path. Upgrade choices use DOM keys. This verifies deployment and persistence, not human difficulty.', errors: [], elites: [], encounters: [], choices: [] };
 page.on('pageerror', error => report.errors.push(error.message));
 report.controlMode = touch ? 'touch' : 'keyboardMouse';
+if (legacyAudio) await page.addInitScript(() => {
+  Object.defineProperty(window.AudioParam.prototype, 'cancelAndHoldAtTime', { configurable: true, value: undefined });
+  window.__MAFUYU_AUDIO_DUCKS__ = 0;
+  const ramp = window.AudioParam.prototype.linearRampToValueAtTime;
+  window.AudioParam.prototype.linearRampToValueAtTime = function (value, time) {
+    if (Math.abs(value - 10 ** (-4 / 20)) < 1e-6) window.__MAFUYU_AUDIO_DUCKS__++;
+    return ramp.call(this, value, time);
+  };
+});
 if (touch) report.fixture = report.fixture.replace('DOM keys', 'DOM touch taps');
 async function activate(locator) { if (touch) await locator.tap(); else await locator.click(); }
 async function choosePending() {
@@ -73,6 +83,12 @@ try {
     return { level: s.player.level, xp: s.player.xp, companions: s.companions.length, modules: s.build.modules.length };
   });
   assert.deepEqual(fresh, { level: 1, xp: 0, companions: 0, modules: 0 });
+  if (touch && legacyAudio) {
+    await page.locator('[data-touch-control="fire"]').tap();
+    assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().touch.autoFireEnabled), false);
+    await page.locator('[data-touch-control="fire"]').tap();
+    assert.equal(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().touch.autoFireEnabled), true);
+  }
   // Verify the deployed decorative assets and the actual two-character exchange.
   const commsManifest = JSON.parse(await readFile('public/assets/comms/manifest.json', 'utf8'));
   report.commsAssets = await page.evaluate(async assets => Promise.all(assets.map(async asset => {
@@ -180,6 +196,14 @@ try {
   await mkdir('.tmp', { recursive: true });
   await page.screenshot({ path: '.tmp/deployed-v' + version + suffix + '.png', animations: 'disabled' });
   assert.equal(report.errors.length, 0);
+  if (legacyAudio) {
+    report.audioCompatibility = await page.evaluate(() => ({
+      holdAvailable: typeof window.AudioParam.prototype.cancelAndHoldAtTime === 'function',
+      duckRamps: window.__MAFUYU_AUDIO_DUCKS__,
+    }));
+    assert.equal(report.audioCompatibility.holdAvailable, false);
+    assert.ok(report.audioCompatibility.duckRamps > 0, 'The real danger ducking path must run without the optional hold API.');
+  }
   report.result = 'passed';
   console.log(JSON.stringify({ version, sha, url, result: report.result, encounters: report.encounters.map(e => e.id), choices: report.choices.length, errors: report.errors }, null, 2));
 } catch (error) { report.result = 'failed'; report.error = error.stack ?? error.message; throw error; }

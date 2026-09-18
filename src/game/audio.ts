@@ -140,7 +140,13 @@ export class GameAudio {
   private duckMusic() {
     if (!this.musicDuck || !this.context) return;
     const now = this.context.currentTime, gain = this.musicDuck.gain;
-    gain.cancelAndHoldAtTime(now);
+    if (typeof gain.cancelAndHoldAtTime === 'function') gain.cancelAndHoldAtTime(now);
+    else {
+      // Some mobile Web Audio implementations lack hold. Capture before cancelling the ramp.
+      const current = gain.value;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(current, now);
+    }
     gain.linearRampToValueAtTime(10 ** (-4 / 20), now + 0.03);
     gain.linearRampToValueAtTime(1, now + 0.28);
   }
