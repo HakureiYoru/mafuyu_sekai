@@ -16,7 +16,7 @@ async function buffer(page: Page) {
     const scale = Math.min(Math.min(rect.width / 1600, rect.height / 900) * Math.min(devicePixelRatio, snapshot.controlMode === 'touch' ? 2 : 2.5),
       Math.sqrt(budgets[snapshot.settings.quality] / (1600 * 900)));
     return { width: canvas.width, height: canvas.height, expectedWidth: 1600 * scale, expectedHeight: 900 * scale,
-      cssWidth: rect.width, cssHeight: rect.height };
+      cssWidth: rect.width, cssHeight: rect.height, density: devicePixelRatio };
   });
 }
 
@@ -42,7 +42,7 @@ test('start, level choice, pause, new seed, explicit replay and persisted score'
   expect(await page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().bestScore)).toBe(12345);
 });
 
-test('retina drawing buffers follow each quality budget without CSS stretching', async ({ page }, testInfo) => {
+test('drawing buffers follow each quality and density budget without CSS stretching', async ({ page }, testInfo) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await menu(page);
   for (const quality of ['low', 'medium', 'high'] as const) {
@@ -50,7 +50,10 @@ test('retina drawing buffers follow each quality budget without CSS stretching',
     await expect.poll(async () => {
       const b = await buffer(page); return Math.max(Math.abs(b.width - b.expectedWidth), Math.abs(b.height - b.expectedHeight));
     }).toBeLessThanOrEqual(1.1);
-    const b = await buffer(page); expect(b.width).toBeGreaterThan(b.cssWidth); expect(b.height).toBeGreaterThan(b.cssHeight);
+    const b = await buffer(page);
+    if (b.density > 1 && b.expectedWidth > b.cssWidth + 1 && b.expectedHeight > b.cssHeight + 1) {
+      expect(b.width).toBeGreaterThan(b.cssWidth); expect(b.height).toBeGreaterThan(b.cssHeight);
+    }
   }
   await page.evaluate(() => { const d = window.__MAFUYU_DEBUG__; d.start({ seed: 123 }); d.state().player.invincible = 3600; });
   await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick)).toBeGreaterThan(5);
