@@ -207,7 +207,11 @@ describe('first-batch runtime regressions', () => {
       expect(getters.map(getter => getter.mock.calls.length)).toEqual(before);
       internal.simulation.state.score = 9999; game.returnToMenu();
       expect(game.getSnapshot().bestScore).toBe(9999);
-      expect(getters.map(getter => getter.mock.calls.length)).toEqual(before.map(count => count + 1));
+      // Saving also makes defensive copies inside SaveRepository; those are not HUD work.
+      const afterSave = getters.map(getter => getter.mock.calls.length);
+      afterSave.forEach((count, index) => expect(count).toBeGreaterThan(before[index]));
+      for (let i = 0; i < 120; i++) internal.publish();
+      expect(getters.map(getter => getter.mock.calls.length)).toEqual(afterSave);
     } finally { for (const getter of getters) getter.mockRestore(); }
   });
   it('refreshes cached scores when another tab saves, without restarting combat', async () => {
