@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { DebugControls } from '../src/game/runtime';
 
 declare global { interface Window { __MAFUYU_DEBUG__: DebugControls } }
-const phase = (page: Page) => page.evaluate(() => window.__MAFUYU_DEBUG__.snapshot().phase);
+const phase = (page: Page) => page.evaluate(() => window.__MAFUYU_DEBUG__?.snapshot().phase ?? 'loading');
 async function menu(page: Page) {
   await page.goto('/?debug=1');
   await expect(page.getByRole('button', { name: '开始游戏', exact: true })).toBeVisible();
