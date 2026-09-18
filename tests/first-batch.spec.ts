@@ -20,6 +20,21 @@ async function buffer(page: Page) {
   });
 }
 
+/** Inspect compositor output, not a cleared WebGL back-buffer or the surrounding HTML HUD. */
+async function battlefieldHasVisiblePixels(page: Page): Promise<boolean> {
+  const screenshot = await page.locator('#game-host canvas').screenshot();
+  return page.evaluate(async data => {
+    const image = new Image(); image.src = `data:image/png;base64,${data}`; await image.decode();
+    const sample = document.createElement('canvas'); sample.width = 64; sample.height = 64;
+    const context = sample.getContext('2d')!;
+    context.drawImage(image, image.width * 0.4, image.height * 0.4, image.width * 0.2, image.height * 0.2, 0, 0, 64, 64);
+    const pixels = context.getImageData(0, 0, 64, 64).data;
+    let bright = 0;
+    for (let i = 0; i < pixels.length; i += 4) if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 70) bright++;
+    return bright > 8;
+  }, screenshot.toString('base64'));
+}
+
 test('start, level choice, pause, new seed, explicit replay and persisted score', async ({ page }) => {
   await menu(page); await page.getByRole('button', { name: '开始游戏', exact: true }).click();
   await expect.poll(() => phase(page)).toBe('playing');
@@ -56,7 +71,8 @@ test('drawing buffers follow each quality and density budget without CSS stretch
     }
   }
   await page.evaluate(() => { const d = window.__MAFUYU_DEBUG__; d.start({ seed: 123 }); d.state().player.invincible = 3600; });
-  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick)).toBeGreaterThan(5);
+  await expect.poll(() => page.evaluate(() => window.__MAFUYU_DEBUG__.state().tick)).toBeGreaterThan(60);
+  await expect.poll(() => battlefieldHasVisiblePixels(page), { message: 'The battlefield must visibly contain the player, not a black canvas.' }).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('clarity.png') });
   expect(errors).toEqual([]);
 });
