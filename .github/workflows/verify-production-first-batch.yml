@@ -1,0 +1,111 @@
+name: Verify first-batch production
+on:
+  push:
+    branches: [verify/production-first-batch-20260919]
+    paths: [.github/workflows/verify-production-first-batch.yml]
+permissions:
+  contents: read
+jobs:
+  production:
+    name: Verify live production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MAFUYU_DEPLOYMENT_URL: https://mafuyu-sekai.vercel.app
+      EXPECTED_COMMIT: 7b75fcaa315a1e82cb08d3435f9f124cbd4a015f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 7b75fcaa315a1e82cb08d3435f9f124cbd4a015f
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run build
+      - name: Compare the production entry and renderer with the released commit
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import datetime, hashlib, json, os, pathlib, re, time, urllib.request
+          from urllib.parse import urljoin, urlparse
+          root = os.environ['MAFUYU_DEPLOYMENT_URL'].rstrip('/') + '/'
+          local_html = pathlib.Path('dist/index.html').read_text()
+          pattern = r'<script[^>]+src=[\"\x27]([^\"\x27]+\.js)[\"\x27]'
+          local_entry = re.search(pattern, local_html).group(1)
+          def download(url):
+              req = urllib.request.Request(url, headers={'Cache-Control': 'no-cache', 'User-Agent': 'Mafuyu-Production-Verification'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  if urlparse(response.geturl()).netloc != urlparse(root).netloc:
+                      raise RuntimeError('Production URL redirected to a different host: ' + response.geturl())
+                  return response.read()
+          def digest(data):
+              return hashlib.sha256(data).hexdigest()
+          report = {'commit': os.environ['EXPECTED_COMMIT'], 'url': root, 'artifacts': [], 'verified': False}
+          pathlib.Path('production-check').mkdir(exist_ok=True)
+          for attempt in range(12):
+              try:
+                  live_html = download(root + '?release=' + os.environ['EXPECTED_COMMIT']).decode()
+                  live_match = re.search(pattern, live_html)
+                  if not live_match:
+                      raise RuntimeError('Production HTML does not expose a game entry')
+                  live_entry = live_match.group(1)
+                  if urljoin(root, live_entry) != urljoin(root, local_entry):
+                      raise RuntimeError('Production still serves a different game entry: ' + live_entry)
+                  local_paths = [pathlib.Path('dist') / local_entry.removeprefix('./')]
+                  renderers = list(pathlib.Path('dist/assets').glob('renderer-*.js'))
+                  if len(renderers) != 1:
+                      raise RuntimeError('Expected one game renderer chunk')
+                  local_paths.extend(renderers)
+                  results = []
+                  for path in local_paths:
+                      artifact_url = urljoin(root, path.relative_to('dist').as_posix())
+                      expected = digest(path.read_bytes())
+                      actual = digest(download(artifact_url))
+                      if actual != expected:
+                          raise RuntimeError('Production artifact hash mismatch: ' + artifact_url)
+                      results.append({'url': artifact_url, 'sha256': actual, 'matchesReleasedBuild': True})
+                  report.update({'verified': True, 'checkedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'artifacts': results})
+                  pathlib.Path('production-check/artifact-verification.json').write_text(json.dumps(report, indent=2))
+                  print(json.dumps(report, indent=2))
+                  with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                      summary.write('## Production artifacts verified\n\n' + root + '\n\nReleased commit: `' + os.environ['EXPECTED_COMMIT'] + '`\n\n')
+                      for item in results:
+                          summary.write('- `' + item['url'] + '` SHA-256 `' + item['sha256'] + '` matches the released build.\n')
+                  break
+              except Exception as error:
+                  print('Production verification attempt', attempt + 1, 'failed:', error, flush=True)
+                  if attempt == 11:
+                      report['error'] = str(error)
+                      pathlib.Path('production-check/artifact-verification.json').write_text(json.dumps(report, indent=2))
+                      raise
+                  time.sleep(15)
+          PY
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Exercise the actual production URL in isolated browser profiles
+        shell: bash
+        run: |
+          cat > playwright.production-check.config.ts <<'TS'
+          import { defineConfig } from '@playwright/test';
+          import smoke from './playwright.smoke.config';
+          export default defineConfig({
+            ...smoke,
+            webServer: undefined,
+            use: { ...smoke.use, baseURL: process.env.MAFUYU_DEPLOYMENT_URL },
+            outputDir: 'test-results/production',
+            reporter: [['list'], ['html', { outputFolder: 'playwright-report/production', open: 'never' }],
+              ['json', { outputFile: 'production-check/browser-results.json' }]],
+          });
+          TS
+          npx playwright test --config playwright.production-check.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-verification-7b75fca
+          path: |
+            production-check
+            playwright-report/production
+            test-results/production
+          if-no-files-found: warn
+          retention-days: 7
