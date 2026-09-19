@@ -19,7 +19,7 @@ let numberFont: BitmapFont | undefined, numberFontUsers = 0;
 export function retainEffectNumberFont(): () => void {
   if (!numberFontUsers) numberFont = BitmapFontManager.install({ name: EFFECT_NUMBER_FONT, chars: EFFECT_NUMBER_CHARS,
     style: { fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 26, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x111427, width: 4 } },
-    resolution: 1.5, padding: 4, skipKerning: true, dynamicFill: true });
+    resolution: 2, padding: 4, skipKerning: true, dynamicFill: true });
   numberFontUsers++;
   let released = false;
   return () => { if (released) return; released = true; if (--numberFontUsers === 0) { BitmapFontManager.uninstall(EFFECT_NUMBER_FONT); numberFont = undefined; } };
@@ -115,7 +115,7 @@ export class EffectSystem {
 
   private createLabel(bitmap: boolean): Text | BitmapText {
     const label = bitmap ? new BitmapText({ text: '', style: { fontFamily: EFFECT_NUMBER_FONT, fontSize: 19, fill: 0xffffff } })
-      : new Text({ text: '', style: { fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 20, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x111427, width: 4 } }, resolution: 1.5 });
+      : new Text({ text: '', style: { fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', fontSize: 20, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x111427, width: 4 } }, resolution: 2 });
     label.anchor.set(0.5); this.labels.addChild(label); return label;
   }
   private setLabelColor(label: Text | BitmapText, color: number): void {

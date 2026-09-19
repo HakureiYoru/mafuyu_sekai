@@ -1,0 +1,37 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: Quality and browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright test --config playwright.smoke.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-smoke-${{ github.run_id }}
+          path: |
+            playwright-report/smoke
+            test-results/smoke
+          if-no-files-found: ignore
+          retention-days: 7
