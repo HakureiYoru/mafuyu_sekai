@@ -1,4 +1,4 @@
-import { BitmapFontManager, BitmapText, Container, Sprite, Text, Texture, type BitmapFont } from 'pixi.js';
+import { BitmapFontManager, BitmapText, Container, Particle as PixiParticle, ParticleContainer, Sprite, Text, Texture, type BitmapFont } from 'pixi.js';
 import { QUALITY } from './config';
 import { TAU } from './math';
 import { MODULES } from './upgrades';
@@ -6,7 +6,7 @@ import type { CombatEvent, GameSettings } from './types';
 
 export interface EffectTextures { glow: Texture; spark: Texture; ring: Texture; player: Texture }
 interface Particle {
-  sprite: Sprite; x: number; y: number; vx: number; vy: number; life: number; total: number;
+  sprite: Sprite | PixiParticle; x: number; y: number; vx: number; vy: number; life: number; total: number;
   startSize: number; endSize: number; stretch: number; spin: number; opacity: number; damping: number; priority: number;
 }
 interface FloatLabel { label: Text | BitmapText; life: number; total: number; x: number; y: number; amount: number; pending: number; commit: number; target: number | null; priority: number; key: string | null }
@@ -30,6 +30,7 @@ const numberMessage = (message: string) => [...message].map(character => numberC
 /** All randomness and clocks here are cosmetic; none feed back into the simulation. */
 export class EffectSystem {
   readonly particles = new Container();
+  private readonly batch = new ParticleContainer({ dynamicProperties: { position: true, rotation: true, vertex: true, color: true, uvs: true }, blendMode: 'add' });
   readonly labels = new Container();
   private active: Particle[] = [];
   private free: Particle[] = [];
@@ -42,6 +43,7 @@ export class EffectSystem {
 
   constructor(private readonly textures: EffectTextures, settings: GameSettings) {
     this.settings = settings;
+    this.particles.addChild(this.batch);
     this.particles.eventMode = 'none';
     this.labels.eventMode = 'none';
   }
@@ -69,24 +71,28 @@ export class EffectSystem {
       if (replace < 0) return;
       this.release(replace);
     }
-    let particle = this.free.pop();
+    const poolIndex = this.free.findIndex(p => (p.sprite instanceof Sprite) === !additive);
+    let particle = poolIndex < 0 ? undefined : this.free.splice(poolIndex, 1)[0];
     if (!particle) {
-      const sprite = new Sprite(texture);
-      sprite.anchor.set(0.5);
-      this.particles.addChild(sprite);
+      const sprite = additive ? new PixiParticle({ texture, anchorX: .5, anchorY: .5 }) : new Sprite(texture);
+      if (sprite instanceof Sprite) { sprite.anchor.set(.5); this.particles.addChild(sprite); }
+      else this.batch.addParticle(sprite);
       particle = { sprite, x: 0, y: 0, vx: 0, vy: 0, life: 0, total: 0, startSize: 0, endSize: 0, stretch: 1, spin: 0, opacity: 1, damping: 3, priority: 0 };
     }
     const sprite = particle.sprite;
-    sprite.visible = true; sprite.texture = texture; sprite.tint = color; sprite.rotation = angle;
-    sprite.blendMode = additive ? 'add' : 'normal';
+    if (sprite instanceof Sprite) sprite.visible = true;
+    sprite.texture = texture; sprite.tint = color; sprite.rotation = angle;
     Object.assign(particle, { x, y, vx, vy, life, total: life, startSize: size, endSize, opacity, stretch, spin: 0, damping: 3, priority: this.emissionPriority });
-    sprite.position.set(x, y); sprite.width = size * stretch; sprite.height = size; sprite.alpha = opacity;
+    sprite.x = x; sprite.y = y; sprite.alpha = opacity;
+    if (sprite instanceof Sprite) { sprite.width = size * stretch; sprite.height = size; }
+    else { sprite.scaleX = size * stretch / texture.width; sprite.scaleY = size / texture.height; }
     this.active.push(particle);
   }
 
   private release(index: number) {
     const particle = this.active[index];
-    particle.sprite.visible = false;
+    particle.sprite.alpha = 0;
+    if (particle.sprite instanceof Sprite) particle.sprite.visible = false;
     this.free.push(particle);
     this.active[index] = this.active[this.active.length - 1];
     this.active.pop();
@@ -315,8 +321,9 @@ export class EffectSystem {
       particle.vx *= damping; particle.vy *= damping;
       const eased = 1 - (1 - progress) ** 2;
       const size = particle.startSize + (particle.endSize - particle.startSize) * eased;
-      particle.sprite.position.set(particle.x, particle.y);
-      particle.sprite.width = size * particle.stretch; particle.sprite.height = size;
+      particle.sprite.x = particle.x; particle.sprite.y = particle.y;
+      if (particle.sprite instanceof Sprite) { particle.sprite.width = size * particle.stretch; particle.sprite.height = size; }
+      else { particle.sprite.scaleX = size * particle.stretch / particle.sprite.texture.width; particle.sprite.scaleY = size / particle.sprite.texture.height; }
       particle.sprite.alpha = particle.opacity * (1 - progress) ** 1.2;
       particle.sprite.rotation += particle.spin * delta;
     }
@@ -359,6 +366,9 @@ export class EffectSystem {
   }
 
   get count() { return this.active.length; }
+  get particlePositions() { return this.active.map(p => ({ x: p.sprite.x, y: p.sprite.y,
+    width: p.sprite instanceof Sprite ? p.sprite.width : p.sprite.scaleX * p.sprite.texture.width })); }
+  get allocatedParticles() { return this.active.length + this.free.length; }
   get labelTextureCount() { return this.labels.children.filter(label => label instanceof Text).length + (numberFont?.pages.length ?? Number(this.labels.children.some(label => label instanceof BitmapText))); }
   destroy() {
     this.particles.destroy({ children: true });

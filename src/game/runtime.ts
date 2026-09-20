@@ -3,6 +3,7 @@ import { FixedClock, RenderGate } from './clock';
 import { createRunSeed } from './run-seed';
 import { requestGameFullscreen } from './fullscreen';
 import { watchDevicePixelRatio } from './render-resolution';
+import { LeaderboardClient } from '../leaderboard/client';
 import { InputController } from './input';
 import { TouchInputController } from './touch-input';
 import { resolveControlMode, viewportSize } from './mobile';
@@ -36,6 +37,7 @@ function loadSettings() {
 const emptyStats = (): PerformanceStats => ({ fps: 0, renderFps: 0, simulationHz: 0, frameP95: 0, frameP99: 0, updateMs: 0, renderMs: 0, enemies: 0, bullets: 0, particles: 0, pickups: 0, voices: 0, textures: 0 });
 
 export class GameRuntime implements RuntimeControls {
+  readonly leaderboard = new LeaderboardClient();
   private difficulty = loadDifficulty();
   private saves = new SaveRepository();
   // Refresh only at persistence boundaries, never in the combat HUD hot path.
@@ -189,6 +191,7 @@ export class GameRuntime implements RuntimeControls {
     this.savedHud = this.readSavedHud();
     this.difficulty = options.difficulty === 'hard' || options.difficulty === 'normal' ? options.difficulty : this.difficulty;
     this.runId = crypto.randomUUID(); this.practiceRun = false;
+    this.leaderboard.start({ difficulty: this.difficulty, mode: 'story', controls: this.controlMode }, !this.debug && options.seed === undefined);
     this.stopLoop(); this.audio.stop();
     this.runSeed = options.seed ?? createRunSeed(this.runSeed);
     this.simulation.reset('story', this.runSeed, this.difficulty, { difficulty: this.difficulty });
@@ -220,7 +223,7 @@ export class GameRuntime implements RuntimeControls {
   };
   returnToMenu = () => {
     if (this.phase === 'loading' || this.disposed) return;
-    if (this.phase === 'playing' || this.phase === 'paused' || this.phase === 'upgrade') this.saveBest();
+    if (this.phase === 'playing' || this.phase === 'paused' || this.phase === 'upgrade') { this.finishOnline('quit'); this.saveBest(); }
     this.stopLoop(); this.audio.stop(); this.clearInputs(); this.touch.reset(); this.dialogue.reset(); this.resetPreview();
     this.renderer?.resetEffects(); this.phase = 'menu'; this.announcement = '';
     this.renderer?.render(this.simulation.state, 1, 0); this.publish();
@@ -287,6 +290,7 @@ export class GameRuntime implements RuntimeControls {
         const previousMiniboss = this.simulation.state.enemies.find(enemy => enemy.role === 'miniboss');
         const previousMiniState = previousMiniboss?.state;
         const action = this.controlMode === 'touch' ? this.touch.read(dt) : this.input.read(camera.x - VIEW.width / 2, camera.y - VIEW.height / 2);
+        if (this.controlMode === 'touch') this.leaderboard.markTouch();
         const events = this.simulation.step(action, dt);
         urgent ||= previousReady !== (player.dashCooldown <= 0) || previousOverheated !== player.overheated || previousWindow !== (player.perfectWindow > 0)
           || previousCharges !== this.simulation.dashCharges || previousMiniState !== previousMiniboss?.state;
@@ -298,7 +302,7 @@ export class GameRuntime implements RuntimeControls {
           this.phase = status;
           this.clearInputs();
           if (status === 'upgrade') this.audio.pause();
-          else { this.saveBest(); this.audio.finish(); }
+          else { if (status === 'failed' || status === 'complete') this.finishOnline(status); this.saveBest(); this.audio.finish(); }
           return false;
         }
       });
@@ -335,6 +339,12 @@ export class GameRuntime implements RuntimeControls {
     }
   }
   private announce(text: string, duration = 2.5) { this.announcement = text; this.announcementUntil = this.simulation.state.elapsed + duration; }
+  private finishOnline(outcome: 'failed' | 'complete' | 'quit') {
+    if (this.debug || this.practiceRun || !this.runId) return;
+    const s = this.simulation.state;
+    this.leaderboard.finish({ difficulty: s.difficulty, mode: s.mode, score: Math.floor(s.score), elapsed: s.elapsed,
+      progression: Math.min(360, s.campaign.progression), wave: s.wave, outcome });
+  }
   private saveBest() {
     if (this.practiceRun) return;
     const { mode, difficulty, score } = this.simulation.state;

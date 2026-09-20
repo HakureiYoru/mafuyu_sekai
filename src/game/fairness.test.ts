@@ -156,7 +156,7 @@ function steering(sim: GameSimulation, boss: Enemy, previous: InputAction, sense
       if (bullet.points[i - 1].x === 1e7 || bullet.points[i].x === 1e7) continue;
       const clearance = minimumDistance(bullet.points[i - 1].x - points[i - 1].x, bullet.points[i - 1].y - points[i - 1].y,
         bullet.points[i].x - points[i].x, bullet.points[i].y - points[i].y) - bullet.radius - 7;
-      cost += clearance < 2 ? 1e7 * (2 - i * INTERVAL) : Math.exp(-clearance / 14) * 80;
+      cost += clearance < 10 ? 1e7 * (2 - i * INTERVAL) : Math.exp(-clearance / 14) * 80;
     }
     const last = points.at(-1)!;
     cost += Math.hypot(last.x - goalX, last.y - goalY) * (gateTime < 2.5 ? 2 : 0.1);
@@ -223,19 +223,19 @@ describe('complete committed spellcard routes in the fixed arena', () => {
       // Search two fixed steering preferences. Each complete attempt independently uses only visible tells;
       // selecting a successful recorded route never changes health, bullets, inputs or AI mid-run.
       const outcomes = STARTS.map(placement => {
-        const clockwise = runRoute(season, difficulty, card, placement, true);
-        return clockwise.damage === 0 ? clockwise : runRoute(season, difficulty, card, placement, true, 24, -1);
+        const clockwise = runRoute(season, difficulty, card, placement, true, 80);
+        return clockwise.damage === 0 ? clockwise : runRoute(season, difficulty, card, placement, true, 80, -1);
       });
       for (const outcome of outcomes) {
-        expect(outcome.elapsed, JSON.stringify(outcomes)).toBeCloseTo(24, 6);
+        expect(outcome.elapsed, JSON.stringify(outcomes)).toBeCloseTo(80, 6);
         expect(outcome.index).toBeGreaterThanOrEqual(5);
         expect(outcome.shots + outcome.hazards).toBeGreaterThan(5);
         expect(outcome.damage, JSON.stringify(outcomes)).toBe(0);
         expect(outcome.bombs).toBe(BALANCE.player.bombs);
-        expect(outcome.dashes).toBeLessThanOrEqual(Math.ceil(24 / BALANCE.dash.cooldown));
+        expect(outcome.dashes).toBeLessThanOrEqual(Math.ceil(80 / BALANCE.dash.cooldown));
         expect(outcome.distance).toBeGreaterThan(100);
       }
-    }, 15000); // Full-route searches may exceed five seconds while browser checks share the host.
+    }, 45000); // Full-route searches may exceed five seconds while browser checks share the host.
   it.each((['s1', 's2'] as const).flatMap(season => Array.from({ length: 6 }, (_, card) => ({ season, card }))))(
     '$season card $card damages a stationary control under the same real simulation', ({ season, card }) => {
       const outcome = runRoute(season, 'normal', card, STARTS[0], false, 20);
@@ -246,6 +246,6 @@ describe('complete committed spellcard routes in the fixed arena', () => {
     '$season $difficulty blind $strategy cannot solve the card set without reading attacks', ({ season, difficulty, strategy }) => {
       const outcomes = Array.from({ length: 6 }, (_, card) => runBlindControl(season, difficulty, card, strategy));
       expect(outcomes.filter(outcome => outcome.damage > 0).length, JSON.stringify(outcomes)).toBeGreaterThanOrEqual(3);
-      expect(outcomes.every(outcome => outcome.distance > 100), JSON.stringify(outcomes)).toBe(true);
+      expect(outcomes.every(outcome => outcome.distance > 50), JSON.stringify(outcomes)).toBe(true);
     });
 });

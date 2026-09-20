@@ -147,6 +147,7 @@ export interface HudSnapshot {
   eliteName?: string; eliteHp?: number; eliteMaxHp?: number;
 }
 export interface RuntimeControls {
+  readonly leaderboard?: import('../leaderboard/client').LeaderboardClient;
   touchAction(action: TouchAction): void; requestFullscreen(): Promise<void>;
   start(options?: Partial<RunStartOptions>): void; pause(): void; resume(): void; restart(): void; continueEndless(): void; returnToMenu(): void;
   setSettings(settings: Partial<GameSettings>): void; subscribe(listener: () => void): () => void; getSnapshot(): HudSnapshot;

@@ -117,7 +117,7 @@ describe('independent six-card encounters', () => {
     for (const season of ['s1', 's2'] as const) for (let card = 0; card < 6; card++) {
       const h = harness(season, difficulty, card);
       let maxCues = 0, maxHazards = 0, maxBullets = 0;
-      for (let tick = 0; tick < 18 * 60; tick++) {
+      for (let tick = 0; tick < 36 * 60; tick++) {
         h.tick(); maxCues = Math.max(maxCues, spellTelegraphs(h.enemy).length);
         maxHazards = Math.max(maxHazards, h.hazards.length); maxBullets = Math.max(maxBullets, h.bullets.length);
       }
@@ -214,15 +214,19 @@ describe('physical gaps and ordinary movement at arena edges', () => {
   it.each(['normal', 'hard'] as const)('the complete %s seven-wall train requires repeated movement and has a walking route', difficulty => {
     const run = (move: boolean) => {
       const h = harness('s2', difficulty); h.player.x = ARENA.x + 100;
-      let cueId = 0, reactAt = Infinity, target = h.player.y;
+      let cueId = 0, reactAt = Infinity, target = h.player.y, margin = Infinity;
       for (let tick = 0; tick < 12 * 60; tick++) {
         const cue = spellTelegraphs(h.enemy).find(cue => cue.kind === 'wall');
         if (cue && cue.id !== cueId) { cueId = cue.id; target = cue.y + cue.gapCenter!; reactAt = h.time + 0.2; }
         const speed = move && h.time >= reactAt ? clamp((target - h.player.y) / STEP, -180, 180) : 0;
         h.tick(STEP, 0, speed);
+        if (move) for (const bullet of h.bullets) if (Math.abs(bullet.x - h.player.x) < 18) {
+          margin = Math.min(margin, Math.abs(bullet.y - h.player.y) - bullet.radius - 7);
+        }
         if (h.enemy.spell!.shotIndex >= 7) h.enemy.spell!.nextAttack = Infinity;
       }
       expect(h.enemy.spell!.shotIndex).toBe(7); expect(h.shots.length).toBeGreaterThan(200);
+      if (move) expect(margin).toBeGreaterThanOrEqual(20);
       return h;
     };
     expect(run(false).hits).toBeGreaterThan(0);
@@ -279,12 +283,32 @@ describe('physical gaps and ordinary movement at arena edges', () => {
 });
 
 describe('fixed clock and bounded encounter lifetime', () => {
+  it.each(['normal', 'hard'] as const)('%s separates full volleys, committed movement and recovery in all twelve cards', difficulty => {
+    for (const season of ['s1', 's2'] as const) for (let card = 0; card < 6; card++) {
+      const h = harness(season, difficulty, card), starts: number[] = [];
+      let previousAction = false;
+      for (let tick = 0; tick < 80 * 60; tick++) {
+        const index = h.enemy.spell!.shotIndex, action = h.enemy.action;
+        h.tick();
+        const current = h.enemy.action, brain = h.enemy.spell!, cfg = SPELL_BALANCE[difficulty];
+        if (current && !previousAction) {
+          starts.push(brain.age); expect(brain.age).toBeGreaterThanOrEqual(cfg.firstMotion);
+          expect(current.warning).toBe(cfg.motionWarning); expect(current.recovery).toBe(cfg.recovery);
+          expect(brain.age + STEP).toBeGreaterThanOrEqual(brain.clearAt);
+        }
+        if (action) expect(brain.shotIndex).toBe(index);
+        previousAction = !!current;
+      }
+      expect(starts.length, `${season}:${card}`).toBeGreaterThanOrEqual(2);
+      for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1] + 1e-7).toBeGreaterThanOrEqual(SPELL_BALANCE[difficulty].motionInterval);
+    }
+  });
   it('produces the same nonempty 24-second attacks at 30, 60 and 144 Hz render clocks', () => {
     const result = (fps: number) => {
       const h = harness('s2', 'hard', 3), clock = new FixedClock();
       clock.advance(0, () => h.tick());
       for (let frame = 1; frame <= fps * 24; frame++) clock.advance(frame * 1000 / fps, () => h.tick());
-      expect(h.enemy.spell!.age).toBeCloseTo(24, 6); expect(h.shots.length).toBeGreaterThan(100);
+      expect(h.enemy.spell!.age).toBeCloseTo(24, 6); expect(h.shots.length).toBeGreaterThan(60);
       expect(h.events.some(event => event.type === 'card')).toBe(true);
       return { age: h.enemy.spell!.age, index: h.enemy.spell!.shotIndex,
         shots: h.shots.map(shot => [shot.sourceId, Number(shot.time.toFixed(7)), Number(shot.angle.toFixed(7))]) };

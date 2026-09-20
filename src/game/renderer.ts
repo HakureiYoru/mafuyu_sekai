@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, Til
 import { ASSET_URLS, BALANCE, ENEMIES, QUALITY, VIEW, WORLD } from './config';
 import { EffectSystem, retainEffectNumberFont } from './effects';
 import { resolveRenderResolution } from './render-resolution';
+import { AttackMaterials, EVOLUTION_VISUALS, MODULE_VISUALS, STYLE_COLORS } from './attack-visuals';
 import { miniBossAttacks, miniBossDashGeometry, miniBossLandingTelegraph, miniBossLaserGeometry } from './miniboss-ai';
 import { enemyAttacks } from './enemy-ai';
 import { bossActionTelegraph } from './boss-actions';
@@ -207,6 +208,7 @@ export class GameRenderer {
   private readonly machineLinks = new Graphics();
   private readonly warnings = new Graphics();
   private readonly playerBeams = new Graphics();
+  private readonly materials = new AttackMaterials();
   private readonly mineHazards = new Container();
   private readonly pickupLayer = new Container();
   private readonly enemyLayer = new Container();
@@ -305,7 +307,7 @@ export class GameRenderer {
     this.scene.addChild(this.world, this.ambient, this.edgeFeedback, this.overlay);
     // Warnings stay above enemy art. Hostile projectiles and the player stay above every beam.
     this.world.addChild(this.backdrop, this.arenaMarks, this.pickupLayer, this.effects.particles, this.machineLinks, this.enemyLayer, this.attachments,
-      this.playerBeams, this.mineHazards, this.warnings, this.combatMarks, this.companionLayer, this.bulletLayer,
+      this.playerBeams, this.materials.layer, this.mineHazards, this.warnings, this.combatMarks, this.companionLayer, this.bulletLayer,
       this.bulletCoreLayer, this.playerLayer, this.playerMarks, this.effects.labels, this.pickupHintLayer);
     this.pickupHint = new Text({ text: '', style: { fontFamily: '"Microsoft YaHei", sans-serif', fontSize: 17,
       fontWeight: '700', fill: 0xdffff3, stroke: { color: 0x0b1820, width: 5 } }, resolution: 2 });
@@ -426,6 +428,7 @@ export class GameRenderer {
   }
 
   render(state: WorldState, alpha: number, dt: number) {
+    this.materials.begin();
     if (!this.initialized || this.disposed) return;
     const delta = clamp(dt, 0, 0.05);
     this.clock += delta;
@@ -447,6 +450,7 @@ export class GameRenderer {
     this.renderEnemies(state, alpha);
     this.renderCombatMarks(state, alpha);
     this.renderPlayerBeams(state);
+    this.materials.end();
     this.renderCompanions(state, alpha);
     this.renderBullets(state, alpha);
     this.renderPlayer(state, alpha, delta);
@@ -707,7 +711,7 @@ export class GameRenderer {
       const x = lerp(effect.prevX, effect.x, alpha), y = lerp(effect.prevY, effect.y, alpha), shape = effect.geometry;
       const warning = effect.age < effect.warning, remaining = Math.max(0, effect.duration - effect.age);
       const opacity = warning ? .42 : Math.min(1, remaining / .18);
-      const color = effect.kind === 'star' || effect.kind === 'note' ? 0xc6bcff : effect.kind === 'wind' || effect.kind === 'lane' ? 0x97edec : 0xa5f4ef;
+      const color = STYLE_COLORS[MODULE_VISUALS[effect.moduleId]];
       const line = warning ? 1.5 : 2.3;
       const utility = effect.utilityGeometry;
       if (utility?.shape === 'path' && utility.points.length > 1) {
@@ -741,6 +745,7 @@ export class GameRenderer {
         }
         if (warning && effect.warning > 0) graph.arc(x, y, Math.min(24, shape.radius * .8), -Math.PI / 2, -Math.PI / 2 + TAU * effect.age / effect.warning).stroke({ color: 0xe5ffff, width: 2, alpha: .8 });
       } else if (shape.shape === 'beam') {
+        if (!warning) this.materials.beam(x, y, shape.angle, shape.length, shape.width, opacity * .8, false, state.elapsed, this.settings);
         const geometry = beamGeometry(x, y, shape.angle, shape.length, shape.width);
         graph.poly(geometry.corners).fill({ color, alpha: (warning ? .025 : .065) * opacity }).stroke({ color, width: warning ? 1 : 1.6, alpha: .55 * opacity });
         graph.moveTo(x, y).lineTo(geometry.endX, geometry.endY).stroke({ color: 0xe1fffa, width: warning ? 1 : Math.min(6, shape.width * .3), alpha: opacity * .8 });
@@ -759,6 +764,10 @@ export class GameRenderer {
         if (shape.closed) graph.poly(points).fill({ color, alpha: .025 * opacity });
         graph.poly(points, shape.closed).stroke({ color, width: Math.min(shape.width, 14), alpha: .10 * opacity });
         graph.poly(points, shape.closed).stroke({ color: 0xd1fff7, width: line, alpha: opacity * .8 });
+        if (!warning && effect.kind !== 'lane') for (let i = 0; i < shape.points.length - (shape.closed ? 0 : 1); i++) {
+          const a = shape.points[i], b = shape.points[(i + 1) % shape.points.length];
+          this.materials.beam(a.x, a.y, Math.atan2(b.y - a.y, b.x - a.x), Math.hypot(b.x - a.x, b.y - a.y), Math.max(8, shape.width), opacity * .6, false, state.elapsed, this.settings);
+        }
         if (effect.kind === 'lane') {
           for (let i = 1; i < shape.points.length; i++) {
             const a = shape.points[i - 1], b = shape.points[i];
@@ -793,13 +802,13 @@ export class GameRenderer {
       const paused = hostile && phase?.speed === 0;
       if (paused) {
         const path = spellReturnPreview(bullet);
-        if (path) this.renderReturnPath(this.warnings, path, bullet.color, true);
+        if (path) this.renderReturnPath(this.warnings, path, 0xffb78f, true);
       }
       effect.texture = hostile ? this.atlas.glow : this.atlas.bolt;
       effect.rotation = angle;
       effect.width = hostile ? Math.max(30, bullet.radius * 5) : perfect ? 115 : bullet.kind === 'special' ? 40 : bullet.kind === 'drone' ? 25 : 31;
       effect.height = hostile ? effect.width : perfect ? 29 : bullet.kind === 'special' ? 20 : 12;
-      effect.tint = hostile ? bullet.shape ? bullet.color : 0xff713e : perfect ? 0xecffcc : bullet.color || 0x9ef8e4;
+      effect.tint = hostile ? bullet.shape === 'orb' ? 0xffd585 : 0xff895f : perfect ? 0xc8ffff : bullet.color || 0x9ef8e4;
       if (!hostile && bullet.color === 0xffcb69) effect.tint = 0x9bddff;
       effect.alpha = hostile ? bullet.shape ? this.settings.quality === 'low' ? 0 : 0.12 : 0.22 : 0.85;
       const tailOffset = hostile ? 0 : perfect ? 28 : 8;
@@ -813,7 +822,7 @@ export class GameRenderer {
       }
       // Friendly shots retain the original crystal; enemies use opaque warm pointed shells.
       core.texture = hostile ? bullet.shape ? this.atlas.danmaku[bullet.shape] : this.atlas.hostileCore : this.assets.bullet;
-      core.tint = hostile && bullet.shape ? bullet.color : 0xffffff;
+      core.tint = hostile && bullet.shape ? bullet.shape === 'orb' ? 0xffd585 : bullet.shape === 'kunai' ? 0xff906c : 0xffbb83 : 0xffffff;
       core.position.set(x, y); core.rotation = angle + (hostile ? 0 : Math.PI / 2);
       core.width = hostile ? Math.max(28, bullet.radius * 4.4) : perfect ? 28 : bullet.kind === 'special' ? 21 : bullet.kind === 'drone' ? 12 : 17;
       core.height = hostile ? Math.max(18, bullet.radius * 3) : core.width;
@@ -823,6 +832,8 @@ export class GameRenderer {
       }
       if (!hostile) {
         const motif = bullet.visualId ?? bullet.moduleId;
+        if (bullet.moduleId) effect.tint = STYLE_COLORS[MODULE_VISUALS[bullet.moduleId]];
+        if (motif && motif in EVOLUTION_VISUALS) effect.tint = STYLE_COLORS[EVOLUTION_VISUALS[motif as keyof typeof EVOLUTION_VISUALS]];
         // Texture transforms stay in the existing batched bullet sprites; no per-shot filters.
         if (motif === 'needle' || motif === 'needleArray') {
           effect.width = 96; effect.height = 5; effect.tint = 0xa8f6ff; effect.alpha = .9;
@@ -902,14 +913,15 @@ export class GameRenderer {
       const remaining = clamp(beam.life / beam.duration, 0, 1);
       if (remaining <= 0) continue;
       const fade = Math.sqrt(remaining), geometry = beamGeometry(beam.x, beam.y, beam.angle, beam.length, beam.width);
+      this.materials.beam(beam.x, beam.y, beam.angle, beam.length, beam.width, fade, false, state.elapsed, this.settings);
       const dx = Math.cos(beam.angle), dy = Math.sin(beam.angle), nx = -dy, ny = dx;
       // The full-width cyan body is the same rectangle used by the instantaneous piercing hit.
       graph.poly(geometry.corners).fill({ color: 0x62ffda, alpha: fade * 0.3 });
       graph.poly(geometry.corners).stroke({ color: 0x99ffee, width: 2, alpha: fade * 0.7 });
       graph.moveTo(beam.x, beam.y).lineTo(geometry.endX, geometry.endY)
-        .stroke({ color: 0xabfff0, width: beam.width * (0.65 + remaining * 0.08), alpha: fade * 0.65 });
+        .stroke({ color: 0xabfff0, width: beam.width * .5, alpha: fade * 0.25 });
       graph.moveTo(beam.x, beam.y).lineTo(geometry.endX, geometry.endY)
-        .stroke({ color: 0xf3fff9, width: beam.width * (0.2 + remaining * 0.32), alpha: fade });
+        .stroke({ color: 0xf3fff9, width: beam.width * .11, alpha: fade * .8 });
       graph.moveTo(beam.x, beam.y).lineTo(geometry.endX, geometry.endY)
         .stroke({ color: 0xffffff, width: 5 + remaining * 7, alpha: fade });
       if (!this.settings.reducedMotion) {
@@ -1080,7 +1092,7 @@ export class GameRenderer {
     const definition = spellCardDefinition(enemy, state.difficulty);
     if (enemy.spell?.stage === 'intro') graph.circle(enemy.x, enemy.y, enemy.radius + 25).stroke({ color: definition.color, width: 4, alpha: 0.8 });
     for (const cue of spellTelegraphs(enemy)) {
-      const progress = clamp(1 - cue.remaining / Math.max(0.001, cue.warning), 0, 1), color = cue.color;
+      const progress = clamp(1 - cue.remaining / Math.max(0.001, cue.warning), 0, 1), color = 0xffb78f;
       if (cue.kind === 'wall') {
         const length = Math.hypot(cue.endX - cue.x, cue.endY - cue.y), ux = (cue.endX - cue.x) / Math.max(1, length), uy = (cue.endY - cue.y) / Math.max(1, length);
         const gapStart = clamp((cue.gapCenter ?? -1000) - (cue.gapWidth ?? 0) / 2, 0, length);
@@ -1178,6 +1190,7 @@ export class GameRenderer {
           this.dashWarning(graph, enemy.x, enemy.y, enemy.angle, dash.length, enemy.radius, 0xffae79, true);
         } else if (enemy.state === 'laserWarmup' || enemy.state === 'laser') {
           const beam = miniBossLaserGeometry(enemy, state.difficulty), active = enemy.state === 'laser';
+          if (active) this.materials.beam(x, y, enemy.angle, beam.length, beam.width, 1, true, state.elapsed, this.settings);
           graph.poly(beam.corners).fill({ color: 0xff9c66, alpha: active ? 0.72 : 0.14 }).stroke({ color: 0xffc9a5, width: active ? 3 : 2, alpha: 0.95 });
           graph.moveTo(x, y).lineTo(beam.endX, beam.endY).stroke({ color: 0xfff4dc, width: active ? cfg.laser.width * 0.24 : 1.5, alpha: 0.85 });
           if (!active) {
@@ -1209,8 +1222,10 @@ export class GameRenderer {
       const progress = 1 - hazard.warning / hazard.warningDuration;
       if (hazard.kind === 'beam') {
         const geometry = beamGeometry(x, y, hazard.angle ?? 0, hazard.length ?? 0, hazard.width ?? radius * 2);
-        graph.poly(geometry.corners).fill({ color: 0xffa26f, alpha: hazard.active ? 0.63 : 0.06 + progress * 0.09 })
-          .stroke({ color: hazard.active ? 0xffe6c4 : 0xffb795, width: hazard.active ? 3 : 2, alpha: 0.8 });
+        if (hazard.active) this.materials.beam(x, y, hazard.angle ?? 0, geometry.length, geometry.width, Math.min(1, hazard.life / .1), true, state.elapsed, this.settings);
+        const fade = hazard.active ? Math.max(.4, Math.min(1, hazard.life / .1)) : 1;
+        graph.poly(geometry.corners).fill({ color: 0xffa26f, alpha: hazard.active ? .42 * fade : 0.06 + progress * 0.09 })
+          .stroke({ color: hazard.active || progress > .65 ? 0xffe6c4 : 0xffb795, width: hazard.active || progress > .65 ? 3 : 2, alpha: .8 * fade });
         graph.moveTo(x, y).lineTo(geometry.endX, geometry.endY).stroke({ color: 0xfff4dc, width: hazard.active ? Math.max(4, geometry.width * 0.26) : 1.5, alpha: hazard.active ? 0.85 : 0.45 });
         if (!hazard.active) graph.arc(x, y, 23, -Math.PI / 2, -Math.PI / 2 + progress * TAU).stroke({ color: 0xffd5b3, width: 3, alpha: 0.9 });
         continue;
@@ -1317,7 +1332,7 @@ export class GameRenderer {
     for (const visual of this.bullets) { visual.effect.visible = false; visual.core.visible = false; visual.heavy.visible = false; }
     for (const visual of this.companions) visual.root.visible = false;
     for (const sprite of this.moduleDecoys) sprite.visible = false;
-    this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.combatMarks.clear(); this.attachments.clear();
+    this.materials.reset(); this.playerBeams.clear(); this.warnings.clear(); this.arenaMarks.clear(); this.machineLinks.clear(); this.combatMarks.clear(); this.attachments.clear();
     this.pickupHint.visible = false; this.skillHint.visible = false; this.commandHint.visible = false;
   }
 
@@ -1330,6 +1345,7 @@ export class GameRenderer {
     this.app.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.app.canvas.removeEventListener('pointerleave', this.onPointerLeave);
     this.effects?.destroy();
+    this.materials.destroy();
     this.releaseNumberFont?.(); this.releaseNumberFont = undefined;
     this.app.destroy(true, { children: true });
     for (const texture of this.generated) texture.destroy(true);

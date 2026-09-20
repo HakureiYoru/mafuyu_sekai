@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-20T07:41:07.742Z",
+  "target": "http://127.0.0.1:5187",
+  "checks": [
+    "concurrent idempotent submission",
+    "low score preserves best and original time",
+    "new best and renamed entry",
+    "duplicate names, server-first tie ordering, cross-browser read",
+    "identity survives reload",
+    "eight isolated boards",
+    "invalid input, impossible duration, stolen ticket rejected",
+    "identity/IP rate limiting"
+  ],
+  "publicScoresWritten": false
+}

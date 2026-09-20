@@ -30,7 +30,11 @@ export interface SpellBrain {
   initialized: boolean; partsSpawned: boolean; cueSequence: number; holdUntil: number;
   gateCenter: number; gateDirection: 1 | -1; cues: SpellEmission[];
   nextMotion: number; motionCycle: number; retreatX: number; retreatY: number;
+  beat: 'volley' | 'drain' | 'motion' | 'recover'; clearAt: number;
+  passage: SpellPassage | null;
 }
+/** Collision-space opening for one committed batch; never grants immunity or paints a safe overlay. */
+export interface SpellPassage { kind: 'wall' | 'ring'; center: number; width: number; angle: number; expires: number }
 export interface SpellBossContext extends AttackBudgetContext {
   player: Player; arena: ArenaRect; difficulty: Difficulty; elapsed: number; enemies: Enemy[];
   shootAt(source: Enemy, x: number, y: number, angle: number, speed: number, radius: number, color: number, options?: EnemyShotOptions): void;
@@ -62,14 +66,17 @@ export const SPELL_CARDS = Object.freeze({
   s2: Object.freeze({ normal: definitions('s2', 'normal'), hard: definitions('s2', 'hard') }),
 });
 export const SPELL_BALANCE = {
-  normal: { warning: 0.7, laserWarning: 1.2, gateWidth: 58, gateStep: 68, speed: 205, anchorSpeed: 210 },
-  hard: { warning: 0.55, laserWarning: 0.8, gateWidth: 44, gateStep: 82, speed: 220, anchorSpeed: 250 },
+  normal: { warning: 0.7, laserWarning: 1.2, gateWidth: 112, gateStep: 68, speed: 205, anchorSpeed: 210,
+    firstMotion: 6, motionInterval: 8, motionWarning: 1.1, recovery: 1.2 },
+  hard: { warning: 0.55, laserWarning: 0.8, gateWidth: 88, gateStep: 82, speed: 220, anchorSpeed: 250,
+    firstMotion: 5, motionInterval: 6.5, motionWarning: 0.9, recovery: 0.9 },
 } as const;
 
 export function createSpellBrain(season: SeasonId, difficulty: Difficulty = 'normal'): SpellBrain {
   return { season, cardIndex: 0, age: 0, cycle: 0, shotIndex: 0, nextAttack: SPELL_CARDS[season][difficulty][0].intro,
     stage: 'intro', anchorIndex: 0, targetX: 0, targetY: 0, partIds: [], initialized: false, partsSpawned: false,
-    cueSequence: 0, holdUntil: 0, gateCenter: 0, gateDirection: 1, cues: [], nextMotion: 2.4, motionCycle: 0, retreatX: 0, retreatY: 0 };
+    cueSequence: 0, holdUntil: 0, gateCenter: 0, gateDirection: 1, cues: [], nextMotion: SPELL_BALANCE[difficulty].firstMotion,
+    motionCycle: 0, retreatX: 0, retreatY: 0, beat: 'volley', clearAt: 0, passage: null };
 }
 export function spellCardDefinition(enemy: Enemy, difficulty: Difficulty = 'normal'): SpellCardDefinition {
   const season = enemy.spell?.season ?? (enemy.archetypeId === 'lacuna' ? 's2' : 's1');
@@ -116,6 +123,27 @@ function schedule(enemy: Enemy, source: Enemy, ctx: SpellBossContext, cue: Omit<
   if (ctx.reserveAttack && !ctx.reserveAttack(enemy.id, shots.length, 0, cue.warning + 0.1)) return;
   brain.cues.push({ ...cue, id: ++brain.cueSequence, sourceId: source.id, remaining: cue.warning,
     fireAt: brain.age + cue.warning, shots });
+  // Finish committed crossing/return trains before moving the body through their lanes.
+  const multiplier = difficultyConfig(ctx.difficulty).bulletSpeed;
+  const exitDistance = (x: number, y: number, angle: number) => {
+    const dx = Math.cos(angle), dy = Math.sin(angle), a = ctx.arena;
+    return Math.max(0, Math.min(Math.abs(dx) < 1e-7 ? Infinity : ((dx > 0 ? a.x + a.width + 24 : a.x - 24) - x) / dx,
+      Math.abs(dy) < 1e-7 ? Infinity : ((dy > 0 ? a.y + a.height + 24 : a.y - 24) - y) / dy));
+  };
+  const returnDuration = (shot: PlannedShot) => {
+    const program = shot.options!.program!, out = program[0], pause = program[1], back = program[2];
+    const speed = (out.speed ?? shot.speed) * multiplier;
+    const outwardExit = exitDistance(shot.x, shot.y, shot.angle) / speed;
+    if (outwardExit <= out.duration) return outwardExit;
+    const x = shot.x + Math.cos(shot.angle) * speed * out.duration, y = shot.y + Math.sin(shot.angle) * speed * out.duration;
+    return out.duration + pause.duration + Math.min(back.duration, exitDistance(x, y, shot.angle + Math.PI) / ((back.speed ?? shot.speed) * multiplier));
+  };
+  const travel = Math.max(0, ...shots.map(shot => shot.options?.program
+    ? returnDuration(shot)
+    : cue.kind === 'wall' ? exitDistance(shot.x, shot.y, shot.angle) / (shot.speed * multiplier)
+      : cue.kind === 'ring' ? (cue.length > 150 ? cue.length * 2 : 900) / (shot.speed * multiplier)
+        : Math.hypot(ctx.player.x - shot.x, ctx.player.y - shot.y) / (shot.speed * multiplier) + 0.7));
+  brain.clearAt = Math.max(brain.clearAt, brain.age + cue.warning + travel);
   if (source.id === enemy.id && cue.kind !== 'wall') brain.holdUntil = Math.max(brain.holdUntil, brain.age + cue.warning);
   announce(enemy, ctx, `spell-${cue.kind}`, cue.x, cue.y);
 }
@@ -148,12 +176,17 @@ function star(enemy: Enemy, ctx: SpellBossContext): void {
 }
 function ring(enemy: Enemy, ctx: SpellBossContext, count: number, rotation: number, speed: number,
   turn = 0, spawnRadius = 0, inward = false, opening?: number): void {
-  const color = spellCardDefinition(enemy, ctx.difficulty).color;
+  const color = spellCardDefinition(enemy, ctx.difficulty).color, b = enemy.spell!, cfg = SPELL_BALANCE[ctx.difficulty];
+  // A wide, readable opening rotates with the batch; there is no permanent common bearing.
+  const gate = opening ?? Math.atan2(ctx.player.y - enemy.y, ctx.player.x - enemy.x) + (b.shotIndex % 2 ? 0.3 : -0.3);
+  const referenceRadius = spawnRadius || Math.max(260, Math.hypot(ctx.player.x - enemy.x, ctx.player.y - enemy.y));
+  const halfOpening = Math.max(0.16, Math.asin(Math.min(0.8, (cfg.gateWidth / 2 + 6) / referenceRadius)));
+  b.passage = { kind: 'ring', center: gate, width: cfg.gateWidth, angle: gate, expires: b.age + 6 };
   const shots: PlannedShot[] = [];
   for (let i = 0; i < count; i++) {
     const angle = rotation + i * TAU / count;
     // This opening belongs to one approaching ring. Later rings use different committed orientations.
-    if (opening !== undefined && Math.abs(Math.atan2(Math.sin(angle - opening), Math.cos(angle - opening))) < 0.2) continue;
+    if (Math.abs(Math.atan2(Math.sin(angle - gate), Math.cos(angle - gate))) < halfOpening) continue;
     const x = enemy.x + Math.cos(angle) * spawnRadius, y = enemy.y + Math.sin(angle) * spawnRadius;
     if (x < ctx.arena.x + 8 || x > ctx.arena.x + ctx.arena.width - 8 || y < ctx.arena.y + 8 || y > ctx.arena.y + ctx.arena.height - 8) continue;
     shots.push({ x, y, angle: angle + (inward ? Math.PI : 0), speed, radius: 6, color,
@@ -169,13 +202,14 @@ function wall(enemy: Enemy, ctx: SpellBossContext, axis: 'x' | 'y', reverse = fa
   const length = axis === 'x' ? a.height - 16 : a.width - 16;
   const origin = axis === 'x' ? a.y + 8 : a.x + 8;
   const playerAlong = (axis === 'x' ? ctx.player.y : ctx.player.x) - origin;
+  const margin = cfg.gateWidth / 2 + 30;
   if (b.shotIndex === 0 || b.gateCenter === 0) {
-    b.gateCenter = clamp(playerAlong, 48, length - 48);
+    b.gateCenter = clamp(playerAlong, margin, length - margin);
     b.gateDirection = b.gateCenter > length / 2 ? -1 : 1;
   } else {
     const next = b.gateCenter + cfg.gateStep * b.gateDirection;
-    if (next < 48 || next > length - 48) b.gateDirection = b.gateDirection === 1 ? -1 : 1;
-    b.gateCenter = clamp(b.gateCenter + cfg.gateStep * b.gateDirection, 48, length - 48);
+    if (next < margin || next > length - margin) b.gateDirection = b.gateDirection === 1 ? -1 : 1;
+    b.gateCenter = clamp(b.gateCenter + cfg.gateStep * b.gateDirection, margin, length - margin);
   }
   const x = axis === 'x' ? a.x + (reverse ? a.width - 8 : 8) : a.x + 8;
   const y = axis === 'y' ? a.y + (reverse ? a.height - 8 : 8) : a.y + 8;
@@ -183,10 +217,7 @@ function wall(enemy: Enemy, ctx: SpellBossContext, axis: 'x' | 'y', reverse = fa
   const color = spellCardDefinition(enemy, ctx.difficulty).color, radius = 7;
   const width = cfg.gateWidth, spacing = sparse ? (ctx.difficulty === 'hard' ? 44 : 58) : 22;
   const positions: number[] = [];
-  if (sparse) {
-    const offset = b.shotIndex % 3 * spacing / 3;
-    for (let n = offset; n <= length; n += spacing) positions.push(n);
-  } else {
+  {
     // Include exact lip bullets. Rounding a regular grid must never shrink the promised gap.
     const low = b.gateCenter - width / 2 - radius, high = b.gateCenter + width / 2 + radius;
     for (let n = low; n >= 0; n -= spacing) positions.push(n);
@@ -197,7 +228,8 @@ function wall(enemy: Enemy, ctx: SpellBossContext, axis: 'x' | 'y', reverse = fa
     angle, speed: cfg.speed, radius, color, options: { shape: 'rice' as const } }));
   schedule(enemy, enemy, ctx, { kind: 'wall', x, y, endX: x + (axis === 'y' ? length : 0), endY: y + (axis === 'x' ? length : 0),
     angle, spread: 0, length, color, warning: ctx.difficulty === 'hard' ? 0.8 : 1,
-    ...(sparse ? {} : { gapCenter: b.gateCenter, gapWidth: width }) }, shots);
+    gapCenter: b.gateCenter, gapWidth: width }, shots);
+  b.passage = { kind: 'wall', center: b.gateCenter, width, angle, expires: b.clearAt };
 }
 function beam(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, angle: number, width = 42, duration = 0.45): void {
   const warning = SPELL_BALANCE[ctx.difficulty].laserWarning;
@@ -205,6 +237,7 @@ function beam(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, angle: 
   ctx.spawnHazard({ kind: 'beam', x, y, angle, width, length: Math.hypot(ctx.arena.width, ctx.arena.height) + 40,
     radius: width / 2, warning, warningDuration: warning, life: duration, duration, sourceId: enemy.id, active: false, angularSpeed: 0 });
   enemy.spell!.holdUntil = Math.max(enemy.spell!.holdUntil, enemy.spell!.age + warning + duration);
+  enemy.spell!.clearAt = Math.max(enemy.spell!.clearAt, enemy.spell!.age + warning + duration);
   announce(enemy, ctx, 'spell-beam', x, y);
 }
 function seal(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, radius = 62, delay = 0): void {
@@ -215,18 +248,25 @@ function seal(enemy: Enemy, ctx: SpellBossContext, x: number, y: number, radius 
     y: clamp(y, ctx.arena.y, ctx.arena.y + ctx.arena.height), radius, warning, warningDuration: warning,
     life: 0.35, duration: 0.35, sourceId: enemy.id, active: false });
   announce(enemy, ctx, 'spell-seal', x, y);
+  enemy.spell!.clearAt = Math.max(enemy.spell!.clearAt, enemy.spell!.age + warning + 0.35);
 }
 function diagonalRow(enemy: Enemy, ctx: SpellBossContext): void {
   const b = enemy.spell!, a = ctx.arena, hard = ctx.difficulty === 'hard', color = spellCardDefinition(enemy, ctx.difficulty).color;
   const direction = b.shotIndex % 2 === 0 ? 1 : -1;
   const angle = Math.PI / 2 + direction * 0.36, spacing = hard ? 66 : 84;
   const offset = b.shotIndex % 3 * spacing / 3, shots: PlannedShot[] = [];
+  // Project the gate onto the player's row so diagonal bullets preserve the advertised width.
+  const projected = ctx.player.x - Math.tan(angle - Math.PI / 2) * -(ctx.player.y - a.y - 8);
+  const gate = clamp(projected + (nudge(b.shotIndex) * 65), a.x + 100, a.x + a.width - 100);
   for (let x = a.x + 16 + offset; x < a.x + a.width - 16; x += spacing) {
+    if (Math.abs(x - gate) < SPELL_BALANCE[ctx.difficulty].gateWidth / 2 + 6) continue;
     shots.push({ x, y: a.y + 8, angle, speed: hard ? 200 : 180, radius: 6, color, options: { shape: 'kunai' } });
   }
   schedule(enemy, enemy, ctx, { kind: 'wall', x: a.x + 8, y: a.y + 8, endX: a.x + a.width - 8, endY: a.y + 8,
-    angle, spread: 0, length: a.width - 16, color, warning: SPELL_BALANCE[ctx.difficulty].warning }, shots);
+    angle, spread: 0, length: a.width - 16, color, warning: SPELL_BALANCE[ctx.difficulty].warning,
+    gapCenter: gate - a.x - 8, gapWidth: SPELL_BALANCE[ctx.difficulty].gateWidth }, shots);
 }
+const nudge = (index: number) => index % 2 ? 1 : -1;
 function firePattern(enemy: Enemy, ctx: SpellBossContext): number {
   const b = enemy.spell!, a = ctx.arena, hard = ctx.difficulty === 'hard', n = b.shotIndex;
   const toward = Math.atan2(ctx.player.y - enemy.y, ctx.player.x - enemy.x);
@@ -238,8 +278,11 @@ function firePattern(enemy: Enemy, ctx: SpellBossContext): number {
       if (hard && n % 3 === 2) ring(enemy, ctx, 22, n * 0.31, 140);
       return hard ? 1.15 : 1.4;
     case 'weave':
-      wall(enemy, ctx, n % 2 ? 'x' : 'y', false, true);
-      return hard ? 1.2 : 1.5;
+      // Two parallel gates form one phrase. Change axis only after the prior train exits;
+      // a perpendicular row must never close the gate while the player is passing it.
+      if (n % 2 === 0) b.gateCenter = 0;
+      wall(enemy, ctx, Math.floor(n / 2) % 2 ? 'x' : 'y');
+      return n % 2 ? Math.max(hard ? 1.2 : 1.5, b.clearAt - b.age + .15) : hard ? 1.2 : 1.5;
     case 'flower':
       ring(enemy, ctx, hard ? 62 : 50, n * (hard ? 0.22 : 0.18), hard ? 175 : 155, (n % 2 ? 1 : -1) * 0.17);
       if (n % 2 === 1) fan(enemy, enemy, ctx, enemy.x, enemy.y, toward, hard ? 3 : 1, 0.5, 275,
@@ -322,8 +365,9 @@ function moveToAnchor(enemy: Enemy, dt: number, ctx: SpellBossContext): void {
 
 /** Three readable body actions accompany the card language: side-cut, pursuit lunge, then old-route retreat. */
 function considerBodyAction(enemy: Enemy, ctx: SpellBossContext): void {
-  const b = enemy.spell!, hard = ctx.difficulty === 'hard', a = ctx.arena;
-  if (enemy.action || b.age < b.nextMotion || b.age < b.holdUntil) return;
+  const b = enemy.spell!, a = ctx.arena;
+  if (b.beat !== 'drain' || enemy.action || b.cues.length || b.age < b.clearAt || b.age < b.holdUntil) return;
+  const cfg = SPELL_BALANCE[ctx.difficulty];
   const index = (b.motionCycle + b.cardIndex) % 3, lacuna = b.season === 's2';
   const previous = { x: enemy.x, y: enemy.y };
   const target = index === 0 ? { x: ctx.player.x + (ctx.player.x < a.x + a.width / 2 ? 280 : -280),
@@ -331,10 +375,10 @@ function considerBodyAction(enemy: Enemy, ctx: SpellBossContext): void {
     : index === 2 && b.retreatX ? { x: b.retreatX, y: b.retreatY }
       : bossActionTarget(enemy, ctx.player, lacuna ? 470 : 400, index === 2 ? 0.8 : 0.25);
   if (beginBossAction(enemy, { kind: index === 0 ? 'sidestep' : index === 2 ? 'retrace' : 'dash', ...target,
-    warning: hard ? 0.75 : 0.95, duration: lacuna ? 0.6 : 0.7, recovery: hard ? 0.6 : 0.8 }, ctx)) {
+    warning: cfg.motionWarning, duration: lacuna ? 0.6 : 0.7, recovery: cfg.recovery }, ctx)) {
     b.retreatX = previous.x; b.retreatY = previous.y; b.motionCycle++;
-    b.nextMotion = b.age + (hard ? 3.6 : 4.2);
-  } else b.nextMotion = b.age + 0.3;
+    b.nextMotion = b.age + cfg.motionInterval; b.beat = 'motion';
+  } else { b.nextMotion = b.age + cfg.motionInterval; b.beat = 'volley'; b.nextAttack = b.age + 0.25; }
 }
 
 /** Runs entirely on the simulation clock; does not integrate positions or apply player damage. */
@@ -366,6 +410,9 @@ export function updateSpellBoss(enemy: Enemy, dt: number, ctx: SpellBossContext)
     moveToAnchor(enemy, dt, ctx); return;
   }
   b.stage = 'active'; enemy.state = 'volley'; enemy.timer = 0;
+  // Complete the card's small phrase before a single deliberate relocation, never an independent dash timer.
+  const phrase = definition.pattern === 'slices' ? 7 : definition.pattern === 'blank' ? 6 : definition.pattern === 'partition' ? 4 : 2;
+  if (b.beat === 'volley' && b.age >= b.nextMotion && b.shotIndex % phrase === 0) b.beat = 'drain';
   considerBodyAction(enemy, ctx);
   if (definition.pattern === 'nodes' && !b.partsSpawned) {
     b.partsSpawned = true;
@@ -374,10 +421,13 @@ export function updateSpellBoss(enemy: Enemy, dt: number, ctx: SpellBossContext)
       if (part) b.partIds.push(part.id);
     }
   }
-  if (b.age >= b.nextAttack - EPSILON) {
-    b.nextAttack += firePattern(enemy, ctx); b.shotIndex++; enemy.attackIndex = b.shotIndex;
+  if (b.beat === 'volley' && b.age >= b.nextAttack - EPSILON) {
+    b.nextAttack = b.age + firePattern(enemy, ctx); b.shotIndex++; enemy.attackIndex = b.shotIndex;
     if (b.shotIndex % 4 === 0) b.anchorIndex = (b.anchorIndex + 1) % 3;
   }
   enemy.angle = Math.atan2(ctx.player.y - enemy.y, ctx.player.x - enemy.x);
+  const ownedAction = !!enemy.action;
   moveToAnchor(enemy, dt, ctx);
+  if (enemy.action) b.beat = enemy.action.phase === 'recover' ? 'recover' : 'motion';
+  else if (ownedAction) { b.beat = 'volley'; b.nextAttack = b.age + 0.25; b.clearAt = b.age; b.passage = null; }
 }

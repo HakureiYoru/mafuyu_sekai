@@ -1,6 +1,6 @@
 {
   "name": "mafuyu-sekai-web",
-  "version": "6.1.2",
+  "version": "6.2.0",
   "private": true,
   "type": "module",
   "description": "凤小梦大战朝比奈真冬 — Wonderhoy 与黑化真冬的整蛊向同人弹幕游戏",
@@ -13,7 +13,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "start": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src tests scripts vite.config.ts playwright.config.ts playwright.mobile.config.ts playwright.smoke.config.ts",
+    "lint": "eslint src server api tests scripts vite.config.ts playwright.config.ts playwright.mobile.config.ts playwright.smoke.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
@@ -26,6 +26,8 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run test:assets && npm run build"
   },
   "dependencies": {
+    "@upstash/redis": "1.38.4",
+    "pixi-filters": "6.1.5",
     "pixi.js": "8.20.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"

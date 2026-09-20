@@ -1,0 +1,23 @@
+.menu-links { display: flex; gap: 24px; justify-content: center; }
+.score-entry { width: 100%; max-width: 560px; margin: 12px auto; font-size: 13px; }
+.score-entry:empty { display: none; }
+.score-entry label { display: flex; justify-content: space-between; margin-bottom: 8px; color: #e5f5ff; }
+.score-entry label span, .score-entry p { color: #a5b9cd; }
+.score-entry form > div { display: flex; gap: 8px; }
+.score-entry input { min-width: 0; flex: 1; border: 1px solid #405568; border-radius: 6px; background: #071422; color: white; padding: 10px 12px; font: inherit; }
+.score-entry button { padding: 8px 20px; min-height: 44px; }
+.leaderboard-dialog { width: min(680px, calc(100vw - 24px)); }
+.arcade-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.arcade-filters select { background: #102333; color: #e6f5ff; border: 1px solid #456071; border-radius: 4px; min-height: 44px; padding: 8px; font: inherit; }
+.arcade-filters button { margin-left: auto; }
+.arcade-list { list-style: none; padding: 0; margin: 0; }
+.arcade-list li { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #283948; }
+.arcade-rank { width: 28px; font-variant-numeric: tabular-nums; color: #8fa9bd; text-align: center; }
+.arcade-list img { width: 36px; height: 36px; object-fit: contain; }
+.arcade-name { flex: 1; min-width: 0; }
+.arcade-name strong { display: block; overflow-wrap: anywhere; color: #eef7ff; }
+.arcade-name small { display: block; color: #a5b9cd; margin-top: 5px; font-size: 11px; }
+.arcade-list b { color: #9cf9e6; font-variant-numeric: tabular-nums; }
+.own-list { background: #14302f; padding: 0 8px; margin-bottom: 12px; }
+.arcade-note { color: #99adbd; font-size: 12px; line-height: 1.7; margin-top: 16px; }
+@media(max-width: 500px) { .arcade-list li { gap: 6px; } .arcade-list img { width: 28px; height: 28px; } .arcade-filters select { flex: 1; font-size: 12px; } }

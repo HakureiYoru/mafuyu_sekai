@@ -1,8 +1,8 @@
 # 凤小梦大战朝比奈真冬
 
-**v6.1.2 · 组合指引与精英收招调整**
+**v6.2.0 · 符卡节奏、街机排行榜与战斗视觉升级**
 
-强化选择显示组合方向与欠缺条件，手机横屏三张卡同屏；PALISADE 改用有缺口的弹幕，冲刺精英增加明确收招窗口。见 [v6.1.2 验证记录](docs/validation/v6.1.2.md)。
+符卡改为弹幕、换位、反击窗口依次推进，主要通路更清楚；新增八个免注册街机榜，贯穿炮与模块光束使用流动束芯和局部辉光。见 [v6.2 设计与部署](docs/design-v6.2.md)及[验证记录](docs/validation/v6.2.md)。
 
 以 Project Sekai 的凤笑梦与朝比奈真冬为主题的整蛊向同人弹幕游戏。笑梦只想大喊 Wonderhoy，阴暗的真冬只想让她闭嘴。笑梦越喊越开心，真冬从压抑、冷漠走向狂躁，用弹幕把声音压回去。台词和道具采用原创黑化整蛊演绎；操作与伤害说明保持直白。
 
@@ -28,7 +28,11 @@ npm run preview
 
 将完整 `dist/` 交给静态 HTTP 服务；`npm start` 同样启动构建预览。相对 base 支持子目录，旧 `/dx.html` 保留查询参数并跳回首页。需要硬件加速及 WebGL。
 
-Vercel 由 `vercel.json` 固定使用 Vite、`npm ci --include=dev`、`npm run build` 和输出目录 `dist`。Root Directory 为仓库根目录。发布时核对同一提交的构建状态与线上流程。
+Vercel 由 `vercel.json` 固定使用 Vite、`npm ci --include=dev`、`npm run check` 和输出目录 `dist`。Root Directory 为仓库根目录。根目录 `api/` 是排行榜的 Vercel Functions；纯静态托管仍可玩，但没有联网榜。开发服务器自动挂载同一组接口，读取被 Git 忽略的 `.env.local`。
+
+排行榜需要 `KV_REST_API_URL` / `KV_REST_API_TOKEN`（或 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`）及随机 `LEADERBOARD_SIGNING_SECRET`。只配置在服务端，绝不可使用 `VITE_` 前缀。选择 Upstash 免费方案并关闭 `autoUpgrade`；配额或网络故障时保留本地玩法和提交重试。`LEADERBOARD_DISABLED=1` 可临时停用接口。预览、开发与生产使用不同 Redis 键前缀；生产环境没有测试成绩。详见设计文档。
+
+菜单进入排行榜；结束后输入 1–12 字昵称留名。同一浏览器每榜保留最高分，使用触屏自动瞄准的局归触屏榜；通关的剧情分数冻结，继续无尽后另行留名。匿名身份保存在 HttpOnly Cookie 中，清除浏览器数据会失去身份。联网榜是基础校验的休闲榜，不承诺防客户端篡改。
 
 ## 操作
 

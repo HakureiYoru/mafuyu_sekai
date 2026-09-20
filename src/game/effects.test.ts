@@ -17,11 +17,11 @@ describe('combat feedback semantics and bounded effects', () => {
     const system = create();
     system.handle({ type: 'hit', hitResult: 'body', x: 0, y: 0, angle: Math.PI, amount: 2 });
     system.update(1 / 60);
-    expect(system.particles.children.filter(sprite => sprite.visible).every(sprite => sprite.x < 0)).toBe(true);
+    expect(system.particlePositions.every(sprite => sprite.x < 0)).toBe(true);
     system.reset();
     system.handle({ type: 'hit', hitResult: 'shield', x: 0, y: 0, angle: Math.PI, amount: 0.5 });
     system.update(1 / 60);
-    expect(system.particles.children.filter(sprite => sprite.visible).every(sprite => sprite.x > 0)).toBe(true);
+    expect(system.particlePositions.every(sprite => sprite.x > 0)).toBe(true);
   });
 
   it('filters damage digits while preserving important outcomes and truthful XP loss', () => {
@@ -70,7 +70,7 @@ describe('combat feedback semantics and bounded effects', () => {
   it('retains the full device blast footprint in reduced motion and names resonance loss and card completion accurately', () => {
     const system = create({ reducedMotion: true, quality: 'low' });
     system.handle({ type: 'attack', text: 'deviceBurst', x: 0, y: 0, amount: 140 });
-    expect(system.particles.children.some(sprite => sprite.visible && Math.abs(sprite.width * 59 / 128 - 140) < 0.01)).toBe(true);
+    expect(system.particlePositions.some(sprite => Math.abs(sprite.width * 59 / 128 - 140) < 0.01)).toBe(true);
     system.handle({ type: 'xpLoss', text: '共鸣经验', amount: 24, x: 0, y: 0 });
     system.handle({ type: 'card', text: 'cleared', amount: 2, x: 0, y: 0 });
     expect(labels(system)).toEqual(['共鸣经验 −24', '符卡 2 击破']);
@@ -94,10 +94,10 @@ describe('combat feedback semantics and bounded effects', () => {
     system.handle({ type: 'beam', x: 0, y: 0, angle: 0 });
     expect(system.count).toBeGreaterThanOrEqual(before);
     expect(system.count).toBeLessThanOrEqual(quality === 'low' ? 300 : quality === 'medium' ? 900 : 1600);
-    expect(system.particles.children.some(sprite => sprite.visible && sprite.x === 44)).toBe(true);
-    const pooled = system.particles.children.length;
+    expect(system.particlePositions.some(sprite => sprite.x === 44)).toBe(true);
+    const pooled = system.allocatedParticles;
     for (let i = 0; i < 20; i++) { system.reset(); system.debugStress(0, 0); system.handle({ type: 'beam', x: 0, y: 0 }); }
-    expect(system.particles.children.length).toBe(pooled);
+    expect(system.allocatedParticles).toBe(pooled);
     system.reset(); expect(system.count).toBe(0); expect(labels(system)).toEqual([]);
   });
 
