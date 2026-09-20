@@ -1,0 +1,759 @@
+{
+  "seed": 62001,
+  "configuration": "Lv7, three companions, precision/droneBurst/doubleDash/prism rankII. Identical 200ms steering cadence with bullet/body forecasts, held fire, reactive dash, no bombs. 80s maximum per card or real death. This limited controller is a comparison, not a human or reachability acceptance test.",
+  "reports": [
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 1,
+      "elapsed": 19.816666666666823,
+      "cardCleared": true,
+      "dps": 60.555088309503304,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 3,
+      "bombsUsed": 0,
+      "enemyShots": 14,
+      "finalHp": 4
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 2,
+      "elapsed": 20.233333333333466,
+      "cardCleared": true,
+      "dps": 64.25041186161408,
+      "damageSources": {
+        "enemyProjectile": 3,
+        "body": 1
+      },
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 13,
+      "finalHp": 1
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 3,
+      "elapsed": 21.3833333333334,
+      "cardCleared": true,
+      "dps": 65.47155105222114,
+      "damageSources": {},
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 22,
+      "finalHp": 5
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 4,
+      "elapsed": 26.316666666666453,
+      "cardCleared": true,
+      "dps": 56.998100063331684,
+      "damageSources": {
+        "beam": 1
+      },
+      "dashes": 1,
+      "bombsUsed": 0,
+      "enemyShots": 6,
+      "finalHp": 4
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 5,
+      "elapsed": 28.483333333332997,
+      "cardCleared": true,
+      "dps": 59.68402574605103,
+      "damageSources": {
+        "bombard": 2
+      },
+      "dashes": 2,
+      "bombsUsed": 0,
+      "enemyShots": 10,
+      "finalHp": 3
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 6,
+      "elapsed": 28.54999999999966,
+      "cardCleared": true,
+      "dps": 66.54991243432654,
+      "damageSources": {},
+      "dashes": 6,
+      "bombsUsed": -1,
+      "enemyShots": 12,
+      "finalHp": 5
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 1,
+      "elapsed": 40.616666666665644,
+      "cardCleared": true,
+      "dps": 64.01313089864749,
+      "damageSources": {
+        "enemyProjectile": 2
+      },
+      "dashes": 8,
+      "bombsUsed": 0,
+      "enemyShots": 17,
+      "finalHp": 3
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 2,
+      "elapsed": 34.9999999999993,
+      "cardCleared": false,
+      "dps": 69.30000000000139,
+      "damageSources": {
+        "enemyProjectile": 4,
+        "body": 1
+      },
+      "dashes": 11,
+      "bombsUsed": 0,
+      "enemyShots": 32,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 3,
+      "elapsed": 53.1333333333316,
+      "cardCleared": true,
+      "dps": 58.34378920953766,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 13,
+      "bombsUsed": 0,
+      "enemyShots": 64,
+      "finalHp": 4
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 4,
+      "elapsed": 60.01666666666454,
+      "cardCleared": true,
+      "dps": 58.31713412941056,
+      "damageSources": {},
+      "dashes": 1,
+      "bombsUsed": 0,
+      "enemyShots": 24,
+      "finalHp": 5
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 5,
+      "elapsed": 57.316666666664695,
+      "cardCleared": true,
+      "dps": 66.29834254143874,
+      "damageSources": {},
+      "dashes": 12,
+      "bombsUsed": 0,
+      "enemyShots": 28,
+      "finalHp": 5
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 6,
+      "elapsed": 61.81666666666444,
+      "cardCleared": true,
+      "dps": 66.32515502831191,
+      "damageSources": {
+        "beam": 4
+      },
+      "dashes": 15,
+      "bombsUsed": 0,
+      "enemyShots": 17,
+      "finalHp": 1
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 1,
+      "elapsed": 13.716666666666928,
+      "cardCleared": false,
+      "dps": 68.12879708383831,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 11,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 2,
+      "elapsed": 10.633333333333441,
+      "cardCleared": false,
+      "dps": 69.78056426332218,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 3,
+      "bombsUsed": 0,
+      "enemyShots": 8,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 3,
+      "elapsed": 15.600000000000355,
+      "cardCleared": false,
+      "dps": 70.1923076923061,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 20,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 4,
+      "elapsed": 31.649999999999483,
+      "cardCleared": true,
+      "dps": 63.98104265402948,
+      "damageSources": {},
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 9,
+      "finalHp": 5
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 5,
+      "elapsed": 35.34999999999928,
+      "cardCleared": false,
+      "dps": 62.475247524753755,
+      "damageSources": {
+        "bombard": 3
+      },
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 16,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 6,
+      "elapsed": 21.85000000000004,
+      "cardCleared": false,
+      "dps": 69.49656750572069,
+      "damageSources": {
+        "enemyProjectile": 2,
+        "body": 1
+      },
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 11,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 1,
+      "elapsed": 10.050000000000079,
+      "cardCleared": false,
+      "dps": 63.08457711442737,
+      "damageSources": {
+        "body": 1,
+        "enemyProjectile": 2
+      },
+      "dashes": 2,
+      "bombsUsed": 0,
+      "enemyShots": 7,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 2,
+      "elapsed": 9.250000000000039,
+      "cardCleared": false,
+      "dps": 70.97297297297267,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 2,
+      "bombsUsed": 0,
+      "enemyShots": 10,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 3,
+      "elapsed": 14.050000000000278,
+      "cardCleared": false,
+      "dps": 72.17081850533665,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 35,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 4,
+      "elapsed": 55.9999999999981,
+      "cardCleared": false,
+      "dps": 62.750000000002125,
+      "damageSources": {
+        "body": 2,
+        "enemyProjectile": 1
+      },
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 27,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 5,
+      "elapsed": 50.816666666665064,
+      "cardCleared": false,
+      "dps": 66.31682518858851,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 13,
+      "bombsUsed": 0,
+      "enemyShots": 31,
+      "finalHp": 0
+    },
+    {
+      "version": "baseline-7b75fca",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 6,
+      "elapsed": 21.650000000000052,
+      "cardCleared": false,
+      "dps": 68.03695150115458,
+      "damageSources": {
+        "enemyProjectile": 1,
+        "beam": 2
+      },
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 7,
+      "finalHp": 0
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 1,
+      "elapsed": 20.700000000000106,
+      "cardCleared": true,
+      "dps": 57.971014492753326,
+      "damageSources": {},
+      "dashes": 2,
+      "bombsUsed": 0,
+      "enemyShots": 8,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 2,
+      "elapsed": 22.616666666666664,
+      "cardCleared": true,
+      "dps": 57.47973470891674,
+      "damageSources": {
+        "enemyProjectile": 2
+      },
+      "dashes": 2,
+      "bombsUsed": 0,
+      "enemyShots": 4,
+      "finalHp": 3
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 3,
+      "elapsed": 23.849999999999927,
+      "cardCleared": true,
+      "dps": 58.70020964360605,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 3,
+      "bombsUsed": 0,
+      "enemyShots": 12,
+      "finalHp": 4
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 4,
+      "elapsed": 26.899999999999753,
+      "cardCleared": true,
+      "dps": 55.76208178438713,
+      "damageSources": {},
+      "dashes": 1,
+      "bombsUsed": 0,
+      "enemyShots": 4,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 5,
+      "elapsed": 30.483333333332883,
+      "cardCleared": true,
+      "dps": 55.76817933296966,
+      "damageSources": {
+        "bombard": 1
+      },
+      "dashes": 1,
+      "bombsUsed": 0,
+      "enemyShots": 6,
+      "finalHp": 4
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s1",
+      "card": 6,
+      "elapsed": 31.46666666666616,
+      "cardCleared": true,
+      "dps": 60.381355932204364,
+      "damageSources": {
+        "beam": 1
+      },
+      "dashes": 4,
+      "bombsUsed": -1,
+      "enemyShots": 8,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 1,
+      "elapsed": 43.73333333333213,
+      "cardCleared": true,
+      "dps": 59.45121951219675,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 6,
+      "bombsUsed": 0,
+      "enemyShots": 14,
+      "finalHp": 4
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 2,
+      "elapsed": 47.383333333331926,
+      "cardCleared": true,
+      "dps": 61.202954625397524,
+      "damageSources": {
+        "enemyProjectile": 2
+      },
+      "dashes": 7,
+      "bombsUsed": 0,
+      "enemyShots": 21,
+      "finalHp": 3
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 3,
+      "elapsed": 61.09999999999781,
+      "cardCleared": true,
+      "dps": 50.736497545009996,
+      "damageSources": {},
+      "dashes": 9,
+      "bombsUsed": 0,
+      "enemyShots": 34,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 4,
+      "elapsed": 60.38333333333119,
+      "cardCleared": true,
+      "dps": 57.96301407673405,
+      "damageSources": {},
+      "dashes": 3,
+      "bombsUsed": 0,
+      "enemyShots": 10,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 5,
+      "elapsed": 63.549999999997674,
+      "cardCleared": true,
+      "dps": 59.79543666404625,
+      "damageSources": {},
+      "dashes": 8,
+      "bombsUsed": 0,
+      "enemyShots": 16,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "normal",
+      "season": "s2",
+      "card": 6,
+      "elapsed": 67.39999999999746,
+      "cardCleared": true,
+      "dps": 60.83086053412692,
+      "damageSources": {
+        "beam": 1
+      },
+      "dashes": 10,
+      "bombsUsed": 0,
+      "enemyShots": 10,
+      "finalHp": 4
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 1,
+      "elapsed": 25.81666666666648,
+      "cardCleared": true,
+      "dps": 62.75016139444848,
+      "damageSources": {},
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 12,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 2,
+      "elapsed": 28.066666666666354,
+      "cardCleared": true,
+      "dps": 62.529691211402124,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 4,
+      "bombsUsed": 0,
+      "enemyShots": 7,
+      "finalHp": 3
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 3,
+      "elapsed": 30.083333333332906,
+      "cardCleared": true,
+      "dps": 62.82548476454383,
+      "damageSources": {
+        "enemyProjectile": 2
+      },
+      "dashes": 7,
+      "bombsUsed": 0,
+      "enemyShots": 21,
+      "finalHp": 1
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 4,
+      "elapsed": 33.7333333333327,
+      "cardCleared": true,
+      "dps": 60.029644268775826,
+      "damageSources": {},
+      "dashes": 5,
+      "bombsUsed": 0,
+      "enemyShots": 5,
+      "finalHp": 5
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 5,
+      "elapsed": 24.049999999999915,
+      "cardCleared": false,
+      "dps": 57.54677754677775,
+      "damageSources": {
+        "bombard": 3
+      },
+      "dashes": 1,
+      "bombsUsed": 0,
+      "enemyShots": 6,
+      "finalHp": 0
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s1",
+      "card": 6,
+      "elapsed": 31.999999999999464,
+      "cardCleared": false,
+      "dps": 62.85937500000105,
+      "damageSources": {
+        "beam": 2,
+        "enemyProjectile": 1
+      },
+      "dashes": 6,
+      "bombsUsed": 0,
+      "enemyShots": 12,
+      "finalHp": 0
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 1,
+      "elapsed": 55.89999999999811,
+      "cardCleared": true,
+      "dps": 62.79069767442073,
+      "damageSources": {
+        "enemyProjectile": 1
+      },
+      "dashes": 13,
+      "bombsUsed": 0,
+      "enemyShots": 25,
+      "finalHp": 3
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 2,
+      "elapsed": 49.73333333333179,
+      "cardCleared": false,
+      "dps": 62.784852546918835,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 10,
+      "bombsUsed": 0,
+      "enemyShots": 29,
+      "finalHp": 0
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 3,
+      "elapsed": 29.86666666666625,
+      "cardCleared": false,
+      "dps": 60.284598214286554,
+      "damageSources": {
+        "enemyProjectile": 3
+      },
+      "dashes": 7,
+      "bombsUsed": 0,
+      "enemyShots": 42,
+      "finalHp": 0
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 4,
+      "elapsed": 79.99999999999675,
+      "cardCleared": false,
+      "dps": 59.0312500000024,
+      "damageSources": {
+        "body": 1,
+        "enemyProjectile": 1
+      },
+      "dashes": 8,
+      "bombsUsed": 0,
+      "enemyShots": 16,
+      "finalHp": 1
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 5,
+      "elapsed": 79.99999999999675,
+      "cardCleared": false,
+      "dps": 62.21875000000253,
+      "damageSources": {
+        "enemyProjectile": 2
+      },
+      "dashes": 14,
+      "bombsUsed": 0,
+      "enemyShots": 28,
+      "finalHp": 1
+    },
+    {
+      "version": "v6.2",
+      "difficulty": "hard",
+      "season": "s2",
+      "card": 6,
+      "elapsed": 45.5499999999987,
+      "cardCleared": false,
+      "dps": 62.87596048298753,
+      "damageSources": {
+        "body": 2,
+        "beam": 1
+      },
+      "dashes": 8,
+      "bombsUsed": 0,
+      "enemyShots": 8,
+      "finalHp": 0
+    }
+  ]
+}

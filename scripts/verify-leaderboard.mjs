@@ -6,7 +6,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 const baseURL = process.env.ARCADE_TEST_URL ?? 'http://127.0.0.1:5187';
 if (baseURL === 'https://mafuyu-sekai.vercel.app') throw new Error('Use an isolated preview deployment for submissions');
 const headers = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {};
-const a = await request.newContext({ baseURL, extraHTTPHeaders: headers }), b = await request.newContext({ baseURL, extraHTTPHeaders: headers });
+const proxy = process.env.ARCADE_TEST_PROXY ? { server: process.env.ARCADE_TEST_PROXY } : undefined;
+const contextOptions = { baseURL, extraHTTPHeaders: headers, proxy };
+const a = await request.newContext(contextOptions), b = await request.newContext(contextOptions);
 const selection = { difficulty: 'normal', mode: 'story', controls: 'keyboardMouse' };
 const checks = [];
 async function start(ctx, board = selection) {
@@ -29,7 +31,7 @@ try {
   await submit(a, await start(a), 3000, {}, '改名·笑梦'); mine = await board(a); assert.equal(mine.own.nickname, '改名·笑梦'); checks.push('new best and renamed entry');
   await submit(b, await start(b), 3000, {}, '改名·笑梦');
   const other = await board(b); assert(other.own.rank > mine.own.rank); checks.push('duplicate names, server-first tie ordering, cross-browser read');
-  const reload = await request.newContext({ baseURL, storageState: await a.storageState(), extraHTTPHeaders: headers });
+  const reload = await request.newContext({ ...contextOptions, storageState: await a.storageState() });
   assert.equal((await board(reload)).own.score, 3000); await reload.dispose(); checks.push('identity survives reload');
   for (const difficulty of ['normal', 'hard']) for (const mode of ['story', 'endless']) for (const controls of ['keyboardMouse', 'touch']) {
     if (difficulty === 'normal' && mode === 'story' && controls === 'keyboardMouse') continue;
@@ -44,4 +46,7 @@ try {
   assert(statuses.includes(429)); checks.push('identity/IP rate limiting');
   const report = { date: new Date().toISOString(), target: baseURL, checks, publicScoresWritten: false };
   await mkdir('docs/validation', { recursive: true }); await writeFile('docs/validation/v6.2-leaderboard.json', JSON.stringify(report, null, 2)); console.log(report);
+} catch (error) {
+  const message = String(error).replaceAll(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '\u0000', '[redacted]');
+  console.error(message); process.exitCode = 1;
 } finally { await a.dispose(); await b.dispose(); }

@@ -1,6 +1,6 @@
 {
-  "date": "2026-09-20T07:41:07.742Z",
-  "target": "http://127.0.0.1:5187",
+  "date": "2026-09-20T07:52:07.945Z",
+  "target": "https://mafuyu-sekai-m4it3iyew-wenjun-hes-projects.vercel.app",
   "checks": [
     "concurrent idempotent submission",
     "low score preserves best and original time",
