@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-20T09:12:44.042Z",
+  "target": "https://mafuyu-sekai-nql1eo91a-wenjun-hes-projects.vercel.app",
+  "checks": [
+    "concurrent idempotent submission",
+    "low score preserves best and original time",
+    "new best and renamed entry",
+    "duplicate names, server-first tie ordering, cross-browser read",
+    "identity survives reload",
+    "eight isolated boards",
+    "invalid input, impossible duration, stolen ticket rejected",
+    "identity/IP rate limiting"
+  ],
+  "publicScoresWritten": false
+}
