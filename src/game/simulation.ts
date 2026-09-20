@@ -3,6 +3,8 @@ import { difficultyConfig } from './difficulty';
 import { createMiniBossBrain, updateMiniBossAi } from './miniboss-ai';
 import { angleDelta, beamGeometry, clamp, normalize, pointInBeam, SeededRandom, segmentCircleHit, SpatialGrid, TAU } from './math';
 import { ObjectPool } from './pool';
+import { ADVANCED_TYPES, createAdvancedBrain, updateAdvancedEnemy, advancedDeath } from './advanced-enemies';
+import { droneSpecialization, supportGrowth, wingGrowth, wingLanes } from './arsenal';
 import { AttackBudget } from './attack-budget';
 import { ModuleCombat, type ModuleCombatContext } from './module-combat';
 import { createEliteBrain, updateEliteAi, ELITE_GROUPS } from './elite-ai';
@@ -38,6 +40,7 @@ export class GameSimulation {
   private ricochetTimer = 0;
   private rearTimer = 0;
   private bloomTimer = 0;
+  private focusedRounds = 0;
   private returnWingTimer = 0;
   private brakeTimer = 0;
   private echoTimer = 0;
@@ -108,6 +111,7 @@ export class GameSimulation {
     this.previousDash = this.previousBomb = false;
     this.grazeRefund = this.markRetarget = this.introductionUntil = 0;
     this.ricochetTimer = this.rearTimer = this.bloomTimer = this.returnWingTimer = this.brakeTimer = this.echoTimer = 0;
+    this.focusedRounds = 0;
     this.introducedTypes = new Set(['basic']); this.pendingEncounterCleanup = false; this.returnBladeHits.clear(); this.returningVolley.clear();
     this.dashBuffered = 0;
     this.dashBufferedDirection = null;
@@ -323,12 +327,24 @@ export class GameSimulation {
       const angle = p.angle + (i - (count - 1) / 2) * BALANCE.weapon.spreads[lv] * (p.focus ? BALANCE.player.focusSpread : 1);
       const bullet = this.addBullet(p.x, p.y, angle, needle ? 1500 : BALANCE.weapon.speeds[lv], 'player', damage * (needle ? baseCount : 1),
         p.level >= 10 ? 6 : 4, color, 'normal', needle ? EVOLUTION_VALUES.needleArray.targets : (p.level >= 10 ? 2 : 1) + this.value('piercing', MODULE_VALUES.piercing.extraHits), !needle && p.level >= 7, BALANCE.weapon.homingRange);
-      if (bullet) bullet.visualId = needle ? 'needle' : 'main';
+      if (bullet) bullet.visualId = needle ? 'needle' : piercingRank > 0 ? 'piercingMain' : this.has('precision') && this.focusTime >= MODULE_VALUES.precision.hold ? 'focusedMain' : 'main';
     }
-    if (this.has('wingShots')) for (const side of [-1, 1]) {
-      const bullet = this.addBullet(p.x - Math.sin(p.angle) * side * 22, p.y + Math.cos(p.angle) * side * 22,
-        p.angle, BALANCE.weapon.speeds[lv], 'player', this.value('wingShots', MODULE_VALUES.wingShots.damage) * buildDamageMultiplier(this.state.build), 4, 0x9be6ff, 'module');
-      if (bullet) { bullet.visualId = 'wing'; bullet.moduleId = 'wingShots'; }
+    if (piercingRank > 0 && this.has('precision') && this.focusTime >= MODULE_VALUES.precision.hold - EPSILON) {
+      if (++this.focusedRounds >= 6) {
+        this.focusedRounds = 0;
+        const rail = this.addBullet(p.x, p.y, p.angle, 1650, 'player', damage * baseCount * .75, 8, 0xafffff, 'module', 5);
+        if (rail) { rail.visualId = 'railOverdrive'; rail.moduleId = 'piercing'; this.moduleEvent('piercing'); }
+      }
+    } else this.focusedRounds = 0;
+    if (this.has('wingShots')) {
+      const lanes = wingLanes(moduleRank(this.state.build, 'wingShots'));
+      for (const side of [-1, 1]) for (let lane = 0; lane < lanes; lane++) {
+        const offset = side * (38 + lane * 13), x = p.x - Math.sin(p.angle) * offset, y = p.y + Math.cos(p.angle) * offset;
+        const converge = p.focus && this.has('precision');
+        const angle = converge ? Math.atan2(p.y + Math.sin(p.angle) * 300 - y, p.x + Math.cos(p.angle) * 300 - x) : p.angle + side * (.08 + lane * .07);
+        const bullet = this.addBullet(x, y, angle, 1150, 'player', this.value('wingShots', MODULE_VALUES.wingShots.damage) * wingGrowth(p.level) / lanes * buildDamageMultiplier(this.state.build), 6, 0x8ecbff, 'module', Math.min(3, 1 + Math.ceil(this.value('piercing', MODULE_VALUES.piercing.extraHits) / 2)));
+        if (bullet) { bullet.visualId = 'wing'; bullet.moduleId = 'wingShots'; }
+      }
     }
     this.emit({ type: 'shot', x: p.x + Math.cos(p.angle) * 30, y: p.y + Math.sin(p.angle) * 30, angle: p.angle, color: 0x73f7eb, amount: BALANCE.weapon.damage });
     this.modules.onMainShot(this.moduleContext());
@@ -516,7 +532,7 @@ export class GameSimulation {
           for (const item of companions) this.returningVolley.add(item.id);
         }
         const returns = this.returningVolley.delete(companion.id);
-        const shot = this.addBullet(companion.x, companion.y, companion.angle, cfg.bulletSpeed, 'player', cfg.damage * buildDamageMultiplier(this.state.build), 4, 0x9ceaff, 'drone', 1, !returns && this.has('droneHoming'), range);
+        const shot = this.addBullet(companion.x, companion.y, companion.angle, cfg.bulletSpeed, 'player', cfg.damage * supportGrowth(p.level) * droneSpecialization(this.state.build) * buildDamageMultiplier(this.state.build), 6, 0xb3baff, 'drone', 1, !returns && this.has('droneHoming'), range);
         if (shot) {
           shot.targetId = target.id;
           if (!returns && this.has('droneHoming')) { shot.homingTime = this.value('droneHoming', MODULE_VALUES.droneHoming.duration); shot.turnSpeed = 2; }
@@ -786,7 +802,7 @@ export class GameSimulation {
     const type = introduction?.type ?? this.threats.selectSpawn(pool, ordinary, this.random.next(), w.difficulty, w.elapsed, pending, progression, count);
     if (!type) return;
     if (isTacticalEnemy(type) && ordinary.filter(e => e.hp > 0 && isTacticalEnemy(e.type)).length + pending.filter(e => isTacticalEnemy(e.type)).length >= this.threats.tacticalCap(w.difficulty, progression)) return;
-    const kindCap = type === 'repairer' ? 2 : type === 'weaver' || type === 'sampler' ? 3 : 180;
+    const kindCap = ADVANCED_TYPES.includes(type) ? w.difficulty === 'hard' ? 2 : 1 : type === 'repairer' ? 2 : type === 'weaver' || type === 'sampler' ? 3 : 180;
     if (ordinary.filter(e => e.hp > 0 && e.type === type).length + pending.filter(e => e.type === type).length >= kindCap) return;
     const angle = this.random.next() * TAU;
     let x = clamp(w.player.x + Math.cos(angle) * 980, 70, WORLD.width - 70), y = clamp(w.player.y + Math.sin(angle) * 980, 70, WORLD.height - 70);
@@ -796,6 +812,8 @@ export class GameSimulation {
     }
     if (introduction) {
       this.introducedTypes.add(type); this.introductionUntil = w.elapsed + 4; this.nextEnemyCommit = Math.max(this.nextEnemyCommit, this.introductionUntil);
+      const lesson = type === 'stalker' ? '裂隙追猎 · 引开冲刺，留意回身扇射' : type === 'prismWarden' ? '折镜执灯 · 拆掉两侧镜片，取消激光' : type === 'conductor' ? '噤声指挥 · 击杀连线单位可取消对应齐射' : '';
+      if (lesson) this.emit({ type: 'attack', x, y, enemyType: type, text: `enemy-lesson:${lesson}` });
       // One new silhouette at a time; ordinary pressure resumes after the four-second introduction.
     }
     const carrier = Math.floor(this.random.next() * count), squadId = this.nextId++;
@@ -874,7 +892,8 @@ export class GameSimulation {
       enemy.encounterId = encounterId ?? (bossSeason === 's1' ? 's1:mafuyu' : 's2:final');
       if (w.mode === 'story') { w.campaign.activeEncounter = enemy.encounterId as EncounterId; w.campaign.phase = 'encounter'; }
     }
-    if (!['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'].includes(type)) enemy.season2 = createSeason2Brain(type);
+    if (ADVANCED_TYPES.includes(type)) enemy.advanced = createAdvancedBrain();
+    else if (!['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss'].includes(type)) enemy.season2 = createSeason2Brain(type);
     if (type === 'miniboss') { enemy.miniboss = createMiniBossBrain(); w.minibossSpawned = true; w.minibossDefeated = false; }
     if (mini) {
       enemy.encounterId = type === 'miniboss' ? 's1:echo' : type === 'palisade' ? 's2:palisade' : 's2:reprise';
@@ -981,8 +1000,8 @@ export class GameSimulation {
       const pendingElite = w.enemies.some(other => other.hp > 0 && other.role === 'elite' && !committed(other));
       const slots = profile.slots - (pendingElite && !elitePriority ? 1 : 0);
       if (!visible || exclusive || commitments >= slots || (!elitePriority && w.elapsed < this.nextEnemyCommit)) return false;
-      if (kind && w.enemies.some(other => other !== e && other.hp > 0 && ['weaver', 'sampler', 'palisade'].includes(other.type) && !['chase', 'recover'].includes(other.state))) return false;
-      if (kind && (w.hazards.some(h => ['sampler', 'weaver', 'palisade'].includes(this.byId.get(h.sourceId)?.type ?? ''))
+      if (kind && w.enemies.some(other => other !== e && other.hp > 0 && ['weaver', 'sampler', 'palisade', 'stalker', 'prismWarden', 'conductor'].includes(other.type) && !['chase', 'recover'].includes(other.state))) return false;
+      if (kind && (w.hazards.some(h => { const owner = this.byId.get(h.sourceId); return owner?.archetypeId === 'prismLens' || ['sampler', 'weaver', 'palisade'].includes(owner?.type ?? ''); })
         || w.bullets.some(b => b.owner === 'enemy' && b.life > 0 && b.attackGroup === 'wall'))) return false;
       if (intent && e.role === 'mob' && !this.threats.canCommit(intent, { elapsed: w.elapsed, difficulty: w.difficulty, player: p, enemies: w.enemies,
         progression: w.mode === 'story' ? w.campaign.progression : 360,
@@ -1018,6 +1037,14 @@ export class GameSimulation {
       if (e.hp <= 0 || e === boss || e === miniboss || priority.includes(e)) continue;
       prepare(e);
       if (e.type === 'node') continue; // Spell emitters are controlled by their parent, once per tick.
+      if (e.advanced || e.archetypeId === 'prismLens') {
+        const context = this.season2Context((kind, intent) => canCommit(e, kind, intent));
+        const decoy = this.modules.decoyTarget(this.moduleContext(), e);
+        if (decoy) context.player = { ...p, ...decoy };
+        updateAdvancedEnemy(e, dt, context);
+        if (w.status === 'playing' && e.hp > 0) moveAndCollide(e);
+        continue;
+      }
       if (e.season2) {
         const context = this.season2Context((kind, intent) => canCommit(e, kind, intent));
         const decoy = e.role === 'mob' && e.state === 'chase' ? this.modules.decoyTarget(this.moduleContext(), e) : null;
@@ -1323,12 +1350,12 @@ export class GameSimulation {
         this.moduleEvent('droneBurst');
         if (this.evolved('triangleAssault') && this.state.companions.length) {
           for (const drone of this.state.companions) {
-            const bullet = this.addBullet(drone.x, drone.y, Math.atan2(enemy.y - drone.y, enemy.x - drone.x), 900, 'player', 18 * highRankFactor(moduleRank(this.state.build, 'droneBurst')) / this.state.companions.length * multiplier, 5, 0xffffff, 'module', 2);
-            if (bullet) bullet.visualId = 'droneBurst';
+            const bullet = this.addBullet(drone.x, drone.y, Math.atan2(enemy.y - drone.y, enemy.x - drone.x), 1200, 'player', EVOLUTION_VALUES.triangleAssault.damage * highRankFactor(moduleRank(this.state.build, 'droneBurst')) / this.state.companions.length * supportGrowth(this.state.player.level) * multiplier, 8, 0xffffff, 'module', 2, this.has('droneHoming'), this.droneRange);
+            if (bullet) { bullet.visualId = 'droneBurst'; bullet.homingTime = 1.2; bullet.turnSpeed = 3; }
           }
         } else {
-          const bullet = this.addBullet(b.prevX, b.prevY, Math.atan2(b.vy, b.vx), 900, 'player', this.value('droneBurst', MODULE_VALUES.droneBurst.damage) * multiplier, 5, 0xffffff, 'module', 2);
-          if (bullet) bullet.visualId = 'droneBurst';
+          const bullet = this.addBullet(b.prevX, b.prevY, Math.atan2(b.vy, b.vx), 1200, 'player', this.value('droneBurst', MODULE_VALUES.droneBurst.damage) * supportGrowth(this.state.player.level) * multiplier, 8, 0xffffff, 'module', 2, this.has('droneHoming'), this.droneRange);
+          if (bullet) { bullet.visualId = 'droneBurst'; bullet.homingTime = 1.2; bullet.turnSpeed = 3; }
         }
       }
     }
@@ -1373,6 +1400,7 @@ export class GameSimulation {
       this.emit({ type: 'kill', hitResult: 'part', x: enemy.x, y: enemy.y, targetId: enemy.id, enemyType: enemy.type, color: ENEMIES.node.color, amount: enemy.radius });
       return;
     }
+    if (enemy.advanced || enemy.archetypeId === 'prismLens') advancedDeath(enemy, this.season2Context());
     if (enemy.season2) onSeason2Death(enemy, this.season2Context());
     this.byId.delete(enemy.id); this.enemyCount--; if (enemy.type === 'mine') this.mineCount--;
     this.threats.cancel(enemy.id);

@@ -1,4 +1,4 @@
-export const ONLINE_RULES = 'v6.2' as const;
+export const ONLINE_RULES = 'v6.3' as const;
 export type Board = { difficulty: 'normal' | 'hard'; mode: 'story' | 'endless'; controls: 'keyboardMouse' | 'touch' };
 export type RunResult = Readonly<Board & { rules: typeof ONLINE_RULES; runId: string; score: number; elapsed: number; progression: number; wave: number; outcome: 'failed' | 'complete' | 'quit' }>;
 export type RankedEntry = Omit<RunResult, 'runId'> & { nickname: string; achievedAt: number; rank: number };

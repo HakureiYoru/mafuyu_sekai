@@ -1,4 +1,5 @@
 import { angleDelta, beamGeometry, clamp, pointInBeam, segmentCircleHit, TAU } from './math';
+import { supportGrowth } from './arsenal';
 import { buildDamageMultiplier, hasEvolution, highRankCooldown, highRankFactor, moduleRank, newModuleStats, NEW_MODULE_IDS, type NewModuleId, type ResolvedBuildStats } from './upgrades';
 import type { CombatEvent, Enemy, InputAction, ModuleId, Pickup, Vec2, WorldState } from './types';
 
@@ -81,7 +82,7 @@ export class ModuleCombat {
   private add(ctx: ModuleCombatContext, id: NewModuleId, kind: ModuleVisual['kind'], point: Vec2, geometry: ModuleGeometry, duration: number, damage = 0, warning = 0): Actor | null {
     if (this.actors.length >= MODULE_COMBAT_LIMITS.actors) return null;
     const view: ModuleVisual = { id: this.nextId++, kind, moduleId: id, rank: this.rank(ctx, id), x: point.x, y: point.y, prevX: point.x, prevY: point.y, age: 0, duration: warning + duration, warning, active: warning <= EPSILON, geometry };
-    const actor: Actor = { view, damage, multiplier: buildDamageMultiplier(ctx.state.build), hits: new Set(), targets: Infinity, started: false };
+    const actor: Actor = { view, damage, multiplier: buildDamageMultiplier(ctx.state.build) * (id.startsWith('drone') ? supportGrowth(ctx.state.player.level) : 1), hits: new Set(), targets: Infinity, started: false };
     this.actors.push(actor); this.visuals.push(view); return actor;
   }
   private cap(kind: ModuleVisual['kind'], maximum: number, id?: ModuleId): void {
@@ -312,6 +313,15 @@ export class ModuleCombat {
         if (!beam) continue; beam.emitterId = drone.id; beam.targetId = target.id; beam.targets = this.evolved(ctx, 'stageSpotlight') ? 3 : 1;
         beam.onStart = (c, a) => {
           this.beam(c, a);
+          // Once per spotlight volley: secondary beams have no on-hit module hooks.
+          if (i === 0 && this.rank(c, 'droneConduit')) {
+            const live = c.state.enemies.find(enemy => enemy.id === a.targetId && enemy.hp > 0);
+            if (live) for (const partner of c.state.companions.filter(item => item.id !== drone.id).slice(0, 2)) {
+              const angle = Math.atan2(live.y - partner.y, live.x - partner.x);
+              const echo = this.add(c, 'droneSpotlight', 'echo', partner, { shape: 'beam', angle, length: stats.length, width: stats.width * .8 }, .24, a.damage * .5);
+              if (echo) { echo.targets = 2; echo.onStart = (next, item) => this.beam(next, item); }
+            }
+          }
           if (this.evolved(c, 'stageSpotlight') && a.view.geometry.shape === 'beam') {
             const geo = a.view.geometry, end = { x: a.view.x + Math.cos(geo.angle) * geo.length, y: a.view.y + Math.sin(geo.angle) * geo.length };
             const flash = this.add(c, 'droneSpotlight', 'field', end, { shape: 'circle', radius: 45 }, 0.18, 4 * highRankFactor(a.view.rank));

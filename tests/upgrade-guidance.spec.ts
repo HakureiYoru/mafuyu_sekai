@@ -211,7 +211,8 @@ test.describe('touch upgrade layout', () => {
       const original = await pausedBuild(page);
       await page.getByRole('button', { name: '查看三角围攻详情', exact: true }).tap();
       await expect(page.getByRole('dialog', { name: '三角围攻', exact: true })).toBeVisible();
-      await expect(page.locator('.upgrade-full-description')).toContainText('总伤害 18');
+      await expect(page.locator('.upgrade-full-description')).toContainText('总基础伤害 36');
+      await expect(page.locator('.upgrade-full-description')).toContainText('武器等级最高乘 2.8');
       await expectInsideVisualViewport(page.getByRole('button', { name: '← 返回选卡', exact: true }));
       expect(await pausedBuild(page)).toEqual(original);
       await page.getByRole('button', { name: '← 返回选卡', exact: true }).tap();

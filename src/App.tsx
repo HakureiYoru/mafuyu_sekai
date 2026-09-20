@@ -6,6 +6,7 @@ import changelog from 'virtual:changelog';
 import { MODULES, EVOLUTIONS, choiceView, buildModuleViews } from './game/upgrades';
 import { evolutionPaths, choiceEvolutionHints } from './game/upgrade-guidance';
 import { compactChoiceDescription } from './game/upgrade-copy';
+import { ARSENAL_SYNERGIES } from './game/arsenal';
 import { BINDING_LABELS, DEFAULT_KEYBINDINGS, isBindableKey, keyLabel, rebindKey } from './game/settings';
 import type { BindingAction } from './game/settings';
 import { BattleComms, useCommsPlacement } from './components/BattleComms';
@@ -270,7 +271,7 @@ function PausedModules({ snapshot: s, expanded = true, recipesExpanded = false }
   return <><details className="paused-modules" open={expanded}><summary>本局模块 <span>{s.modules.length} 种 · {buildLayers(s)} 层</span></summary><div>{buildModuleViews({ modules: [...s.modules], ranks: s.moduleRanks, evolutions: [...s.evolutions] }).map(item => {
     const state = s.moduleStates.find(module => module.id === item.id);
     return <article key={item.id}><div><strong>{item.name} {rankLabel(item.rank)}{item.evolution ? ' ✦' : ''}</strong><span className={`module-${state?.status ?? 'ready'}`}>{state ? `${labels[state.status]}${state.remaining > 0 ? ` · ${state.remaining.toFixed(1)}s` : ''}` : '持续生效'}</span></div><p>{item.description}</p>{item.flavor && <small className="module-flavor">{item.flavor}</small>}</article>;
-  })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><EvolutionRecipes snapshot={s} expanded={recipesExpanded} /></>;
+  })}</div>{!s.modules.length && <p className="upgrade-owned">收集经验升级，选择本局强化。</p>}</details><details className="arsenal-synergies evolution-recipes"><summary>即装即用 · 武装联动</summary><p>子机伤害随武器等级成长；每种子机模块再为基础子机弹增加10%伤害，最多五种。</p><div>{ARSENAL_SYNERGIES.map(link => <p key={link.name}><strong>{link.name} · {link.modules.every(id => s.modules.includes(id)) ? '已生效' : link.modules.map(id => MODULES[id].name).join('＋')}</strong><span>{link.text}</span></p>)}</div></details><EvolutionRecipes snapshot={s} expanded={recipesExpanded} /></>;
 }
 
 function RunResults({ snapshot }: { snapshot: HudSnapshot }) {

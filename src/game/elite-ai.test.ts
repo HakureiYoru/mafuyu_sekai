@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ELITE_GROUPS, createEliteBrain, eliteTelegraphs, updateEliteAi, type EliteAiContext } from './elite-ai';
+import { ELITE_GROUPS, STATIONARY_ELITES, createEliteBrain, eliteTelegraphs, updateEliteAi, type EliteAiContext } from './elite-ai';
 import { FixedClock } from './clock';
 import { GameSimulation } from './simulation';
 import { createSeason2Brain, updateSeason2Ai } from './season2-ai';
@@ -47,7 +47,7 @@ describe('ten two-action mandatory elites', () => {
         h.tick(); maximum = Math.max(maximum, eliteTelegraphs(h.e).length);
         expect(h.e.disabledUntil ?? 0).toBe(0);
       }
-      expect(h.events.some(event => event.text?.startsWith('action-'))).toBe(true);
+      expect(h.events.some(event => event.text?.startsWith('action-'))).toBe(!STATIONARY_ELITES.includes(ELITE_GROUPS[stage - 1][variant as 0 | 1].id));
       expect(h.shots.length + h.hazards.length).toBeGreaterThan(0);
       expect(h.e.elite!.cycle).toBeGreaterThan(3); expect(maximum).toBeLessThanOrEqual(3);
     });
@@ -90,6 +90,11 @@ describe('ten two-action mandatory elites', () => {
     it.each(ELITE_GROUPS.flat().map(definition => [definition.name, definition.stage, ELITE_GROUPS[definition.stage - 1].indexOf(definition)] as const))(
       `${difficulty} %s locks its route and then stays still without firing throughout the full movement recovery`, (_name, stage, variant) => {
         const h = harness(stage, variant as 0 | 1, difficulty), recovery = difficulty === 'hard' ? 1.2 : 1.4;
+        if (STATIONARY_ELITES.includes(ELITE_GROUPS[stage - 1][variant as 0 | 1].id)) {
+          h.run(30); expect(h.e.action).toBeUndefined();
+          expect(h.events.some(event => event.text === 'core-exposed')).toBe(true);
+          expect(h.shots.length + h.hazards.length).toBeGreaterThan(0); return;
+        }
         for (let tick = 0; tick < 1800 && !h.e.action; tick++) h.tick();
         expect(h.e.action).toBeDefined();
         const route = { x: h.e.action!.targetX, y: h.e.action!.targetY, angle: h.e.action!.angle };
@@ -120,7 +125,7 @@ describe('ten two-action mandatory elites', () => {
         expect(h.shots.length).toBeGreaterThan(0);
       });
 
-    it.each([['gate', 2, 0], ['executor', 5, 0], ['ring', 5, 1]] as const)(
+    it.each([['gate', 2, 0]] as const)(
       `${difficulty} large %s uses two ranged attacks per lateral reposition and never chains a body dash`, (_name, stage, variant) => {
         const h = harness(stage, variant, difficulty); h.run(30);
         const actions = h.events.filter(event => ['elite-move', 'elite-windup', 'elite-cores'].includes(event.text ?? '')).map(event => event.text);
@@ -130,4 +135,44 @@ describe('ten two-action mandatory elites', () => {
         expect(h.e.elite!.extraDash).toBe(0);
       });
   }
+});
+
+describe('elite mechanics have different solutions', () => {
+  it('keeps ranged elite commitments occupied until the core exposure window', () => {
+    for (const [stage, variant] of [[2, 1], [5, 0]] as const) {
+      const h = harness(stage, variant);
+      while (h.e.elite!.cycle === 0) h.tick();
+      h.tick(); expect(h.e.state).toBe('volley');
+      while (Number.isFinite(h.e.elite!.exposeAt)) h.tick();
+      expect(h.e.state).toBe('recover'); expect(h.e.exposedUntil).toBeGreaterThan(h.ctx.elapsed);
+    }
+  });
+  it('beam patrol alternates a single line and two parallel tracks without body charges', () => {
+    const h = harness(2, 1); h.run(12);
+    expect(h.hazards.length).toBeGreaterThanOrEqual(3);
+    const [single, left, right] = h.hazards;
+    expect(single.kind).toBe('beam');
+    expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeCloseTo(180);
+    expect(left.width).toBe(40); expect(right.angle).toBeCloseTo(left.angle!); expect(h.e.action).toBeUndefined();
+  });
+  it('recorder connects actual old samples without targeting the player again', () => {
+    const h = harness(3, 1);
+    for (let i = 0; i < 600; i++) { h.ctx.player.y = 2000 + Math.sin(i / 120) * 240; h.tick(); }
+    const lines = h.hazards.filter(hazard => hazard.kind === 'beam');
+    expect(lines.length).toBeGreaterThan(0); expect(lines.every(line => line.warning >= .85)).toBe(true);
+    const samples = h.hazards.filter(hazard => hazard.kind === 'bombard');
+    expect(lines.every(line => samples.some(point => point.x === line.x && point.y === line.y))).toBe(true);
+  });
+  it('messenger bends once while thrower stops and reverses, rather than sharing the same fan', () => {
+    const messenger = harness(3, 0), thrower = harness(4, 1); messenger.run(15); thrower.run(15);
+    const a = messenger.shots.flatMap(shot => shot.options?.program ?? []), b = thrower.shots.flatMap(shot => shot.options?.program ?? []);
+    expect(a.some(phase => !!phase.turnRate)).toBe(true); expect(a.some(phase => phase.reverse)).toBe(false);
+    expect(b.some(phase => phase.speed === 0)).toBe(true); expect(b.some(phase => phase.reverse)).toBe(true);
+  });
+  it('ring elite leaves a changing physical opening and never inserts a dash into an inward ring', () => {
+    const h = harness(5, 1); h.run(20);
+    const batches = new Map<number, number>(); for (const shot of h.shots) batches.set(shot.time, (batches.get(shot.time) ?? 0) + 1);
+    expect(batches.size).toBeGreaterThan(3); expect([...batches.values()].every(count => count >= 10 && count < 16)).toBe(true);
+    expect(h.events.some(event => event.text === 'elite-move')).toBe(false);
+  });
 });

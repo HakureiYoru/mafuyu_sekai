@@ -73,7 +73,7 @@ describe('v5 combat modules use non-recursive sources', () => {
     expect(sim.state.bullets).toHaveLength(0);
     for (let i = 0; i < 12; i++) hit(sim, enemy, 'drone');
     const burst = sim.state.bullets.find(b => b.kind === 'module');
-    expect(burst).toMatchObject({ damage: 12, remainingHits: 1 }); expect(burst?.hitIds.has(enemy.id)).toBe(true);
+    expect(burst).toMatchObject({ damage: 39.6, remainingHits: 1 }); expect(burst?.hitIds.has(enemy.id)).toBe(true);
     expect(enemy.slowUntil).toBeCloseTo(sim.state.elapsed + 0.8);
     for (let i = 0; i < 12; i++) hit(sim, enemy, 'drone');
     expect(sim.state.bullets.filter(b => b.kind === 'module')).toHaveLength(1);

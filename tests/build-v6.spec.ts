@@ -21,6 +21,7 @@ test('unlimited build has a compact HUD and a complete readable pause inventory'
   await expect(page.locator('.module-summary')).toContainText('360000');
   await expect(page.locator('.module-summary')).not.toContainText('/ 6');
   await expect(page.locator('.paused-modules article')).toHaveCount(36);
+  await expect(page.locator('.arsenal-synergies>div>p')).toHaveCount(5);
   await expect(page.locator('.paused-modules article').first()).toContainText('Lv.10000');
   expect(await page.locator('.module-live>span').count()).toBeLessThanOrEqual(3);
   await page.screenshot({ path: 'test-results/v6-build-inventory.png', style: '.debug-panel{visibility:hidden!important;}' });

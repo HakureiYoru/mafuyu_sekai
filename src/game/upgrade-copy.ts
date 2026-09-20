@@ -13,7 +13,7 @@ function newModuleCopy(id: NewModuleId, rank: number, evolutions: readonly Evolu
     case 'anchorStars': return `主炮命中留下延爆星印，爆破伤害${damage}${s.count ? `，散出${s.count}枚短芒` : ''}。`;
     case 'crescentMagazine': return `射击时追加${s.count}枚弯月刃，每枚伤害${each}，沿弧线穿过敌人。`;
     case 'beamCircuit': return `贯穿炮后追加${s.count}束余光，每束伤害${each}；不清弹。`;
-    case 'droneSpotlight': return `最多${s.count}台现有子机依次发射短束，每束伤害${damage}。`;
+    case 'droneSpotlight': return `最多${s.count}台子机发重束，各伤害${damage}；武器等级最高×2.8。`;
     case 'droneNotes': return `子机每轮留下${s.count}枚感应音符，每枚伤害${each}，最多${s.capacity}枚。`;
     case 'dronePlectrum': return `子机扫出${number(s.arc * 180 / Math.PI)}°刀弧，伤害${damage}，每敌一次。`;
     case 'droneConduit': return `${rank >= 5 ? '三台子机可闭合三角' : '子机间连线伤敌'}，每敌伤害${damage}；一台时连接主机。`;
@@ -36,15 +36,15 @@ function legacyModuleCopy(id: Exclude<ModuleId, NewModuleId>, rank: number, evol
     case 'piercing': return evolutions.includes('needleArray')
       ? `慢移针弹最多命中${EVOLUTION_VALUES.needleArray.targets}敌；${rank > 5 ? `基础主炮伤害×${number(highRankFactor(rank))}` : `非慢移主炮额外穿透${s.extraHits}敌`}。`
       : `普通主炮额外穿透${s.extraHits}个不同目标${rank > 5 ? `，基础伤害×${number(highRankFactor(rank))}` : '，可连续命中前后敌人'}。`;
-    case 'wingShots': return `每轮主炮两枚平行翼弹，各伤害${number(s.damage)}，不额外加热。`;
-    case 'precision': return `保持慢移0.35秒后，普通主炮伤害增加${percent(s.bonus)}。`;
+    case 'wingShots': return `双翼${rank >= 5 ? '六' : rank >= 3 ? '四' : '双'}弹，每侧伤害${number(s.damage)}；武器等级最高×3.25。`;
+    case 'precision': return `慢移0.35秒主炮+${percent(s.bonus)}；配贯通每六轮发75%整轮伤害重针。`;
     case 'shatter': return `主炮击杀迸发六枚短程碎片，各伤害${number(s.damage)}。`;
     case 'chain': return `特殊弹命中后连锁最多${s.targets}个其他目标，各伤害${number(s.damage)}。`;
     case 'prism': return `贯穿炮两束侧束各伤害${number(s.sideDamage)}；慢移集中束首敌伤害${number(s.focusDamage)}。`;
     case 'droneHoming': return `基础子机弹转向追踪${number(s.duration)}秒，之后沿当前方向飞行。`;
     case 'droneBurst': return evolutions.includes('triangleAssault')
-      ? `子机累计${s.hits}次基础命中后交叉集火，总伤害${number(EVOLUTION_VALUES.triangleAssault.damage * highRankFactor(rank))}，按子机数均分。`
-      : `子机累计${s.hits}次基础命中追加穿甲弹，伤害${number(s.damage)}，最多命中两敌。`;
+      ? `累计${s.hits}次基础命中交叉集火，总伤害${number(EVOLUTION_VALUES.triangleAssault.damage * highRankFactor(rank))}；等级最高×2.8。`
+      : `累计${s.hits}次基础命中，追加伤害${number(s.damage)}穿甲弹；等级最高×2.8。`;
     case 'slow': return `子机命中使普通怪减速${percent(s.amount)}、持续0.8秒；首领不受影响。`;
     case 'division': return `子机索敌范围${number(s.range)}，自动优先分配不同目标。`;
     case 'intercept': return `每${number(s.cooldown)}秒储备一次拦截，消除附近一枚敌弹；最多储备一次。`;

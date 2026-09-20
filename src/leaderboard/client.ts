@@ -1,6 +1,6 @@
 import { ONLINE_RULES, validResult, type Board, type BoardResponse, type RunResult, type RunTicket } from './protocol';
 
-const KEY = 'mafuyu:online:pending:v6.2';
+const KEY = 'mafuyu:online:pending:v6.3';
 export interface PendingScore { result: RunResult; ticket: RunTicket; submitted: boolean }
 export interface OnlineState { pending: readonly PendingScore[]; notice: string; busy: boolean }
 export class LeaderboardClient {

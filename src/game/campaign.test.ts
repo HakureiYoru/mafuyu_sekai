@@ -36,10 +36,10 @@ describe('continuous five-encounter campaign', () => {
     expect(director.state.completedStages).toEqual([1, 2, 3, 4, 5]);
     expect(director.state.defeatedEncounters).toEqual(ENCOUNTERS);
   });
-  it('introduces all eleven mixed mob families in authored order and budgets exactly 360 seconds', () => {
+  it('introduces all fourteen mixed mob families in authored order and budgets exactly 360 seconds', () => {
     expect(CAMPAIGN_STAGES.reduce((sum, stage) => sum + stage.duration, 0)).toBe(CAMPAIGN_DURATION);
-    expect(ENEMY_INTRODUCTIONS.map(item => item.time)).toEqual([0, 20, 35, 60, 75, 110, 150, 180, 210, 240, 270]);
-    expect(new Set(ENEMY_INTRODUCTIONS.map(item => item.type)).size).toBe(11);
+    expect(ENEMY_INTRODUCTIONS.map(item => item.time)).toEqual([0, 20, 35, 60, 75, 100, 110, 125, 150, 165, 180, 210, 240, 270]);
+    expect(new Set(ENEMY_INTRODUCTIONS.map(item => item.type)).size).toBe(14);
   });
   it('preserves all gate transitions at 30/60/120/144 Hz with two seconds of real boss combat per gate', () => {
     const results = [30, 60, 120, 144].map(hz => {

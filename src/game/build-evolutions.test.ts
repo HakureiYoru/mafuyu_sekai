@@ -38,12 +38,12 @@ function resource(sim: GameSimulation, id: UpgradeChoiceId) {
 }
 
 describe('rank II changes actual combat output', () => {
-  it('fires 2.6-damage main shots with two added penetrations, and independent 1.5-damage wings', () => {
+  it('fires 2.6-damage main shots with two added penetrations, and independent level-scaled wings', () => {
     const sim = scene(['precision', 'piercing', 'wingShots']);
     advance(sim, 21, idle({ focus: true })); sim.step(idle({ focus: true, shoot: true }));
     const main = sim.state.bullets.filter(b => b.kind === 'normal'), wings = sim.state.bullets.filter(b => b.kind === 'module');
     expect(main).toHaveLength(3); expect(main.every(b => b.damage === 2.6 && b.remainingHits === 3)).toBe(true);
-    expect(wings.map(b => b.damage)).toEqual([1.5, 1.5]); expect(sim.state.player.heat).toBeCloseTo(25 * STEP);
+    expect(wings.map(b => b.damage)).toEqual([6, 6]); expect(sim.state.player.heat).toBeCloseTo(25 * STEP);
   });
 
   it('deals 18 through side beams, or 58 to the first focused victim without duplicate side damage', () => {
@@ -65,14 +65,14 @@ describe('rank II changes actual combat output', () => {
     const shards = sim.state.bullets.filter(b => b.kind === 'module'); expect(shards).toHaveLength(6); expect(shards.every(b => b.damage === 1.5)).toBe(true);
   });
 
-  it('triggers a 14-damage burst on the tenth drone hit, while secondary hits never count', () => {
+  it('triggers a level-scaled burst on the tenth drone hit, while secondary hits never count', () => {
     const sim = scene(['droneBurst']), enemy = target(sim); const events: CombatEvent[] = [];
     for (let index = 0; index < 9; index++) events.push(...hit(sim, enemy, 'drone'));
     for (let index = 0; index < 12; index++) events.push(...hit(sim, enemy, 'module'));
     expect(events.some(event => event.type === 'module' && event.moduleId === 'droneBurst')).toBe(false);
     events.push(...hit(sim, enemy, 'drone'));
     expect(events.filter(event => event.type === 'module' && event.moduleId === 'droneBurst')).toHaveLength(1);
-    expect(events.some(event => event.damageSource === 'module' && event.amount === 14)).toBe(true);
+    expect(events.some(event => event.damageSource === 'module' && Math.abs((event.amount ?? 0) - 43.2) < 1e-6)).toBe(true);
   });
 
   it('rank II vent, condenser, revival and dash charge obey their actual numbers and preserve locks', () => {
@@ -147,7 +147,7 @@ describe('new module geometry and non-recursive effects', () => {
     events.push(...advance(sim, 48));
     expect(events.filter(event => event.targetId === enemy.id && event.damageSource === 'drone')).toHaveLength(1);
     expect(events.filter(event => event.targetId === enemy.id && event.damageSource === 'module')).toHaveLength(1);
-    expect(enemy.hp).toBe(994);
+    expect(enemy.hp).toBeCloseTo(985.96);
   });
 
   it('brake and ion slow choose the strongest amount, leaving bosses and committed dashes unaffected', () => {
@@ -187,7 +187,7 @@ describe('evolved combat preserves its slot effects and bounded additional damag
   it('spiral bloom adds six 2-damage radial shots while retaining two wings and two rear sparks', () => {
     const sim = scene(['wingShots', 'rearSpark'], 2, 0, 'spiralBloom'); sim.step(idle({ shoot: true }));
     const extras = sim.state.bullets.filter(b => b.kind === 'module');
-    expect(extras.filter(b => b.damage === 2)).toHaveLength(6); expect(extras.filter(b => b.damage === 1.5)).toHaveLength(4);
+    expect(extras.filter(b => b.damage === 2)).toHaveLength(6); expect(extras.filter(b => b.visualId === 'wing').map(b => b.damage)).toEqual([6, 6]); expect(extras.filter(b => b.damage === 1.5)).toHaveLength(2);
     expect(new Set(extras.filter(b => b.damage === 2).map(b => Math.atan2(b.vy, b.vx).toFixed(3))).size).toBe(6);
   });
 
@@ -203,12 +203,12 @@ describe('evolved combat preserves its slot effects and bounded additional damag
     }
   });
 
-  it('triangle assault divides total burst damage 18 across three drone origins', () => {
+  it('triangle assault divides level-scaled burst damage across three drone origins', () => {
     const sim = scene(['droneBurst', 'crossOrbit'], 2, 3, 'triangleAssault'), enemy = target(sim, 2500);
     let events: CombatEvent[] = []; for (let i = 0; i < 10; i++) events = hit(sim, enemy, 'drone');
     expect(events.filter(event => event.type === 'module' && event.moduleId === 'droneBurst')).toHaveLength(1);
     const bursts = sim.state.bullets.filter(b => b.kind === 'module'); expect(bursts).toHaveLength(3);
-    expect(bursts.reduce((damage, b) => damage + b.damage, 0)).toBe(18); expect(bursts.every(b => b.remainingHits === 2)).toBe(true);
+    expect(bursts.reduce((damage, b) => damage + b.damage, 0)).toBeCloseTo(64.8); expect(bursts.every(b => b.remainingHits === 2)).toBe(true);
     expect(new Set(bursts.map(b => `${b.prevX}:${b.prevY}`)).size).toBe(3);
   });
 

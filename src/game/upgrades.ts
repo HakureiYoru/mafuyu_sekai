@@ -45,13 +45,13 @@ const MODULE_FLAVORS: Record<ModuleId, string> = {
 const definition = (id: ModuleId, name: string, branch: ModuleBranch, description: string, rank2Description: string): ModuleDefinition => ({ id, name, branch, description, rank2Description, flavor: MODULE_FLAVORS[id] });
 export const MODULES: Record<ModuleId, ModuleDefinition> = {
   piercing: definition('piercing', '贯通线圈', 'main', '普通主炮额外穿透 1 个不同目标。', '普通主炮额外穿透 2 个不同目标。'),
-  wingShots: definition('wingShots', '双联翼炮', 'main', '每轮追加两枚平行副弹，各造成 1 点伤害，不额外加热。', '两枚平行副弹各造成 1.5 点伤害。'),
+  wingShots: definition('wingShots', '双联翼炮', 'main', '每轮双翼齐射，每侧基础伤害 2；武器每升一级 +25%，Lv10 为 3.25 倍。', '每侧基础伤害 3。III／V 层分成两／三枚，保持该层每侧总伤害。'),
   precision: definition('precision', '精密校准', 'main', '保持慢移 0.35 秒后，普通主炮伤害增加 20%。', '保持慢移 0.35 秒后，普通主炮伤害增加 30%。'),
   shatter: definition('shatter', '碎晶弹头', 'main', '主炮击杀迸发 6 枚伤害为 1 的短程碎片；冷却 0.45 秒。', '主炮击杀产生的六枚碎片各造成 1.5 点伤害。'),
   chain: definition('chain', '导电追踪', 'main', '特殊弹索敌扩大至 600；命中后向 220 内最多两个其他目标连锁，各造成 5 点伤害。', '特殊弹命中后最多连锁三个其他目标，各造成 5 点伤害。'),
   prism: definition('prism', '分光棱镜', 'main', '贯穿炮追加两束 12 点侧束；慢移时改为集中束，首目标受到 52 点伤害。侧束不重复伤害主束目标，不额外清弹。', '两束侧束各造成 18 点伤害；慢移集中束首目标受到 58 点伤害。'),
   droneHoming: definition('droneHoming', '追迹矩阵', 'drone', '基础子机弹获得 1.2 秒有限追踪，最大转速 2 弧度／秒。', '基础子机弹的有限追踪持续 1.6 秒。'),
-  droneBurst: definition('droneBurst', '共振集火', 'drone', '子机累计 12 次基础命中追加 12 伤害穿甲弹，最多命中两个目标；冷却至少 3 秒。', '子机累计 10 次基础命中追加 14 伤害穿甲弹。'),
+  droneBurst: definition('droneBurst', '共振集火', 'drone', '子机累计 12 次基础命中追加 18 伤害穿甲弹，最多命中两个目标；冷却至少 3 秒。', '子机累计 10 次基础命中追加 24 伤害穿甲弹。'),
   slow: definition('slow', '离子束缚', 'drone', '子机基础命中使普通怪减速 25%，持续 0.8 秒；不影响首领或已承诺的突进。', '减速提高至 35%，持续 0.8 秒。'),
   division: definition('division', '分工索敌', 'drone', '子机索敌扩大至 720，自动优先分配不同目标。', '子机索敌扩大至 840，自动优先分配不同目标。'),
   intercept: definition('intercept', '防卫拦截', 'drone', '每 8 秒储备一次拦截，消除周围 90 内的一枚敌弹；不拦截激光或范围攻击。', '拦截储备冷却缩短至 6 秒，仍最多储备一次。'),
@@ -72,7 +72,7 @@ export const MODULES: Record<ModuleId, ModuleDefinition> = {
   anchorStars: definition('anchorStars', '锚星弹', 'main', '主炮命中留下星印，0.65 秒后半径 75 爆破、伤害 6；冷却 1.5 秒。', '星印伤害 7，半径 80。'),
   crescentMagazine: definition('crescentMagazine', '弯月弹匣', 'main', '射击每 1.4 秒追加一枚伤害 4 的弯月刃，沿弧线切过最多三个目标。', '弯月刃伤害提高至 5.5。'),
   beamCircuit: definition('beamCircuit', '贯穿回路', 'main', '贯穿炮后 0.3 秒沿原方向追加伤害 8、长 900 的余光；不清弹。', '余光合计伤害提高至 9。'),
-  droneSpotlight: definition('droneSpotlight', '焦点灯', 'drone', '每 3.6 秒一台子机蓄光 0.35 秒，发出伤害 6 的短束；不停止基础射击。', '短束伤害 7，射程 650。'),
+  droneSpotlight: definition('droneSpotlight', '焦点灯', 'drone', '每 3.6 秒一台子机蓄光 0.35 秒，发出伤害 10 的短束；不停止基础射击。', '短束伤害 12，射程 710。'),
   droneNotes: definition('droneNotes', '浮游音符', 'drone', '每 4 秒留下一个冷色音符，成形后敌人靠近即爆破、伤害 6；最多两个。', '每轮音符合计伤害 8。'),
   dronePlectrum: definition('dronePlectrum', '扫弦拨片', 'drone', '每 2.8 秒一台子机扫出 90° 刀弧，半径 85、伤害 4；每敌一次。', '扫弦伤害 4.5，半径 92.5。'),
   droneConduit: definition('droneConduit', '束流棱台', 'drone', '每 4 秒在子机间连线 0.35 秒、伤害 4；一台时连接主机，每敌一次。', '束流伤害 5，持续 0.475 秒。'),
@@ -86,7 +86,7 @@ Object.assign(MODULES.pulseChamber, { rank3Description: '双弧声波：伤害 8
 Object.assign(MODULES.anchorStars, { rank3Description: '星印伤害 8、半径 85，散出三枚伤害 2 的短芒。', rank5Description: '星印伤害 10、半径 95，散出六枚伤害 2.5 的短芒；不重复命中圆爆目标。' });
 Object.assign(MODULES.crescentMagazine, { rank3Description: '两枚镜像刀弧，各伤害 3.5。', rank5Description: '三枚刀弧各伤害 3、宽 40，各最多四个目标。' });
 Object.assign(MODULES.beamCircuit, { rank3Description: '两束平行余光，延迟 0.25 / 0.45 秒，各伤害 5。', rank5Description: '三束平行余光，延迟 0.2 / 0.35 / 0.5 秒，各伤害 4.5，不清弹。' });
-Object.assign(MODULES.droneSpotlight, { rank3Description: '最多两台现有子机依次点亮，各伤害 8。', rank5Description: '最多三台子机依次点亮，各伤害 10、射程 740。' });
+Object.assign(MODULES.droneSpotlight, { rank3Description: '最多两台现有子机依次点亮，各伤害 14。', rank5Description: '最多三台子机依次点亮，各伤害 18、射程 800。' });
 Object.assign(MODULES.droneNotes, { rank3Description: '每轮成对音符，各伤害 5；最多四枚。', rank5Description: '每轮三角音符，各伤害 4.5；最多六枚。' });
 Object.assign(MODULES.dronePlectrum, { rank3Description: '180° 刀弧，半径 100、伤害 5。', rank5Description: '360° 闭合刀弧，半径 120、伤害 6，整圈每敌一次。' });
 Object.assign(MODULES.droneConduit, { rank3Description: '束流持续 0.6 秒、伤害 6。', rank5Description: '三台子机形成闭合三角，持续 0.75 秒、伤害 8，所有边共享判定。' });
@@ -97,10 +97,10 @@ Object.assign(MODULES.counterPulse, { rank3Description: '0.25 秒后追加半径
 
 /** Combat numbers are shared with the fixed-step simulation; tuples index rank I / II. */
 export const MODULE_VALUES = {
-  piercing: { extraHits: [1, 2] }, wingShots: { damage: [1, 1.5] }, precision: { bonus: [0.2, 0.3], hold: 0.35 },
+  piercing: { extraHits: [1, 2] }, wingShots: { damage: [2, 3] }, precision: { bonus: [0.2, 0.3], hold: 0.35 },
   shatter: { damage: [1, 1.5], count: 6, cooldown: 0.45 }, chain: { targets: [2, 3], damage: 5, range: 220, lockRange: 600 },
   prism: { sideDamage: [12, 18], focusDamage: [52, 58] }, droneHoming: { duration: [1.2, 1.6], turnSpeed: 2 },
-  droneBurst: { hits: [12, 10], damage: [12, 14], cooldown: 3, targets: 2 }, slow: { amount: [0.25, 0.35], duration: 0.8 },
+  droneBurst: { hits: [12, 10], damage: [18, 24], cooldown: 3, targets: 2 }, slow: { amount: [0.25, 0.35], duration: 0.8 },
   division: { range: [720, 840] }, intercept: { cooldown: [8, 6], radius: 90 }, orbitBlade: { damage: [4, 5], radius: 24, cooldown: 0.4, transit: 0.25, markDuration: 1.4, markCooldown: 0.8 },
   doubleDash: { cooldown: [2.6, 2.3], charges: 2 }, vent: { heat: [25, 35], cooldown: 4 }, reserveAmmo: { heat: [30, 40], threshold: 80, cooldown: 10 },
   graze: { heat: [2, 3], recharge: [0.05, 0.08], refundCap: [0.3, 0.45], rate: 3 }, revive: { hp: [1, 2], invincible: [0.8, 1.2] }, magnet: { cooldown: [10, 8], range: [600, 750], duration: 0.8 },
@@ -118,7 +118,7 @@ export const NEW_MODULE_VALUES: Record<NewModuleId, Record<string, number | read
   anchorStars: { cooldown: 1.5, damage: [6, 8, 10], radius: [75, 85, 95], warning: 0.65, count: [0, 3, 6], fragmentDamage: [0, 2, 2.5], range: [180, 180, 240], capacity: 2 },
   crescentMagazine: { cooldown: 1.4, damage: [4, 7, 9], count: [1, 2, 3], width: [32, 32, 40], targets: [3, 3, 4], speed: 650, duration: 0.65 },
   beamCircuit: { cooldown: 2, damage: [8, 10, 13.5], count: [1, 2, 3], length: 900, width: [24, 24, 28] },
-  droneSpotlight: { cooldown: 3.6, damage: [6, 8, 10], count: [1, 2, 3], length: [620, 680, 740], width: [16, 18, 20], warning: 0.35, duration: 0.18 },
+  droneSpotlight: { cooldown: 3.6, damage: [10, 14, 18], count: [1, 2, 3], length: [680, 740, 800], width: [24, 30, 36], warning: 0.35, duration: 0.28 },
   droneNotes: { cooldown: 4, damage: [6, 10, 13.5], count: [1, 2, 3], radius: [65, 70, 75], capacity: [2, 4, 6], warning: 0.5, duration: 3 },
   dronePlectrum: { cooldown: 2.8, damage: [4, 5, 6], radius: [85, 100, 120], width: [16, 18, 20], arc: [Math.PI / 2, Math.PI, Math.PI * 2], duration: [0.25, 0.35, 0.45] },
   droneConduit: { cooldown: 4, damage: [4, 6, 8], width: [12, 14, 16], duration: [0.35, 0.6, 0.75] },
@@ -200,7 +200,7 @@ export const EVOLUTIONS: Record<EvolutionId, EvolutionDefinition> = {
   needleArray: { id: 'needleArray', name: '针轨贯阵', primary: 'piercing', partner: 'precision', description: '慢移时将当轮基础主炮合为一枚高速针弹，保留合计伤害，最多命中五个不同目标；副弹独立。', flavor: '笑梦：咻————！真冬：别把光捅进来！' },
   spiralBloom: { id: 'spiralBloom', name: '回旋花火', primary: 'wingShots', partner: 'rearSpark', description: '保留翼炮与尾弹，射击期间每 1.2 秒追加六枚环形短弹，各 2 伤害，射程 420。', flavor: '笑梦：哇！砰砰砰！真冬：吵死了吵死了！！' },
   forkNetwork: { id: 'forkNetwork', name: '分叉电网', primary: 'chain', partner: 'slow', description: '保留特殊主弹与连锁，另向最多两个不同目标发射各 6 伤害的追踪弹；副弹不再连锁。', flavor: '笑梦：Wonderhoy！Wonderhoy！真冬：别再传了！！' },
-  triangleAssault: { id: 'triangleAssault', name: '三角围攻', primary: 'droneBurst', partner: 'crossOrbit', description: '集火追加弹由现有子机交叉发射，总伤害 18 按数量均分；每弹最多命中两个目标，保留 3 秒冷却。', flavor: '小笑梦：哇！哇！哇！真冬：到底有几个你？！' },
+  triangleAssault: { id: 'triangleAssault', name: '三角围攻', primary: 'droneBurst', partner: 'crossOrbit', description: '集火追加弹由现有子机交叉发射，总基础伤害 36 按数量均分，随武器等级最高乘 2.8；每弹最多命中两个目标，保留 3 秒冷却。', flavor: '小笑梦：哇！哇！哇！真冬：到底有几个你？！' },
   huntingReturn: { id: 'huntingReturn', name: '巡猎回旋', primary: 'orbitBlade', partner: 'returnWing', description: '护刃返回轨道的途中也可伤害经过的敌人，每趟每敌一次 4 伤害；不阻挡敌弹。', flavor: '笑梦：转回来啦！真冬：不是让你回来！！' },
   echoTrail: { id: 'echoTrail', name: '残响疾行', primary: 'doubleDash', partner: 'dashEcho', description: '保留双蓄 II，残影爆破替换为持续 0.75 秒、宽 64 的冲刺尾迹；余迹 I／II 时每敌一次 8／12 伤害，冷却 4 秒，不清弹。', flavor: '笑梦：咻咻——！真冬：……地上也是你的声音。' },
   sonicBreak: { id: 'sonicBreak', name: '聚音破阵', primary: 'pulseChamber', partner: 'precision', description: '慢移声波末端左右分裂声刃，各为声波伤害的 50%，射程 220；不重复伤害声波目标。', flavor: '笑梦：左右都听见啦！真冬：……不想听。' },
@@ -218,7 +218,7 @@ export const EVOLUTIONS: Record<EvolutionId, EvolutionDefinition> = {
 };
 export const EVOLUTION_VALUES = {
   needleArray: { targets: 5 }, spiralBloom: { cooldown: 1.2, count: 6, damage: 2, range: 420 },
-  forkNetwork: { targets: 2, damage: 6 }, triangleAssault: { damage: 18, targets: 2, cooldown: 3 },
+  forkNetwork: { targets: 2, damage: 6 }, triangleAssault: { damage: 36, targets: 2, cooldown: 3 },
   huntingReturn: { damage: 4 }, echoTrail: { duration: 0.75, width: 64, damage: [8, 12], cooldown: 4 },
 } as const;
 export const RESONANCE = { xpPerRank: 600, maxRank: 4, damagePerRank: 0.05, maxDamageBonus: 0.2 } as const;
@@ -370,7 +370,7 @@ const MODULE_MECHANICS: Record<ModuleId, string> = {
   droneSpotlight: '现有子机蓄光后锁向发射，III / V 层最多两 / 三台依次参与', droneNotes: '子机留下靠近触发的音符，III / V 层成对 / 三角排布', dronePlectrum: '子机扫出刀弧，III / V 层展开半圈 / 整圈', droneConduit: '子机间连线伤敌，V 层三机闭合三角，整轮共享命中去重',
   decoyEcho: '冲刺留下误导普通怪的纸偶，III 层消失减速，V 层双纸偶', slipstream: '连续直线移动触发踏空，III 层推开普通怪，V 层追加减速', dashLane: '冲刺铺设航道，加速普通移动并减速普通怪，不叠乘', counterPulse: '实际受伤推开普通怪，III 层双环，V 层留下减速网格',
 };
-export function moduleDescription(id: ModuleId, rank: number): string {
+function baseModuleDescription(id: ModuleId, rank: number): string {
   const module = MODULES[id];
   if (rank === 1) return module.description;
   if (rank === 2) return module.rank2Description;
@@ -386,6 +386,14 @@ export function moduleDescription(id: ModuleId, rank: number): string {
     return `${labels[key] ?? key} ${formatted(rankValue(temporary, id, values as unknown as readonly [number, number]))}`;
   }).join(' · ');
   return `${MODULE_MECHANICS[id]}。第 ${rank} 层：${stats}。${id === 'revive' ? `受伤降热 ${rank >= 5 ? 12 : rank === 4 ? 10 : 8}，冷却 ${formatted(highRankCooldown(6, rank))} 秒；复苏仍整局一次，不恢复已消耗次数。` : '形态在 III / V 层展开，V 层后递减强化。'}`;
+}
+export function moduleDescription(id: ModuleId, rank: number): string {
+  const base = baseModuleDescription(id, rank);
+  const growth = id.startsWith('drone') && id !== 'droneHoming' ? ' 伤害随武器等级成长：每级 +20%，Lv10 为 2.8 倍。' : '';
+  const synergy = id === 'precision' || id === 'piercing' ? ' 两者同时装配，校准后每六轮追加一枚75%整轮伤害的五穿重针。'
+    : id === 'wingShots' ? ' 伤害随武器等级每级 +25%，Lv10 为 3.25 倍。III／V 层每侧分为两／三枚、均分伤害；配校准慢移交叉集火，配贯通最多三穿。'
+      : id === 'droneSpotlight' || id === 'droneConduit' ? ' 两者同时装配，首束追光带动其他子机补射半伤光束，每轮最多两束。' : '';
+  return base + growth + synergy;
 }
 export function buildModuleViews(build: BuildView): { id: ModuleId; name: string; description: string; flavor: string; branch: ModuleBranch; rank: ModuleRank; evolution: EvolutionId | null }[] {
   return build.modules.map(id => {

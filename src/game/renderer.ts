@@ -8,6 +8,7 @@ import { enemyAttacks } from './enemy-ai';
 import { bossActionTelegraph } from './boss-actions';
 import { eliteTelegraphs } from './elite-ai';
 import { season2Telegraphs } from './season2-ai';
+import { advancedTelegraphs, advancedGeometry } from './advanced-enemies';
 import type { Season2Telegraph } from './season2-ai';
 import { spellCardDefinition, spellReturnPreview, spellTelegraphs } from './spellcards';
 import type { SpellReturnPath } from './spellcards';
@@ -27,7 +28,7 @@ interface CompanionVisual { root: Container; glow: Sprite; ship: Sprite; barrel:
 interface Atlas { glow: Texture; spark: Texture; ring: Texture; bolt: Texture; hostile: Texture; hostileCore: Texture; player: Texture; mine: Texture; diamond: Texture; cross: Texture; pickupPlate: Texture; caution: Texture; badges: Record<EnemyType, Texture>; danmaku: Record<EnemyBulletShape, Texture> }
 const WHITE = 0xf5f2ff;
 const BADGE_TYPES: EnemyType[] = ['basic', 'dasher', 'sniper', 'sprayer', 'minelayer', 'mine', 'boss', 'miniboss',
-  'shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier', 'palisade', 'reprise', 'arm', 'node', 'core'];
+  'shield', 'weaver', 'returner', 'sampler', 'repairer', 'carrier', 'palisade', 'reprise', 'arm', 'node', 'core', 'stalker', 'prismWarden', 'conductor'];
 const badgeCell = (index: number) => ({ x: index % 8 * 128, y: index < 8 ? 128 : 384 + Math.floor((index - 8) / 8) * 128 });
 const COLORS: Record<PickupType, number> = { xp: 0xa2fce2, hp: 0xff94b6, bomb: 0xffda94, supply: 0x89e3ff, coolant: 0x8ff7e6, miniBomb: 0xffbd82, blackHole: 0xc5a0ff, support: 0x8bebff };
 const PICKUP_NAMES: Record<Exclude<PickupType, 'xp'>, string> = { hp: '好吃！· 生命恢复', supply: '再冲！· 技能补给', coolant: '好凉！· 快速冷却', bomb: 'Wonderhoy！· 炸弹 +1', miniBomb: '砰！！· 范围爆破', blackHole: '全过来！· 引力黑洞', support: '小笑梦 · 支援子机' };
@@ -49,7 +50,13 @@ function drawMachineBadge(ctx: CanvasRenderingContext2D, type: EnemyType): void 
     for (let i = 0; i <= sides; i++) { const angle = offset + i * TAU / sides; if (i === 0) ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius); else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius); }
     ctx.fill(); ctx.stroke();
   };
-  if (type === 'shield') {
+  if (type === 'stalker') {
+    for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-48, side * 28); ctx.lineTo(32, side * 52); ctx.lineTo(57, side * 22); ctx.lineTo(20, side * 33); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  } else if (type === 'prismWarden') {
+    polygon(4, 59); for (const side of [-1, 1]) { box(side * 45 - 9, -19, 18, 38); }
+  } else if (type === 'conductor') {
+    polygon(3, 58); for (let i = 0; i < 3; i++) { const a = i * TAU / 3; box(Math.cos(a) * 45 - 7, Math.sin(a) * 45 - 7, 14, 14); }
+  } else if (type === 'shield') {
     ctx.beginPath(); ctx.moveTo(34, -46); ctx.lineTo(54, -28); ctx.lineTo(59, 0); ctx.lineTo(54, 28); ctx.lineTo(34, 46); ctx.lineTo(30, 26); ctx.lineTo(38, 0); ctx.lineTo(30, -26); ctx.closePath(); ctx.fill(); ctx.stroke();
     box(-54, -20, 12, 40);
   } else if (type === 'weaver') {
@@ -520,7 +527,7 @@ export class GameRenderer {
       const color = ENEMIES[enemy.type].color;
       const isMine = enemy.type === 'mine';
       const part = enemy.type === 'arm' || enemy.type === 'node' || enemy.type === 'core';
-      const machine = !!enemy.season2 && !part;
+      const machine = (!!enemy.season2 || !!enemy.advanced) && !part;
       const disabled = (enemy.disabledUntil ?? 0) > state.elapsed;
       const hit = clamp(enemy.hitTime / 0.12, 0, 1);
       const artSize = enemy.radius * (part ? 3 : isMine ? 1.8 : machine ? 1.95 : enemy.type === 'boss' ? 2.3 : 2.35);
@@ -835,13 +842,18 @@ export class GameRenderer {
         if (bullet.moduleId) effect.tint = STYLE_COLORS[MODULE_VISUALS[bullet.moduleId]];
         if (motif && motif in EVOLUTION_VISUALS) effect.tint = STYLE_COLORS[EVOLUTION_VISUALS[motif as keyof typeof EVOLUTION_VISUALS]];
         // Texture transforms stay in the existing batched bullet sprites; no per-shot filters.
-        if (motif === 'needle' || motif === 'needleArray') {
+        if (motif === 'railOverdrive' || motif === 'piercingMain' || motif === 'focusedMain') {
+          const rail = motif === 'railOverdrive';
+          effect.width = rail ? 180 : 66; effect.height = rail ? 19 : 8; effect.tint = rail ? 0xafffff : 0x74dfed;
+          effect.position.set(x - Math.cos(angle) * (rail ? 65 : 22), y - Math.sin(angle) * (rail ? 65 : 22));
+          core.texture = this.atlas.bolt; core.rotation = angle; core.width = rail ? 65 : 30; core.height = rail ? 9 : 5; core.tint = 0xf0ffff;
+        } else if (motif === 'needle' || motif === 'needleArray') {
           effect.width = 96; effect.height = 5; effect.tint = 0xa8f6ff; effect.alpha = .9;
           effect.position.set(x - Math.cos(angle) * 37, y - Math.sin(angle) * 37);
           core.texture = this.atlas.bolt; core.rotation = angle; core.width = 36; core.height = 5; core.tint = 0xf0ffff;
         } else if (motif === 'wing' || motif === 'wingShots') {
-          effect.width = 39; effect.height = 6; effect.tint = 0x8ddcff;
-          core.texture = this.atlas.bolt; core.rotation = angle; core.width = 18; core.height = 6; core.tint = 0xc7f4ff;
+          effect.width = 78; effect.height = 15; effect.tint = 0x78baff;
+          core.texture = this.atlas.diamond; core.rotation = angle; core.width = 34; core.height = 11; core.tint = 0xc7f4ff;
         } else if (motif === 'crystal' || motif === 'shatter') {
           core.texture = this.atlas.diamond; core.width = 13; core.height = 8; core.tint = 0xc4faff;
           core.rotation = angle; effect.width = 20; effect.height = 5; effect.tint = 0xa2d4ff;
@@ -855,9 +867,13 @@ export class GameRenderer {
           core.texture = this.atlas.bolt; core.width = 23; core.height = 9; core.rotation = angle; core.tint = 0xd0c6ff;
           effect.width = 37; effect.height = 8; effect.tint = 0xb2b6ff;
         } else if (motif === 'droneBurst') {
-          core.texture = this.atlas.bolt; core.width = 30; core.height = 8; core.rotation = angle; core.tint = 0xf0f1ff;
-          effect.width = 63; effect.height = 11; effect.tint = 0xacbaff;
+          core.texture = this.atlas.diamond; core.width = 54; core.height = 16; core.rotation = angle; core.tint = 0xf0f1ff;
+          effect.width = 132; effect.height = 24; effect.tint = 0xacbaff;
         } else if (motif === 'rearSpark') { core.width = 11; core.height = 11; effect.width = 26; effect.height = 5; effect.tint = 0xa6fff0; }
+      }
+      if (!hostile && bullet.kind === 'drone' && !bullet.returning) {
+        core.texture = this.atlas.diamond; core.rotation = angle; core.width = 24 + Math.min(10, state.player.level); core.height = 12; core.tint = 0xe0d9ff;
+        effect.width = 64; effect.height = 18; effect.tint = 0xa2a9ff;
       }
       heavy.visible = hostile && (bullet.friendlyDamage ?? 0) > 0 && (bullet.friendlyHits ?? 0) > 0;
       if (heavy.visible) {
@@ -891,6 +907,8 @@ export class GameRenderer {
       visual.glow.alpha = companion.shotCooldown > BALANCE.companion.interval - 0.08 ? 0.48 : 0.22;
       visual.barrel.alpha = companion.targetId === null ? 0.55 : 1;
       const x = visual.root.x, y = visual.root.y, angle = companion.angle;
+      const charge = clamp(1 - companion.shotCooldown / BALANCE.companion.interval, 0, 1);
+      this.combatMarks.arc(x, y, 28, angle - Math.PI, angle - Math.PI + charge * TAU).stroke({ color: 0xaebaff, width: 2.5, alpha: .75 });
       if ((state.build.ranks.orbitBlade ?? 0) > 0) {
         const radius = 24;
         for (const side of [-1, 1]) this.combatMarks.arc(x, y, radius, angle + side * Math.PI / 2 - .65, angle + side * Math.PI / 2 + .65)
@@ -977,7 +995,7 @@ export class GameRenderer {
     if (player.invincible > 0) graph.circle(x, y, 35).stroke({ color: 0xe5fff6, width: 1.5, alpha: 0.85 });
     const cos = Math.cos(player.angle), sin = Math.sin(player.angle), nx = -sin, ny = cos;
     if ((state.build.ranks.wingShots ?? 0) > 0) for (const side of [-1, 1]) {
-      const cannonX = x + nx * side * 22, cannonY = y + ny * side * 22;
+      const cannonX = x + nx * side * 38, cannonY = y + ny * side * 38;
       graph.moveTo(cannonX - cos * 6, cannonY - sin * 6).lineTo(cannonX + cos * 36, cannonY + sin * 36)
         .stroke({ color: 0x112734, width: 6, alpha: .8 });
       graph.moveTo(cannonX + cos * 23, cannonY + sin * 23).lineTo(cannonX + cos * 36, cannonY + sin * 36)
@@ -1174,6 +1192,18 @@ export class GameRenderer {
         }
       } else if (enemy.spell) {
         this.renderSpellWarnings(graph, enemy, state);
+      } else if (enemy.advanced) {
+        for (const cue of advancedTelegraphs(enemy)) {
+          if (cue.unitId && !state.enemies.some(unit => unit.id === cue.unitId && unit.hp > 0)) continue;
+          if (cue.kind === 'fan') this.sector(graph, cue.x, cue.y, cue.angle - .5, 1, cue.length, 0xffa26b, .045);
+          else {
+            const geometry = advancedGeometry(cue);
+            graph.poly(geometry.corners).fill({ color: 0xff9d68, alpha: .065 }).stroke({ color: 0xffc285, width: 2, alpha: .85 });
+            this.directionMark(graph, geometry.endX, geometry.endY, cue.angle, 0xffd2a3, 12);
+          }
+          graph.circle(cue.x, cue.y, 22).stroke({ color: 0xffc285, width: 2, alpha: .8 });
+          if (enemy.type === 'conductor') graph.moveTo(enemy.x, enemy.y).lineTo(cue.x, cue.y).stroke({ color: 0xffa780, width: 2, alpha: .55 });
+        }
       } else if (enemy.season2) {
         for (const cue of season2Telegraphs(enemy, state.difficulty)) this.renderSeason2Warning(graph, enemy, cue);
       } else if (enemy.type === 'miniboss' && enemy.miniboss && !enemy.action) {

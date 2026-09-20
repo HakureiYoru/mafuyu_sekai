@@ -16,7 +16,7 @@ async function start(ctx, board = selection) {
   assert.equal(res.headers()['x-arcade-environment'], 'preview', 'Refusing test scores outside an isolated preview'); return res.json();
 }
 async function submit(ctx, ticket, score, extras = {}, name = '测试·笑梦') {
-  const result = { ...selection, rules: 'v6.2', runId: ticket.runId, score, elapsed: 2, progression: 1, wave: 1, outcome: 'quit', ...extras };
+  const result = { ...selection, rules: 'v6.3', runId: ticket.runId, score, elapsed: 2, progression: 1, wave: 1, outcome: 'quit', ...extras };
   const res = await ctx.post('/api/submit', { data: { token: ticket.token, nickname: name, result } });
   return { status: res.status(), data: await res.json() };
 }
@@ -45,7 +45,7 @@ try {
   const statuses = await Promise.all(Array.from({ length: 14 }, () => b.post('/api/run', { data: selection }).then(r => r.status())));
   assert(statuses.includes(429)); checks.push('identity/IP rate limiting');
   const report = { date: new Date().toISOString(), target: baseURL, checks, publicScoresWritten: false };
-  await mkdir('docs/validation', { recursive: true }); await writeFile('docs/validation/v6.2-leaderboard.json', JSON.stringify(report, null, 2)); console.log(report);
+  await mkdir('docs/validation', { recursive: true }); await writeFile('docs/validation/v6.3-leaderboard.json', JSON.stringify(report, null, 2)); console.log(report);
 } catch (error) {
   const message = String(error).replaceAll(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '\u0000', '[redacted]');
   console.error(message); process.exitCode = 1;

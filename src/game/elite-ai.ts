@@ -1,6 +1,6 @@
 import { WORLD } from './config';
 import { beginBossAction, bossActionTarget, updateBossAction, type AttackBudgetContext } from './boss-actions';
-import { clamp, normalize, TAU } from './math';
+import { angleDelta, clamp, normalize, TAU } from './math';
 import { createSeason2Brain, returningProgram } from './season2-ai';
 import type { AreaHazard, ArenaRect, CombatEvent, Difficulty, Enemy, EnemyShotOptions, EnemyType, Player, Vec2 } from './types';
 
@@ -13,6 +13,12 @@ export const ELITE_GROUPS: readonly (readonly [EliteDefinition, EliteDefinition]
   [{ id: 'hunter', name: '回声猎手', type: 'dasher', hp: 900, radius: 50, stage: 4 }, { id: 'thrower', name: '停拍投手', type: 'returner', hp: 800, radius: 50, stage: 4 }],
   [{ id: 'executor', name: '裂核执刑者', type: 'carrier', hp: 1100, radius: 54, stage: 5 }, { id: 'ring', name: '环阵监察', type: 'weaver', hp: 1000, radius: 54, stage: 5 }],
 ];
+export const ELITE_LESSONS: Record<ElitePattern, string> = {
+  leaper: '引走直冲，绕侧反击', chaser: '横移射手，绕开错拍针束', gate: '先拆发射臂，再穿移动门阵', beam: '单线与双轨交替，观察射线再换路',
+  messenger: '弯折弹不回头，绕过折射拐点', sampler: '离开旧脚印，别走回记录连线', hunter: '记住去程，回冲不会重新瞄准',
+  thrower: '停驻刀刃仍危险，等待原路折返', executor: '提前拆掉碎核，取消侧翼散射', ring: '观察开口，交替处理外放与内收',
+};
+export const STATIONARY_ELITES: readonly ElitePattern[] = ['beam', 'sampler', 'thrower', 'executor', 'ring'];
 export interface EliteTelegraph {
   kind: 'fan' | 'beam' | 'wall' | 'ring' | 'sample'; x: number; y: number; angle: number; spread: number;
   length: number; width: number; radius: number; warning: number; remaining: number; points?: Vec2[];
@@ -104,7 +110,7 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
   }
   if (updateBossAction(e, dt, ctx)) return;
   if (brain.pending.length || brain.samplesLeft > 0) { e.state = 'volley'; e.vx = e.vy = 0; return; }
-  if (ctx.elapsed < brain.nextAttack - 1e-8) { e.state = 'recover'; e.vx = e.vy = 0; return; }
+  if (ctx.elapsed < brain.nextAttack - 1e-8) { e.state = Number.isFinite(brain.exposeAt) ? 'volley' : 'recover'; e.vx = e.vy = 0; return; }
   const distance = Math.hypot(ctx.player.x - e.x, ctx.player.y - e.y);
   if (distance > 700 || distance < 160) {
     const direction = normalize(ctx.player.x - e.x, ctx.player.y - e.y), sign = distance < 160 ? -1 : 1;
@@ -117,7 +123,7 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
   const angle = Math.atan2(ctx.player.y - e.y, ctx.player.x - e.x), releases: EliteRelease[] = [];
   e.angle = angle; e.vx = e.vy = 0;
   const large = ['gate', 'executor', 'ring'].includes(definition.id);
-  const move = large ? brain.cycle % 3 === 2 : ['leaper', 'chaser', 'hunter'].includes(definition.id) ? !second
+  const move = STATIONARY_ELITES.includes(definition.id) ? false : large ? brain.cycle % 3 === 2 : ['leaper', 'chaser', 'hunter'].includes(definition.id) ? !second
     : ['sampler', 'beam', 'thrower'].includes(definition.id) && second;
   if (move) {
     const side = large ? (brain.cycle % 2 ? -1 : 1) * Math.PI / 2
@@ -136,16 +142,22 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
     return;
   }
   if (definition.id === 'beam') {
-    if (!reserve(e, ctx, 0, 1, hard ? 0.71 : 0.96)) return;
+    const tracks = second ? [-90, 90] : [0];
+    if (!reserve(e, ctx, 0, tracks.length, hard ? 0.71 : 0.96)) return;
     const delay = hard ? 0.7 : 0.95;
-    ctx.spawnHazard({ kind: 'beam', x: e.x, y: e.y, angle, width: 40, length: 1400, radius: 20,
+    for (const offset of tracks) ctx.spawnHazard({ kind: 'beam', x: e.x - Math.sin(angle) * offset, y: e.y + Math.cos(angle) * offset, angle, width: 40, length: 1100, radius: 20,
       warning: delay, warningDuration: delay, duration: 0.3, life: 0.3, sourceId: e.id, active: false, angularSpeed: 0 });
     brain.nextAttack = ctx.elapsed + delay + 0.9; brain.exposeAt = ctx.elapsed + delay + 0.3; brain.cycle++; cue(e, ctx, 'elite-beam'); return;
   }
   if (definition.id === 'sampler') {
-    if (!reserve(e, ctx, 0, 2, 0.5)) return;
-    brain.samples = []; brain.samplesLeft = 2; brain.nextSample = ctx.elapsed;
-    brain.nextAttack = ctx.elapsed + 2; brain.exposeAt = ctx.elapsed + 1.4; brain.cycle++; cue(e, ctx, 'elite-sample'); return;
+    if (!reserve(e, ctx, 0, 3, 1.2)) return;
+    if (!second || brain.samples.length < 2) { brain.samples = []; brain.samplesLeft = 3; brain.nextSample = ctx.elapsed; }
+    else for (let i = 1; i < brain.samples.length; i++) {
+      const a = brain.samples[i - 1], b = brain.samples[i], length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (length < 20) continue;
+      ctx.spawnHazard({ kind: 'beam', ...a, angle: Math.atan2(b.y - a.y, b.x - a.x), width: 32, length, radius: 16, warning: hard ? .85 : 1.1, warningDuration: hard ? .85 : 1.1, duration: .3, life: .3, sourceId: e.id, active: false });
+    }
+    brain.nextAttack = ctx.elapsed + 2.7; brain.exposeAt = ctx.elapsed + 1.9; brain.cycle++; cue(e, ctx, 'elite-sample'); return;
   }
   if (definition.id === 'executor') {
     if (!reserve(e, ctx, 12, 0, 1.2)) return;
@@ -175,14 +187,16 @@ export function updateEliteAi(e: Enemy, dt: number, ctx: EliteAiContext): void {
     } else for (let batch = 0; batch < (definition.id === 'thrower' ? 2 : 1); batch++) {
       const heading = angle + batch * 0.2;
       releases.push(emission(e, ctx, fanShots(e.x, e.y, heading, definition.id === 'thrower' ? 10 : 9, 1.6, 250,
-        { shape: 'kunai', program: returningProgram(250, 1.2, hard ? 0.55 : 0.65) }), 'fan', heading, 1.6, warning + batch * 0.4));
+        { shape: 'kunai', program: definition.id === 'thrower' ? returningProgram(250, 1.2, hard ? 0.55 : 0.65)
+          : [{ duration: .8, speed: 250 }, { duration: .65, speed: 250, turnRate: brain.cycle % 4 ? -.9 : .9 }, { duration: 2, speed: 310 }] }), 'fan', heading, 1.6, warning + batch * 0.4));
     }
   } else if (definition.id === 'ring') {
     const inward = Math.floor(brain.cycle / 2) % 2 === 1, radius = inward ? 320 : e.radius + 12;
     const shots = Array.from({ length: 16 }, (_, i) => {
       const bearing = i * TAU / 16 + brain.cycle * 0.13;
       return { x: e.x + Math.cos(bearing) * radius, y: e.y + Math.sin(bearing) * radius, angle: bearing + (inward ? Math.PI : 0), speed: 230, options: { shape: 'orb' as const } };
-    }).filter(shot => shot.x > 8 && shot.y > 8 && shot.x < WORLD.width - 8 && shot.y < WORLD.height - 8);
+    }).filter(shot => shot.x > 8 && shot.y > 8 && shot.x < WORLD.width - 8 && shot.y < WORLD.height - 8
+      && Math.abs(angleDelta(angle + (brain.cycle % 2 ? .4 : -.4), Math.atan2(shot.y - e.y, shot.x - e.x))) > (inward ? .35 : .85));
     releases.push(emission(e, ctx, shots, 'ring', angle, TAU, inward ? (hard ? 0.8 : 1) : warning, { radius, points: shots.map(shot => ({ x: shot.x, y: shot.y })) }));
   } else {
     for (let batch = 0; batch < (definition.id === 'chaser' ? 2 : 1); batch++) {

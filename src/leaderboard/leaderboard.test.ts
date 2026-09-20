@@ -4,7 +4,7 @@ import { boardKey, cleanNickname, validResult, type Board, type RunResult } from
 import { sign, verify } from '../../server/leaderboard';
 
 const board: Board = { difficulty: 'normal', mode: 'story', controls: 'keyboardMouse' };
-const result: RunResult = { ...board, rules: 'v6.2', runId: 'valid-run-123', score: 2500, elapsed: 100, progression: 80, wave: 1, outcome: 'failed' };
+const result: RunResult = { ...board, rules: 'v6.3', runId: 'valid-run-123', score: 2500, elapsed: 100, progression: 80, wave: 1, outcome: 'failed' };
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 const storage = () => { const data = new Map<string, string>(); return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } } as Storage; };
 const flush = async () => { await new Promise(resolve => setTimeout(resolve, 0)); };

@@ -11,7 +11,7 @@ import { GameAudio } from './audio';
 import { Dialogue } from './dialogue';
 import { GameSimulation } from './simulation';
 import { CAMPAIGN_STAGES } from './campaign';
-import { ELITE_GROUPS } from './elite-ai';
+import { ELITE_GROUPS, ELITE_LESSONS } from './elite-ai';
 import { PROFILE_KEY, PROFILE_BACKUP_KEY, SaveRepository } from './profile';
 import { SPELL_CARDS, spellCardDefinition } from './spellcards';
 import { MODULES, EVOLUTIONS } from './upgrades';
@@ -334,6 +334,11 @@ export class GameRuntime implements RuntimeControls {
       else if (event.type === 'support') this.announce(event.text === 'arrival' ? '小笑梦到场 · 靠近拾取子机' : event.text === 'catchup' ? `后台补给 · 武装提升至 Lv${event.amount ?? this.simulation.state.player.level}` : `小笑梦报到 ${event.amount ?? this.simulation.state.companions.length}/3 · 子机自动掩护`, 2.5);
       else if (event.type === 'attack' && event.enemyType === 'boss' && event.text === 'phase') this.announce(`第 ${event.amount} 阶段 · 压抑崩裂`, 1.6);
       else if (event.type === 'attack' && event.text === 'arrival' && ['miniboss', 'palisade', 'reprise'].includes(event.enemyType ?? '')) this.announce(ENEMIES[event.enemyType!].label, 1.6);
+      else if (event.type === 'attack' && event.text?.startsWith('elite-arrival:')) {
+        const name = event.text.slice('elite-arrival:'.length), definition = ELITE_GROUPS.flat().find(item => item.name === name);
+        this.announce(`${name} · ${definition ? ELITE_LESSONS[definition.id] : '观察起手再反击'}`, 3.5);
+      }
+      else if (event.type === 'attack' && event.text?.startsWith('enemy-lesson:')) this.announce(event.text.slice('enemy-lesson:'.length), 3.5);
       else if (event.type === 'kill' && event.enemyType === 'miniboss') this.announce(this.simulation.state.mode === 'story' ? 'ECHO 击破 · 首领补给已领取' : 'ECHO 击破 · 下一波继续', 2);
       if (event.type === 'complete') this.recordCompletion(event);
     }

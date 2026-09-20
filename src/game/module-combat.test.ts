@@ -73,11 +73,21 @@ describe('main-cannon derivatives', () => {
 });
 
 describe('automatic drone forms', () => {
+  it('choir beams add at most two half-damage partners and capture level growth once', () => {
+    const f = fixture(['droneSpotlight', 'droneConduit']); f.state.player.level = 10;
+    const target = f.addEnemy(1300, 1000, 50);
+    for (let i = 0; i < 3; i++) f.addDrone(target, 1000, 980 + i * 20);
+    f.advance(.7);
+    const hits = f.damage.filter(hit => hit.module === 'droneSpotlight');
+    expect(hits.map(hit => hit.amount).sort((a, b) => a - b)).toEqual([14, 14, 28]);
+    f.advance(1); expect(f.damage.filter(hit => hit.module === 'droneSpotlight')).toHaveLength(3);
+    expect(f.state.companions).toHaveLength(3);
+  });
   it('locks spotlight direction only at the end of charge and applies damage once', () => {
     const f = fixture(['droneSpotlight']); const target = f.addEnemy(1200); f.addDrone(target);
     f.advance(0.3); expect(f.damage).toHaveLength(0);
     target.x = target.prevX = 1000; target.y = target.prevY = 1200; f.advance(0.3);
-    expect(f.damage).toHaveLength(1); expect(f.damage[0].amount).toBe(6);
+    expect(f.damage).toHaveLength(1); expect(f.damage[0].amount).toBe(10);
   });
   it('uses only existing drones for the III / V relay and never adds companions', () => {
     for (const count of [1, 2, 3]) {
@@ -227,7 +237,7 @@ describe('remaining evolution combat contracts', () => {
   });
   it('stage spotlight hits three beam targets and a separate endpoint target once', () => {
     const f = fixture(['droneSpotlight']); f.evolve('stageSpotlight'); const target = f.addEnemy(1100);
-    f.addEnemy(1200); f.addEnemy(1300); const endpoint = f.addEnemy(1620); f.addDrone(target);
+    f.addEnemy(1200); f.addEnemy(1300); const endpoint = f.addEnemy(1680); f.addDrone(target);
     f.advance(0.8); expect(f.damage).toHaveLength(4); expect(f.damage.find(hit => hit.id === endpoint.id)?.amount).toBe(4);
   });
   it('static garden lets two note generations overlap but keeps the six-note cap', () => {

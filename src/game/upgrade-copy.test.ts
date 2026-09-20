@@ -60,7 +60,7 @@ describe('compact upgrade choice descriptions', () => {
     expect(summary('revive', 20)).toContain('已用不恢复');
     expect(summary('crescentMagazine', 20)).toContain('3枚弯月刃');
     expect(summary('piercing', 6)).toContain('基础伤害×1.12');
-    expect(summary('wingShots', 4)).toContain('伤害1.95');
+    expect(summary('wingShots', 4)).toContain('伤害3.9');
   });
 
   it('describes evolved replacement attacks using their resulting-rank damage', () => {
@@ -71,9 +71,9 @@ describe('compact upgrade choice descriptions', () => {
     expect(summary('dashEcho', 6, ['echoTrail'])).toContain('伤害18.82');
     const volley = summary('droneBurst', 3, ['triangleAssault']);
     expect(volley).toContain('累计8次基础命中');
-    expect(volley).toContain('总伤害18');
+    expect(volley).toContain('总伤害36');
     expect(volley).not.toContain('16.8');
-    expect(summary('droneBurst', 6, ['triangleAssault'])).toContain('总伤害20.16');
+    expect(summary('droneBurst', 6, ['triangleAssault'])).toContain('总伤害40.32');
   });
 
   it('keeps the evolved needle target cap and never claims evolved counter pulses cannot clear bullets', () => {

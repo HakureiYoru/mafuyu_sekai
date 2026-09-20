@@ -19,6 +19,9 @@ export const BALANCE = {
   limits: { enemies: 180, mines: 70, bullets: 4608, playerBullets: 1536, enemyBullets: 3072, playerReserve: 1536, pickupCells: 80 },
 } as const;
 export const ENEMIES: Record<EnemyType, { hp: number; speed: number; radius: number; color: number; label: string }> = {
+  stalker: { hp: 30, speed: 150, radius: 32, color: 0xffb487, label: '裂隙追猎' },
+  prismWarden: { hp: 40, speed: 80, radius: 40, color: 0xffc385, label: '折镜执灯' },
+  conductor: { hp: 34, speed: 95, radius: 36, color: 0xff9980, label: '噤声指挥' },
   basic: { hp: 6, speed: 115, radius: 30, color: 0xff6584, label: '空洞追击' },
   dasher: { hp: 14, speed: 155, radius: 36, color: 0xffcb69, label: '狂躁突进' },
   sniper: { hp: 18, speed: 60, radius: 36, color: 0xc99dff, label: '假面狙击' },

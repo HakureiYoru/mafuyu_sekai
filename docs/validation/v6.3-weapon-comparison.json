@@ -1,0 +1,221 @@
+{
+  "setup": "Identical seed 63001; rank III; 20 simulation seconds, stationary radius55 target at range300, held focus, 85/35 heat cycle; three companions only for drones/choir. Effective damage including misses/cooldowns; diagnostic target, not a full-run or human balance verdict.",
+  "reports": [
+    {
+      "version": "a6d2fc7",
+      "level": 4,
+      "kind": "main",
+      "damage": 572.3200001381338,
+      "dps": 28.616000006906688,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 4,
+      "kind": "wings",
+      "damage": 953.9200002960861,
+      "dps": 47.696000014804305,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 4,
+      "kind": "drones",
+      "damage": 841.6000000052154,
+      "dps": 42.08000000026077,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 4,
+      "kind": "choir",
+      "damage": 820,
+      "dps": 41,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 7,
+      "kind": "main",
+      "damage": 972.7200002353638,
+      "dps": 48.63600001176819,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 7,
+      "kind": "wings",
+      "damage": 1404.7200004141778,
+      "dps": 70.23600002070889,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 7,
+      "kind": "drones",
+      "damage": 1137.6000000052154,
+      "dps": 56.88000000026077,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 7,
+      "kind": "choir",
+      "damage": 1116,
+      "dps": 55.8,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 10,
+      "kind": "main",
+      "damage": 1876.0000004526228,
+      "dps": 93.80000002263114,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 10,
+      "kind": "wings",
+      "damage": 2376.400000659749,
+      "dps": 118.82000003298745,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 10,
+      "kind": "drones",
+      "damage": 1807.6000000052154,
+      "dps": 90.38000000026076,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "a6d2fc7",
+      "level": 10,
+      "kind": "choir",
+      "damage": 1786,
+      "dps": 89.3,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 4,
+      "kind": "main",
+      "damage": 641.6800001394004,
+      "dps": 32.084000006970015,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 4,
+      "kind": "wings",
+      "damage": 1977.2800002973527,
+      "dps": 98.86400001486763,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 4,
+      "kind": "drones",
+      "damage": 1370.5600000228733,
+      "dps": 68.52800000114367,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 4,
+      "kind": "choir",
+      "damage": 1451.2000000178814,
+      "dps": 72.56000000089406,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 7,
+      "kind": "main",
+      "damage": 1089.0000002197921,
+      "dps": 54.450000010989605,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 7,
+      "kind": "wings",
+      "damage": 3249.000000219792,
+      "dps": 162.4500000109896,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 7,
+      "kind": "drones",
+      "damage": 2021.5200000032783,
+      "dps": 101.07600000016392,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 7,
+      "kind": "choir",
+      "damage": 2132.4000000208616,
+      "dps": 106.62000000104308,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 10,
+      "kind": "main",
+      "damage": 2100.4000004362315,
+      "dps": 105.02000002181157,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 10,
+      "kind": "wings",
+      "damage": 5353.000000229105,
+      "dps": 267.6500000114553,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 10,
+      "kind": "drones",
+      "damage": 3046.4799999967217,
+      "dps": 152.32399999983608,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    },
+    {
+      "version": "v6.3",
+      "level": 10,
+      "kind": "choir",
+      "damage": 3187.5999999791384,
+      "dps": 159.37999999895692,
+      "heat": 62.50000000000088,
+      "elapsed": 20.000000000000146
+    }
+  ]
+}

@@ -49,7 +49,7 @@ export interface ThreatContext {
 }
 
 const PRESSURE = new Set<EnemyType>(['basic', 'dasher', 'returner', 'carrier']);
-const TACTICAL = new Set<EnemyType>(['sniper', 'sprayer', 'minelayer', 'shield', 'weaver', 'sampler', 'repairer']);
+const TACTICAL = new Set<EnemyType>(['sniper', 'sprayer', 'minelayer', 'shield', 'weaver', 'sampler', 'repairer', 'stalker', 'prismWarden', 'conductor']);
 export function isTacticalEnemy(type: EnemyType): boolean { return TACTICAL.has(type); }
 
 /** A conservative danger envelope, also suitable for rendering a pending commitment. */

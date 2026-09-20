@@ -13,8 +13,8 @@ export const CAMPAIGN_DURATION = 360;
 export const ENCOUNTERS = CAMPAIGN_STAGES.map(stage => stage.exitEncounter);
 export const ENEMY_INTRODUCTIONS: readonly { time: number; type: EnemyType }[] = [
   { time: 0, type: 'basic' }, { time: 20, type: 'dasher' }, { time: 35, type: 'returner' },
-  { time: 60, type: 'sniper' }, { time: 75, type: 'shield' }, { time: 110, type: 'carrier' },
-  { time: 150, type: 'minelayer' }, { time: 180, type: 'weaver' }, { time: 210, type: 'repairer' },
+  { time: 60, type: 'sniper' }, { time: 75, type: 'shield' }, { time: 100, type: 'stalker' }, { time: 110, type: 'carrier' },
+  { time: 125, type: 'prismWarden' }, { time: 150, type: 'minelayer' }, { time: 165, type: 'conductor' }, { time: 180, type: 'weaver' }, { time: 210, type: 'repairer' },
   { time: 240, type: 'sprayer' }, { time: 270, type: 'sampler' },
 ];
 export interface CampaignDefinition { id: string; duration: number; stages: readonly CampaignStage[]; finalEncounter: EncounterId }

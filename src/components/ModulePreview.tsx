@@ -19,7 +19,7 @@ export function ModulePreview({ id, rank, evolved = false, reducedMotion }: { id
     <g className="preview-target"><circle cx="199" cy="35" r="10" /><path d="M193 29l12 12m0-12-12 12" /></g>
     <g className="preview-action">
       {shape === 'needle' && <><path d="M58 35h146m-12-4 12 4-12 4" /><path className="preview-highlight" d={`M${110 - stage * 14} 35h${82 + stage * 14}`} />{Array.from({ length: stage + 1 }, (_, i) => <path key={i} d={`M${105 + i * 28} 23v24`} />)}</>}
-      {shape === 'wing' && <>{[-1, 1].map(side => <g key={side}><path d={`M46 ${35 + side * 13}h15l15 ${side * 5}h52`} /><path d={`M133 ${35 + side * 18}h36m9 0h9`} /></g>)}<path d="M61 35h98" /></>}
+      {shape === 'wing' && <>{[-1, 1].map(side => <g key={side}><path d={`M46 ${35 + side * 13}h15`} />{Array.from({ length: id === 'wingShots' ? stage : 1 }, (_, lane) => <path key={lane} className={lane === 0 ? 'preview-highlight' : undefined} d={`M65 ${35 + side * 13}L139 ${35 + side * (12 + lane * 8)}h48`} />)}</g>)}<path d="M61 35h98" /></>}
       {shape === 'focus' && <><path d="m56 18 78 17-78 17m78-17h57" /><circle cx="159" cy="35" r={9 + stage * 2} /><path className="preview-highlight" d="M154 35h41" /></>}
       {shape === 'shatter' && <><path d="M56 35h90" />{Array.from({ length: 6 }, (_, i) => <path key={i} transform={`rotate(${i * 60} 161 35)`} d="M167 35h16" />)}<circle cx="161" cy="35" r="4" /></>}
       {shape === 'chain' && <><path d="m58 35 60-14 44 31 35-17" /><circle cx="118" cy="21" r="4" /><circle cx="162" cy="52" r="4" /></>}

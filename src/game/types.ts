@@ -5,6 +5,7 @@ import type { KeyBindings } from './settings';
 import type { BossActionState } from './boss-actions';
 import type { EliteBrain } from './elite-ai';
 import type { ModuleVisual } from './module-combat';
+import type { AdvancedBrain } from './advanced-enemies';
 
 export type Difficulty = 'normal' | 'hard';
 export type SeasonId = 's1' | 's2';
@@ -25,7 +26,7 @@ export interface PlayerBuild {
   rewardWatermarks?: Partial<Record<UpgradeSource, number>>; rewardSequence?: number;
 }
 export interface ArenaRect { x: number; y: number; width: number; height: number }
-export type EnemyType = 'basic' | 'dasher' | 'sniper' | 'sprayer' | 'minelayer' | 'mine' | 'boss' | 'miniboss' | 'shield' | 'weaver' | 'returner' | 'sampler' | 'repairer' | 'carrier' | 'palisade' | 'reprise' | 'arm' | 'node' | 'core';
+export type EnemyType = 'basic' | 'dasher' | 'sniper' | 'sprayer' | 'minelayer' | 'mine' | 'boss' | 'miniboss' | 'shield' | 'weaver' | 'returner' | 'sampler' | 'repairer' | 'carrier' | 'palisade' | 'reprise' | 'arm' | 'node' | 'core' | 'stalker' | 'prismWarden' | 'conductor';
 export type EnemyRole = 'mob' | 'elite' | 'miniboss' | 'boss' | 'part' | 'hazard';
 export type PickupType = 'xp' | 'hp' | 'bomb' | 'supply' | 'coolant' | 'miniBomb' | 'blackHole' | 'support';
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'upgrade' | 'failed' | 'complete' | 'error';
@@ -65,6 +66,7 @@ export interface AreaHazard extends Vec2 {
   angle?: number; width?: number; length?: number; angularSpeed?: number;
 }
 export interface Enemy extends MovingBody {
+  advanced?: AdvancedBrain;
   weakpoint?: { x: number; y: number; radius: number; hp: number; maxHp: number }; shieldBrokenUntil?: number;
   id: number; type: EnemyType; hp: number; maxHp: number; speed: number; angle: number;
   state: 'chase' | 'charge' | 'dash' | 'recover' | 'aim' | 'laserWarmup' | 'laser' | 'arming' | 'lay' | 'volley' | 'phaseShift' | 'novaWarmup' | 'nova' | 'bombardWarmup' | 'bombard';
